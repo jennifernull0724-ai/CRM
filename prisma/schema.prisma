@@ -1,0 +1,236 @@
+// This is your Prisma schema file
+// Contractor CRM - Owner-First, Demo-Safe
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+// System State Management
+model SystemState {
+  id        String   @id @default("SINGLETON")
+  state     String   @default("OWNER_SETUP") // OWNER_SETUP or ENFORCED
+  updatedAt DateTime @updatedAt
+  updatedBy String?
+}
+
+// User Roles: USER, ADMIN, OWNER
+// OWNER = Root authority, never blocked
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String   // bcrypt hashed
+  firstName String?
+  lastName  String?
+  role      String   @default("USER") // USER, ADMIN, OWNER
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  ownedContacts     Contact[]         @relation("ContactOwner")
+  assignedTasks     Task[]            @relation("TaskAssignee")
+  createdTasks      Task[]            @relation("TaskCreator")
+  notes             Note[]
+  activities        Activity[]
+  estimates         Estimate[]
+  certifications    UserCertification[]
+  emailTemplates    EmailTemplate[]
+  notifications     Notification[]    @relation("NotificationRecipient")
+  sentNotifications Notification[]    @relation("NotificationSender")
+}
+
+// Contacts - The Anchor
+model Contact {
+  id           String    @id @default(uuid())
+  company      String
+  firstName    String
+  lastName     String
+  email        String?
+  phone        String?
+  title        String?
+  status       String    @default("ACTIVE") // ACTIVE, INACTIVE, ARCHIVED
+  ownerId      String
+  owner        User      @relation("ContactOwner", fields: [ownerId], references: [id])
+  lastActivity DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  // Relations
+  tasks      Task[]
+  notes      Note[]
+  activities Activity[]
+  estimates  Estimate[]
+
+  @@index([ownerId])
+  @@index([status])
+  @@index([lastActivity])
+}
+
+// Tasks - Contact-Anchored
+model Task {
+  id          String    @id @default(uuid())
+  contactId   String
+  contact     Contact   @relation(fields: [contactId], references: [id])
+  title       String
+  description String?
+  dueDate     DateTime?
+  completed   Boolean   @default(false)
+  completedAt DateTime?
+  assigneeId  String
+  assignee    User      @relation("TaskAssignee", fields: [assigneeId], references: [id])
+  createdById String
+  createdBy   User      @relation("TaskCreator", fields: [createdById], references: [id])
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([contactId])
+  @@index([assigneeId])
+  @@index([dueDate])
+  @@index([completed])
+}
+
+// Notes - Rich Text with @mentions
+model Note {
+  id        String   @id @default(uuid())
+  contactId String
+  contact   Contact  @relation(fields: [contactId], references: [id])
+  content   String   // Rich text/markdown
+  mentions  String?  // JSON array of user IDs
+  authorId  String
+  author    User     @relation(fields: [authorId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([contactId])
+  @@index([authorId])
+}
+
+// Activity - Immutable Truth (Append-Only)
+model Activity {
+  id         String   @id @default(uuid())
+  contactId  String
+  contact    Contact  @relation(fields: [contactId], references: [id])
+  type       String   // NOTE, TASK_CREATED, TASK_COMPLETED, EMAIL_SENT, EMAIL_RECEIVED, CALL, MEETING, SOCIAL, CUSTOM, ESTIMATE_CREATED, ESTIMATE_APPROVED, STATUS_CHANGED
+  title      String
+  description String?
+  metadata   String?  // JSON for additional data
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  createdAt  DateTime @default(now())
+
+  @@index([contactId])
+  @@index([type])
+  @@index([createdAt])
+  @@index([userId])
+}
+
+// Estimates - Revenue Engine
+model Estimate {
+  id          String          @id @default(uuid())
+  contactId   String
+  contact     Contact         @relation(fields: [contactId], references: [id])
+  version     Int             @default(1)
+  status      String          @default("DRAFT") // DRAFT, SUBMITTED, APPROVED
+  total       Float           @default(0)
+  ownerId     String
+  owner       User            @relation(fields: [ownerId], references: [id])
+  approvedAt  DateTime?
+  approvedBy  String?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  
+  // Relations
+  lineItems   EstimateLineItem[]
+
+  @@index([contactId])
+  @@index([status])
+  @@index([ownerId])
+}
+
+// Estimate Line Items with Presets
+model EstimateLineItem {
+  id          String   @id @default(uuid())
+  estimateId  String
+  estimate    Estimate @relation(fields: [estimateId], references: [id], onDelete: Cascade)
+  category    String   // LABOR, EQUIPMENT, MATERIALS, SERVICES, FEES, OTHER
+  preset      String?  // Preset name or custom label
+  description String
+  quantity    Float    @default(1)
+  unitPrice   Float    @default(0)
+  total       Float    @default(0)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([estimateId])
+}
+
+// Certifications - Owner-Defined Compliance
+model Certification {
+  id          String              @id @default(uuid())
+  name        String              @unique
+  category    String              // RAILROAD, CONSTRUCTION, ENVIRONMENTAL, GENERAL_SAFETY, INSURANCE, OTHER
+  description String?
+  isActive    Boolean             @default(true)
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  // Relations
+  userCertifications UserCertification[]
+}
+
+// User Certifications - Assignments and Expirations
+model UserCertification {
+  id               String        @id @default(uuid())
+  userId           String
+  user             User          @relation(fields: [userId], references: [id])
+  certificationId  String
+  certification    Certification @relation(fields: [certificationId], references: [id])
+  issueDate        DateTime?
+  expirationDate   DateTime?
+  documentUrl      String?
+  notes            String?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  @@unique([userId, certificationId])
+  @@index([userId])
+  @@index([certificationId])
+  @@index([expirationDate])
+}
+
+// Email Templates
+model EmailTemplate {
+  id        String   @id @default(uuid())
+  name      String
+  subject   String
+  body      String   // HTML content
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+}
+
+// Notifications
+model Notification {
+  id          String   @id @default(uuid())
+  type        String   // MENTION, TASK_ASSIGNED, TASK_DUE, etc.
+  title       String
+  message     String
+  isRead      Boolean  @default(false)
+  recipientId String
+  recipient   User     @relation("NotificationRecipient", fields: [recipientId], references: [id])
+  senderId    String?
+  sender      User?    @relation("NotificationSender", fields: [senderId], references: [id])
+  createdAt   DateTime @default(now())
+
+  @@index([recipientId])
+  @@index([isRead])
+}
