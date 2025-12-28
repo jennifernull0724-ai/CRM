@@ -1,65 +1,636 @@
+import type { ReactNode } from 'react'
 import Link from 'next/link'
-import { notFound } from 'next/navigation'
-import { prisma } from '@/lib/prisma'
+import { notFound, redirect } from 'next/navigation'
+import { getServerSession } from 'next-auth'
+import { formatDistanceToNow } from 'date-fns'
+import { authOptions } from '@/lib/auth'
+import { getContactWorkspace } from '@/lib/contacts/workspace'
+import {
+  completeContactTaskAction,
+  createContactNoteAction,
+  createContactTaskAction,
+  logContactCallAction,
+  logContactCustomActivityAction,
+  logContactMeetingAction,
+  logContactSocialAction,
+  updateContactTaskAction,
+} from '@/app/contacts/actions'
+import { NoteComposer } from '@/app/contacts/[contactId]/_components/note-composer'
+import { sanitizeNoteBody } from '@/lib/contacts/noteRichText'
 
 export const dynamic = 'force-dynamic'
 
-export default async function ContactDetailPage({
+const TIMELINE_FILTERS = [
+  { label: 'Contact', value: 'CONTACT_CREATED' },
+  { label: 'Task created', value: 'TASK_CREATED' },
+  { label: 'Task updated', value: 'TASK_UPDATED' },
+  { label: 'Task completed', value: 'TASK_COMPLETED' },
+  { label: 'Note', value: 'NOTE_ADDED' },
+  { label: 'Call', value: 'CALL_LOGGED' },
+  { label: 'Meeting', value: 'MEETING_LOGGED' },
+  { label: 'Social', value: 'SOCIAL_LOGGED' },
+  { label: 'Custom', value: 'CUSTOM_ACTIVITY_LOGGED' },
+  { label: 'Deal', value: 'DEAL_CREATED' },
+  { label: 'Estimate', value: 'ESTIMATE_CREATED' },
+  { label: 'Work Order', value: 'WORKORDER_CREATED_FROM_CONTACT' },
+]
+
+const VALID_TIMELINE_TYPES = new Set(TIMELINE_FILTERS.map((item) => item.value))
+
+type SearchParams = Record<string, string | string[] | undefined>
+
+function parseTimelineTypes(input: string | string[] | undefined) {
+  const values = Array.isArray(input) ? input : input ? [input] : []
+  return values.filter((value) => VALID_TIMELINE_TYPES.has(value))
+}
+
+function formatRelative(date: Date | string) {
+  return formatDistanceToNow(new Date(date), { addSuffix: true })
+}
+
+function parseMentionIds(raw: string | null) {
+  if (!raw) return [] as string[]
+  try {
+    const parsed = JSON.parse(raw)
+    return Array.isArray(parsed) ? parsed : []
+  } catch (error) {
+    return []
+  }
+}
+
+export default async function ContactWorkspacePage({
   params,
+  searchParams,
 }: {
   params: { contactId: string }
+  searchParams: SearchParams
 }) {
-  const contact = await prisma.contact.findUnique({
-    where: { id: params.contactId },
-    include: {
-      company: true,
-      owner: true,
-      deals: {
-        orderBy: { createdAt: 'desc' },
-        take: 5,
-      },
-      tasks: {
-        where: { completed: false },
-        orderBy: { dueDate: 'asc' },
-      },
-      notes: {
-        orderBy: { createdAt: 'desc' },
-        take: 5,
-        include: {
-          createdBy: true,
-        },
-      },
-      activities: {
-        orderBy: { createdAt: 'desc' },
-        take: 10,
-        include: {
-          user: true,
-        },
-      },
-    },
+  const session = await getServerSession(authOptions)
+  if (!session?.user?.companyId) {
+    redirect(`/login?from=/contacts/${params.contactId}`)
+  }
+
+  const timelineTypes = parseTimelineTypes(searchParams.timelineType)
+
+  const workspace = await getContactWorkspace(params.contactId, session.user.companyId, {
+    types: timelineTypes,
+    limit: 80,
   })
 
-  if (!contact) {
+  if (!workspace) {
     notFound()
   }
 
-  const overdueTasks = contact.tasks.filter(
-    (task) => task.dueDate && task.dueDate < new Date()
-  )
+  const contact = workspace.contact
+  const contactName = `${contact.firstName} ${contact.lastName}`
+  const companyLabel = contact.companyOverrideName || contact.derivedCompanyName || 'Unlabeled company'
+
+  const openTasks = workspace.tasks.filter((task) => !task.completed)
+  const completedTasks = workspace.tasks.filter((task) => task.completed).slice(0, 5)
+  const overdueTasks = openTasks.filter((task) => task.dueDate && task.dueDate < new Date()).length
+
+  const mentionLookup = new Map(workspace.workspaceUsers.map((user) => [user.id, user]))
+
+  const createTask = createContactTaskAction.bind(null, contact.id)
+  const noteAction = createContactNoteAction.bind(null, contact.id)
+  const logCall = logContactCallAction.bind(null, contact.id)
+  const logMeeting = logContactMeetingAction.bind(null, contact.id)
+  const logSocial = logContactSocialAction.bind(null, contact.id)
+  const logCustom = logContactCustomActivityAction.bind(null, contact.id)
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Header */}
-        <div className="bg-white rounded-lg shadow p-6 mb-6">
-          <div className="flex justify-between items-start">
+    <div className="min-h-screen bg-slate-950 text-slate-50">
+      <div className="mx-auto max-w-7xl px-4 py-10">
+        <section className="rounded-3xl border border-slate-800 bg-gradient-to-br from-slate-900 via-slate-900 to-slate-950 p-8">
+          <div className="flex flex-col gap-6 lg:flex-row lg:justify-between">
+            <div className="space-y-3">
+              <p className="text-xs uppercase tracking-[0.5em] text-slate-500">Contact Command Center</p>
+              <h1 className="text-4xl font-semibold text-white">{contactName}</h1>
+              <p className="text-base text-slate-300">{companyLabel}</p>
+              <div className="flex flex-wrap gap-4 text-sm text-slate-400">
+                {contact.email && (
+                  <a href={`mailto:${contact.email}`} className="hover:text-emerald-300">
+                    {contact.email}
+                  </a>
+                )}
+                {contact.phone && (
+                  <a href={`tel:${contact.phone}`} className="hover:text-emerald-300">
+                    {contact.phone}
+                  </a>
+                )}
+                <span>Owner · {contact.owner?.name ?? 'Unassigned'}</span>
+                <span>State · {contact.activityState}</span>
+                <span>Last activity · {formatRelative(contact.lastActivityAt)}</span>
+              </div>
+            </div>
+            <div className="grid w-full max-w-md grid-cols-3 gap-4 rounded-2xl border border-slate-800 bg-slate-950/60 p-4 text-center text-sm">
+              <Metric label="Open tasks" value={openTasks.length} helper={overdueTasks ? `${overdueTasks} overdue` : 'On track'} tone="emerald" />
+              <Metric label="Notes" value={workspace.notes.length} helper="Last 25" tone="amber" />
+              <Metric label="Deals" value={workspace.deals.length} helper="Linked" tone="violet" />
+            </div>
+          </div>
+        </section>
+
+        <div className="mt-10 grid gap-6 lg:grid-cols-[2fr,1fr]">
+          <div className="space-y-6">
+            <TasksPanel
+              tasks={openTasks}
+              completedTasks={completedTasks}
+              overdueTasks={overdueTasks}
+              users={workspace.workspaceUsers}
+              createAction={createTask}
+              updateAction={(taskId) => updateContactTaskAction.bind(null, contact.id, taskId)}
+              completeAction={(taskId) => completeContactTaskAction.bind(null, contact.id, taskId)}
+            />
+
+            <section className="rounded-3xl border border-slate-800 bg-slate-900/70 p-5">
+              <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <p className="text-xs uppercase tracking-[0.4em] text-slate-500">Notes & Mentions</p>
+                  <h2 className="text-2xl font-semibold text-white">Threaded intelligence</h2>
+                </div>
+                <p className="text-xs text-slate-400">Rich text · immutable history</p>
+              </div>
+              <div className="mt-6 grid gap-8 lg:grid-cols-[1.1fr,1fr]">
+                <NoteComposer action={noteAction} mentionableUsers={workspace.workspaceUsers} />
+                <div className="space-y-4">
+                  {workspace.notes.length === 0 ? (
+                    <p className="rounded-2xl border border-dashed border-slate-700 p-6 text-sm text-slate-500">
+                      No notes recorded yet.
+                    </p>
+                  ) : (
+                    workspace.notes.map((note) => {
+                      const mentionIds = parseMentionIds(note.mentions)
+                      const mentionedUsers = mentionIds
+                        .map((id) => mentionLookup.get(id))
+                        .filter(Boolean)
+
+                      return (
+                        <article key={note.id} className="rounded-2xl border border-slate-800 bg-slate-950/40 p-4">
+                          <div
+                            className="prose prose-invert max-w-none text-sm"
+                            dangerouslySetInnerHTML={{ __html: sanitizeNoteBody(note.content) }}
+                          />
+                          <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-slate-500">
+                            <span>{note.createdBy?.name ?? 'Unknown actor'}</span>
+                            <span>·</span>
+                            <span>{formatRelative(note.createdAt)}</span>
+                            {mentionedUsers.length > 0 && (
+                              <span className="inline-flex flex-wrap gap-2">
+                                {mentionedUsers.map((user) => (
+                                  <span key={user!.id} className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-emerald-200">
+                                    @{user!.name}
+                                  </span>
+                                ))}
+                              </span>
+                            )}
+                          </div>
+                        </article>
+                      )
+                    })
+                  )}
+                </div>
+              </div>
+            </section>
+
+            <ManualActivityPanel
+              logCall={logCall}
+              logMeeting={logMeeting}
+              logSocial={logSocial}
+              logCustom={logCustom}
+            />
+
+            <TimelinePanel
+              contactId={contact.id}
+              timeline={workspace.timeline}
+              timelineTypes={timelineTypes}
+            />
+          </div>
+
+          <div className="space-y-6">
+            <EmailShell integration={workspace.emailIntegration} contactId={contact.id} />
+            <RelatedObjectsPanel
+              deals={workspace.deals}
+              estimates={workspace.estimates}
+              workOrders={workspace.workOrders}
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function Metric({
+  label,
+  value,
+  helper,
+  tone,
+}: {
+  label: string
+  value: number
+  helper: string
+  tone: 'emerald' | 'amber' | 'violet'
+}) {
+  const toneClass =
+    tone === 'emerald'
+      ? 'text-emerald-300'
+      : tone === 'amber'
+        ? 'text-amber-300'
+        : 'text-indigo-300'
+  return (
+    <div className="rounded-2xl border border-slate-800 bg-slate-900/40 px-3 py-4">
+      <p className="text-xs uppercase tracking-[0.4em] text-slate-500">{label}</p>
+      <p className={`text-3xl font-semibold ${toneClass}`}>{value}</p>
+      <p className="text-xs text-slate-500">{helper}</p>
+    </div>
+  )
+}
+
+type ActionState = import('@/app/contacts/actions').ActionState
+
+type TaskPanelProps = {
+  tasks: Array<{
+    id: string
+    title: string
+    dueDate: Date | null
+    priority: string
+    notes: string | null
+    assignedTo?: { id: string; name: string; email: string | null }
+    createdAt: Date
+  }>
+  completedTasks: TaskPanelProps['tasks']
+  overdueTasks: number
+  users: Array<{ id: string; name: string }>
+  createAction: (stateOrFormData: ActionState | FormData, formData?: FormData) => Promise<ActionState>
+  updateAction: (
+    taskId: string
+  ) => (stateOrFormData: ActionState | FormData, formData?: FormData) => Promise<ActionState>
+  completeAction: (
+    taskId: string
+  ) => (stateOrFormData: ActionState | FormData, formData?: FormData) => Promise<ActionState>
+}
+
+function TasksPanel({ tasks, completedTasks, overdueTasks, users, createAction, updateAction, completeAction }: TaskPanelProps) {
+  return (
+    <section className="rounded-3xl border border-slate-800 bg-slate-900/80 p-5">
+      <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+        <div>
+          <p className="text-xs uppercase tracking-[0.4em] text-slate-500">Tasks</p>
+          <h2 className="text-2xl font-semibold text-white">Execution queue</h2>
+        </div>
+        <div className="text-xs text-rose-300">{overdueTasks} overdue</div>
+      </div>
+      <div className="mt-6 grid gap-6 lg:grid-cols-[1.1fr,1fr]">
+        <form action={createAction} className="space-y-3 rounded-2xl border border-slate-800 bg-slate-950/40 p-4">
+          <p className="text-xs uppercase tracking-[0.4em] text-slate-500">Create task</p>
+          <input name="title" placeholder="Task title" className="w-full rounded-2xl border border-slate-800 bg-slate-900/70 px-3 py-2 text-sm text-slate-100" required />
+          <div className="grid gap-3 md:grid-cols-2">
+            <label className="text-xs text-slate-400">
+              Due date
+              <input type="date" name="dueDate" className="mt-1 w-full rounded-2xl border border-slate-800 bg-slate-900/70 px-3 py-2 text-sm text-slate-100" />
+            </label>
+            <label className="text-xs text-slate-400">
+              Priority
+              <select name="priority" className="mt-1 w-full rounded-2xl border border-slate-800 bg-slate-900/70 px-3 py-2 text-sm text-slate-100">
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+                <option value="low">Low</option>
+              </select>
+            </label>
+          </div>
+          <label className="text-xs text-slate-400">
+            Assign owner
+            <select name="ownerId" className="mt-1 w-full rounded-2xl border border-slate-800 bg-slate-900/70 px-3 py-2 text-sm text-slate-100">
+              <option value="">Me</option>
+              {users.map((user) => (
+                <option key={user.id} value={user.id}>
+                  {user.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <textarea
+            name="notes"
+            placeholder="Internal notes"
+            className="h-24 w-full rounded-2xl border border-slate-800 bg-slate-900/70 px-3 py-2 text-sm text-slate-100"
+          />
+          <button type="submit" className="w-full rounded-2xl bg-emerald-400 px-4 py-3 text-sm font-semibold text-slate-900">
+            Save task
+          </button>
+        </form>
+        <div className="space-y-3">
+          {tasks.length === 0 ? (
+            <p className="rounded-2xl border border-dashed border-slate-800 p-4 text-sm text-slate-500">No open tasks.</p>
+          ) : (
+            tasks.map((task) => (
+              <article key={task.id} className="rounded-2xl border border-slate-800 bg-slate-950/50 p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-base font-semibold text-white">{task.title}</p>
+                    <p className="text-xs text-slate-500">
+                      Due {task.dueDate ? formatRelative(task.dueDate) : 'No due date'} · {task.priority}
+                    </p>
+                  </div>
+                  <form action={completeAction(task.id)}>
+                    <button className="rounded-full border border-emerald-300/50 px-3 py-1 text-xs text-emerald-200 hover:bg-emerald-400/10">
+                      Mark complete
+                    </button>
+                  </form>
+                </div>
+                {task.notes && <p className="mt-2 text-sm text-slate-400">{task.notes}</p>}
+                <details className="mt-3 rounded-2xl border border-slate-800">
+                  <summary className="cursor-pointer px-3 py-2 text-xs text-slate-400">Edit task</summary>
+                  <form action={updateAction(task.id)} className="space-y-2 px-3 py-2 text-sm">
+                    <input name="title" defaultValue={task.title} className="w-full rounded-2xl border border-slate-800 bg-slate-900/70 px-2 py-1" />
+                    <div className="grid gap-2 md:grid-cols-2">
+                      <input type="date" name="dueDate" defaultValue={task.dueDate ? new Date(task.dueDate).toISOString().slice(0, 10) : ''} className="rounded-2xl border border-slate-800 bg-slate-900/70 px-2 py-1" />
+                      <select name="priority" defaultValue={task.priority} className="rounded-2xl border border-slate-800 bg-slate-900/70 px-2 py-1">
+                        <option value="high">High</option>
+                        <option value="medium">Medium</option>
+                        <option value="low">Low</option>
+                      </select>
+                    </div>
+                    <select name="ownerId" defaultValue={task.assignedTo?.id ?? ''} className="w-full rounded-2xl border border-slate-800 bg-slate-900/70 px-2 py-1">
+                      <option value="">Keep current owner</option>
+                      {users.map((user) => (
+                        <option key={user.id} value={user.id}>
+                          {user.name}
+                        </option>
+                      ))}
+                    </select>
+                    <textarea name="notes" defaultValue={task.notes ?? ''} className="w-full rounded-2xl border border-slate-800 bg-slate-900/70 px-2 py-1" />
+                    <button className="w-full rounded-2xl bg-slate-800/70 px-3 py-2 text-xs uppercase tracking-wide text-slate-200">
+                      Update task
+                    </button>
+                  </form>
+                </details>
+              </article>
+            ))
+          )}
+          {completedTasks.length > 0 && (
+            <div className="rounded-2xl border border-slate-800 bg-slate-950/40 p-3 text-xs text-slate-400">
+              <p className="mb-2 font-semibold text-slate-200">Recently completed</p>
+              <ul className="space-y-1">
+                {completedTasks.map((task) => (
+                  <li key={task.id}>{task.title}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      </div>
+    </section>
+  )
+}
+
+function ManualActivityPanel({
+  logCall,
+  logMeeting,
+  logSocial,
+  logCustom,
+}: {
+  logCall: (stateOrFormData: ActionState | FormData, formData?: FormData) => Promise<ActionState>
+  logMeeting: (stateOrFormData: ActionState | FormData, formData?: FormData) => Promise<ActionState>
+  logSocial: (stateOrFormData: ActionState | FormData, formData?: FormData) => Promise<ActionState>
+  logCustom: (stateOrFormData: ActionState | FormData, formData?: FormData) => Promise<ActionState>
+}) {
+  return (
+    <section className="rounded-3xl border border-slate-800 bg-slate-900/80 p-5">
+      <p className="text-xs uppercase tracking-[0.4em] text-slate-500">Manual activities</p>
+      <h2 className="text-2xl font-semibold text-white">Log the touch</h2>
+      <div className="mt-6 grid gap-4 lg:grid-cols-2">
+        <form action={logCall} className="space-y-2 rounded-2xl border border-slate-800 bg-slate-950/50 p-4 text-sm">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Call</p>
+          <div className="grid gap-2 md:grid-cols-2">
+            <select name="direction" className="rounded-2xl border border-slate-800 bg-slate-900/70 px-2 py-1">
+              <option value="INBOUND">Inbound</option>
+              <option value="OUTBOUND">Outbound</option>
+            </select>
+            <input type="number" name="duration" min={0} placeholder="Duration (min)" className="rounded-2xl border border-slate-800 bg-slate-900/70 px-2 py-1" />
+          </div>
+          <input name="result" placeholder="Outcome" className="rounded-2xl border border-slate-800 bg-slate-900/70 px-2 py-1" required />
+          <input type="datetime-local" name="happenedAt" className="rounded-2xl border border-slate-800 bg-slate-900/70 px-2 py-1" />
+          <textarea name="notes" placeholder="Notes" className="h-16 rounded-2xl border border-slate-800 bg-slate-900/70 px-2 py-1" />
+          <button className="w-full rounded-2xl bg-slate-800/80 px-3 py-2 text-xs uppercase tracking-wide text-slate-200">Log call</button>
+        </form>
+
+        <form action={logMeeting} className="space-y-2 rounded-2xl border border-slate-800 bg-slate-950/50 p-4 text-sm">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Meeting</p>
+          <select name="meetingType" className="rounded-2xl border border-slate-800 bg-slate-900/70 px-2 py-1">
+            <option value="DISCOVERY">Discovery</option>
+            <option value="REVIEW">Review</option>
+            <option value="SITE_VISIT">Site visit</option>
+            <option value="OTHER">Other</option>
+          </select>
+          <input type="datetime-local" name="scheduledFor" className="rounded-2xl border border-slate-800 bg-slate-900/70 px-2 py-1" />
+          <input type="number" name="duration" min={0} placeholder="Duration (min)" className="rounded-2xl border border-slate-800 bg-slate-900/70 px-2 py-1" />
+          <input name="attendees" placeholder="Attendees (comma separated)" className="rounded-2xl border border-slate-800 bg-slate-900/70 px-2 py-1" />
+          <input name="outcome" placeholder="Outcome" className="rounded-2xl border border-slate-800 bg-slate-900/70 px-2 py-1" />
+          <textarea name="notes" placeholder="Notes" className="h-16 rounded-2xl border border-slate-800 bg-slate-900/70 px-2 py-1" />
+          <button className="w-full rounded-2xl bg-slate-800/80 px-3 py-2 text-xs uppercase tracking-wide text-slate-200">Log meeting</button>
+        </form>
+
+        <form action={logSocial} className="space-y-2 rounded-2xl border border-slate-800 bg-slate-950/50 p-4 text-sm">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Social touch</p>
+          <select name="platform" className="rounded-2xl border border-slate-800 bg-slate-900/70 px-2 py-1">
+            <option value="LINKEDIN">LinkedIn</option>
+            <option value="X">X</option>
+            <option value="INSTAGRAM">Instagram</option>
+            <option value="FIELD">Field</option>
+            <option value="OTHER">Other</option>
+          </select>
+          <input name="action" placeholder="Action" className="rounded-2xl border border-slate-800 bg-slate-900/70 px-2 py-1" required />
+          <input type="datetime-local" name="occurredAt" className="rounded-2xl border border-slate-800 bg-slate-900/70 px-2 py-1" />
+          <textarea name="notes" placeholder="Notes" className="h-16 rounded-2xl border border-slate-800 bg-slate-900/70 px-2 py-1" />
+          <button className="w-full rounded-2xl bg-slate-800/80 px-3 py-2 text-xs uppercase tracking-wide text-slate-200">Log touch</button>
+        </form>
+
+        <form action={logCustom} className="space-y-2 rounded-2xl border border-slate-800 bg-slate-950/50 p-4 text-sm">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Custom</p>
+          <input name="description" placeholder="Description" className="rounded-2xl border border-slate-800 bg-slate-900/70 px-2 py-1" required />
+          <input type="datetime-local" name="occurredAt" className="rounded-2xl border border-slate-800 bg-slate-900/70 px-2 py-1" />
+          <textarea name="notes" placeholder="Notes" className="h-24 rounded-2xl border border-slate-800 bg-slate-900/70 px-2 py-1" />
+          <button className="w-full rounded-2xl bg-slate-800/80 px-3 py-2 text-xs uppercase tracking-wide text-slate-200">Log custom activity</button>
+        </form>
+      </div>
+    </section>
+  )
+}
+
+function TimelinePanel({
+  contactId,
+  timeline,
+  timelineTypes,
+}: {
+  contactId: string
+  timeline: Array<{
+    id: string
+    type: string
+    subject: string
+    description: string | null
+    createdAt: Date
+    user?: { name: string | null } | null
+  }>
+  timelineTypes: string[]
+}) {
+  return (
+    <section className="rounded-3xl border border-slate-800 bg-slate-900/80 p-5">
+      <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+        <div>
+          <p className="text-xs uppercase tracking-[0.4em] text-slate-500">Activity timeline</p>
+          <h2 className="text-2xl font-semibold text-white">Immutable truth</h2>
+        </div>
+        <p className="text-xs text-slate-500">Server-side filters</p>
+      </div>
+      <form className="mt-4 space-y-3 rounded-2xl border border-slate-800 bg-slate-950/50 p-4 text-sm" method="GET">
+        <div className="grid gap-2 md:grid-cols-3">
+          {TIMELINE_FILTERS.map((filter) => (
+            <label key={filter.value} className="flex items-center gap-2 rounded-2xl border border-slate-800 bg-slate-900/60 px-3 py-2">
+              <input type="checkbox" name="timelineType" value={filter.value} defaultChecked={timelineTypes.includes(filter.value)} className="h-4 w-4 rounded border-slate-500 text-emerald-400" />
+              <span className="text-xs text-slate-200">{filter.label}</span>
+            </label>
+          ))}
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <button type="submit" className="rounded-2xl bg-emerald-400 px-4 py-2 text-xs font-semibold text-slate-900">
+            Apply filters
+          </button>
+          <Link href={`/contacts/${contactId}`} className="rounded-2xl border border-slate-700 px-4 py-2 text-xs text-slate-200">
+            Reset
+          </Link>
+        </div>
+      </form>
+      <div className="mt-6 space-y-4">
+        {timeline.length === 0 ? (
+          <p className="rounded-2xl border border-dashed border-slate-800 p-4 text-sm text-slate-500">No activity recorded for the selected filters.</p>
+        ) : (
+          timeline.map((activity) => (
+            <div key={activity.id} className="flex items-start gap-3">
+              <div className="h-3 w-3 rounded-full bg-emerald-400" />
+              <div className="flex-1 rounded-2xl border border-slate-800 bg-slate-950/40 p-4">
+                <div className="flex flex-wrap items-center gap-2 text-xs text-slate-400">
+                  <span className="rounded-full bg-slate-900/80 px-2 py-0.5 text-[10px] uppercase tracking-wide text-slate-300">{activity.type}</span>
+                  <span>·</span>
+                  <span>{formatRelative(activity.createdAt)}</span>
+                  {activity.user?.name && (
+                    <>
+                      <span>·</span>
+                      <span>{activity.user.name}</span>
+                    </>
+                  )}
+                </div>
+                <p className="mt-2 text-base font-medium text-white">{activity.subject}</p>
+                {activity.description && <p className="text-sm text-slate-400">{activity.description}</p>}
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+    </section>
+  )
+}
+
+function EmailShell({
+  integration,
+  contactId,
+}: {
+  integration: { provider: string; status: string } | null
+  contactId: string
+}) {
+  return (
+    <section className="rounded-3xl border border-slate-800 bg-slate-900/80 p-5">
+      <p className="text-xs uppercase tracking-[0.4em] text-slate-500">Email</p>
+      <h2 className="text-2xl font-semibold text-white">Workspace inbox</h2>
+      {integration ? (
+        <div className="mt-4 space-y-3 text-sm text-slate-300">
+          <p>Provider connected: {integration.provider}</p>
+          <p>Status: {integration.status}</p>
+          <Link href={`/contacts/${contactId}/email`} className="inline-flex items-center justify-center rounded-2xl bg-emerald-400 px-4 py-2 text-xs font-semibold text-slate-900">
+            Launch composer
+          </Link>
+        </div>
+      ) : (
+        <div className="mt-4 space-y-3 text-sm text-slate-400">
+          <p>Email composer unlocks once Gmail/Outlook is connected.</p>
+          <Link href="/settings/profile" className="inline-flex items-center justify-center rounded-2xl border border-slate-700 px-4 py-2 text-xs font-semibold text-slate-200">
+            Connect provider
+          </Link>
+        </div>
+      )}
+    </section>
+  )
+}
+
+function RelatedObjectsPanel({
+  deals,
+  estimates,
+  workOrders,
+}: {
+  deals: Array<{ id: string; name: string; stage: string; value: number | null }>
+  estimates: Array<{ id: string; quoteNumber: string; status: string }>
+  workOrders: Array<{ id: string; title: string; status: string }>
+}) {
+  return (
+    <section className="space-y-4">
+      <RelatedCard
+        title="Deals"
+        empty="No deals yet"
+        items={deals.map((deal) => (
+          <Link key={deal.id} href={`/deals/${deal.id}`} className="flex items-center justify-between rounded-2xl border border-slate-800 bg-slate-950/40 px-4 py-3 text-sm text-slate-200">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">
-                {contact.firstName} {contact.lastName}
-              </h1>
-              {contact.title && (
-                <p className="text-lg text-gray-600 mb-1">{contact.title}</p>
-              )}
+              <p className="font-semibold text-white">{deal.name}</p>
+              <p className="text-xs text-slate-500">Stage · {deal.stage}</p>
+            </div>
+            {deal.value && <p className="text-sm text-slate-300">${deal.value.toLocaleString()}</p>}
+          </Link>
+        ))}
+      />
+
+      <RelatedCard
+        title="Estimates"
+        empty="No estimates"
+        items={estimates.map((estimate) => (
+          <div key={estimate.id} className="rounded-2xl border border-slate-800 bg-slate-950/40 px-4 py-3 text-sm text-slate-200">
+            <p className="font-semibold text-white">Quote #{estimate.quoteNumber}</p>
+            <p className="text-xs text-slate-500">Status · {estimate.status}</p>
+          </div>
+        ))}
+      />
+
+      <RelatedCard
+        title="Work Orders"
+        empty="No work orders"
+        items={workOrders.map((order) => (
+          <div key={order.id} className="rounded-2xl border border-slate-800 bg-slate-950/40 px-4 py-3 text-sm text-slate-200">
+            <p className="font-semibold text-white">{order.title}</p>
+            <p className="text-xs text-slate-500">Status · {order.status}</p>
+          </div>
+        ))}
+      />
+    </section>
+  )
+}
+
+function RelatedCard({
+  title,
+  empty,
+  items,
+}: {
+  title: string
+  empty: string
+  items: ReactNode[]
+}) {
+  return (
+    <section className="rounded-3xl border border-slate-800 bg-slate-900/80 p-5">
+      <p className="text-xs uppercase tracking-[0.4em] text-slate-500">{title}</p>
+      <div className="mt-3 space-y-3">
+        {items.length > 0 ? items : <p className="text-sm text-slate-500">{empty}</p>}
+      </div>
+    </section>
+  )
+}
+import Link from 'next/link'
               {contact.company && (
                 <p className="text-lg text-gray-600 mb-2">{contact.company.name}</p>
               )}

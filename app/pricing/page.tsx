@@ -1,5 +1,10 @@
 import Link from 'next/link'
-import { PLAN_TIERS, getTotalSeats } from '@/lib/billing/planTiers'
+import {
+  PLAN_TIERS,
+  FEATURE_LABELS,
+  RESTRICTION_LABELS,
+  getTotalSeats,
+} from '@/lib/billing/planTiers'
 
 export default function PricingPage() {
   const plans = [
@@ -39,10 +44,10 @@ export default function PricingPage() {
       {/* Hero */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 text-center">
         <h1 className="text-4xl font-bold text-white mb-4">
-          Pricing Built for Regulated Operations
+          Pricing with zero feature drift
         </h1>
         <p className="text-xl text-gray-400 mb-8">
-          Choose the plan that fits your team size and compliance needs
+          One canonical pricing table powers the product, checkout, and enforcement.
         </p>
       </div>
 
@@ -72,17 +77,22 @@ export default function PricingPage() {
                   {plan.priceLabel}
                 </div>
                 <div className="text-sm text-gray-400">
-                  Up to {getTotalSeats(plan.seatLimits)} users
+                  {(() => {
+                    const totalSeats = getTotalSeats(plan.seatLimits)
+                    return Number.isFinite(totalSeats)
+                      ? `${totalSeats} total seats`
+                      : 'Unlimited seats'
+                  })()}
                 </div>
               </div>
 
               <div className="mb-6">
                 <div className="text-sm font-medium text-gray-300 mb-3">Features</div>
                 <ul className="space-y-2">
-                  {plan.features.map((feature, idx) => (
+                  {plan.features.map((feature) => (
                     <li key={idx} className="flex items-start gap-2 text-sm text-gray-400">
                       <span className="text-green-500 mt-0.5">✓</span>
-                      <span>{feature}</span>
+                      <span>{FEATURE_LABELS[feature]}</span>
                     </li>
                   ))}
                 </ul>
@@ -92,10 +102,10 @@ export default function PricingPage() {
                 <div className="mb-6">
                   <div className="text-sm font-medium text-gray-300 mb-3">Restrictions</div>
                   <ul className="space-y-2">
-                    {plan.restrictions.map((restriction, idx) => (
-                      <li key={idx} className="flex items-start gap-2 text-sm text-gray-500">
+                    {plan.restrictions.map((restriction) => (
+                      <li key={restriction} className="flex items-start gap-2 text-sm text-gray-500">
                         <span className="mt-0.5">•</span>
-                        <span>{restriction}</span>
+                        <span>{RESTRICTION_LABELS[restriction]}</span>
                       </li>
                     ))}
                   </ul>
@@ -108,28 +118,21 @@ export default function PricingPage() {
                     href="/signup"
                     className="block w-full bg-gray-700 text-white py-3 px-4 rounded-lg text-center font-medium hover:bg-gray-600 transition-colors"
                   >
-                    Start 14-day trial
+                    Start 14-day controlled access
                   </Link>
-                ) : plan.key === 'enterprise' ? (
-                  <a
-                    href={`mailto:${process.env.NEXT_PUBLIC_SUPPORT_EMAIL || 'jennnull4@gmail.com'}?subject=Enterprise Plan Inquiry`}
-                    className="block w-full bg-blue-600 text-white py-3 px-4 rounded-lg text-center font-medium hover:bg-blue-700 transition-colors"
-                  >
-                    Contact sales
-                  </a>
                 ) : (
                   <Link
-                    href="/signup"
+                    href={`/upgrade?plan=${plan.key}`}
                     className="block w-full bg-blue-600 text-white py-3 px-4 rounded-lg text-center font-medium hover:bg-blue-700 transition-colors"
                   >
-                    Get started
+                    Launch secure checkout
                   </Link>
                 )}
               </div>
 
               <div className="mt-4 text-center">
                 <div className="text-xs text-gray-500">
-                  {plan.stripeEligible ? 'Requires payment' : 'No credit card'}
+                  {plan.stripeEligible ? 'Stripe subscription • promo codes enabled' : 'No credit card required'}
                 </div>
               </div>
             </div>
@@ -163,7 +166,7 @@ export default function PricingPage() {
 
             <div>
               <h3 className="text-lg font-medium text-white mb-2">
-                What's included in compliance module?
+                What&apos;s included in compliance module?
               </h3>
               <p className="text-gray-400">
                 Employee management, certification tracking, QR code verification, document storage, and audit-ready activity logs. Available on Pro and Enterprise plans only.
@@ -175,7 +178,7 @@ export default function PricingPage() {
                 Is there a setup fee?
               </h3>
               <p className="text-gray-400">
-                No setup fees. You only pay the monthly subscription price.
+                No setup fees. Paid plans are annual subscriptions billed through Stripe Checkout with promotion codes enabled.
               </p>
             </div>
           </div>

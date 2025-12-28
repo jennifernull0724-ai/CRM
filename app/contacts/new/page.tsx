@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
 
@@ -9,6 +10,7 @@ export default async function NewContactPage() {
   })
 
   const companies = await prisma.company.findMany({
+    where: { kind: 'client' },
     select: { id: true, name: true },
     orderBy: { name: 'asc' },
   })
@@ -184,12 +186,12 @@ export default async function NewContactPage() {
               >
                 Create Contact
               </button>
-              <a
+              <Link
                 href="/contacts"
                 className="bg-gray-200 text-gray-700 px-6 py-2 rounded-lg hover:bg-gray-300 font-medium"
               >
                 Cancel
-              </a>
+              </Link>
             </div>
           </div>
         </form>

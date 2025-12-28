@@ -30,7 +30,7 @@ export async function GET(req: NextRequest) {
     const assignedToId = searchParams.get('assignedToId') || ''
     const contactId = searchParams.get('contactId') || ''
 
-    const where: any = {
+    const where: Record<string, unknown> = {
       ...(stage && { stage }),
       ...(assignedToId && { assignedToId }),
       ...(contactId && { contactId }),

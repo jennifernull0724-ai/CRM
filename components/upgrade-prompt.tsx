@@ -1,20 +1,28 @@
 'use client'
 
 import Link from 'next/link'
-import { getUpgradeMessage, type PlanKey } from '@/lib/billing/planTiers'
+import {
+  describeFeature,
+  getUpgradeMessage,
+  planAllowsFeature,
+  type PlanFeatureKey,
+  type PlanKey,
+} from '@/lib/billing/planTiers'
 
 interface UpgradePromptProps {
   currentPlan: PlanKey
-  feature: string
+  feature: PlanFeatureKey
   message?: string
 }
 
 export function UpgradePrompt({ currentPlan, feature, message }: UpgradePromptProps) {
   const upgradeMessage = message || getUpgradeMessage(currentPlan, feature)
+  const featureLabel = describeFeature(feature)
   
   return (
     <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 text-center">
       <div className="text-yellow-800 font-medium mb-2">🔒 Feature Locked</div>
+      <div className="text-sm uppercase tracking-wide text-yellow-600 mb-1">{featureLabel}</div>
       <p className="text-gray-700 mb-4">{upgradeMessage}</p>
       <Link
         href="/pricing"
@@ -53,10 +61,10 @@ export function FeatureGate({
 }: {
   children: React.ReactNode
   currentPlan: PlanKey
-  requiredFeature: string
+  requiredFeature: PlanFeatureKey
   fallback?: React.ReactNode
 }) {
-  const hasAccess = ['growth', 'pro', 'enterprise'].includes(currentPlan)
+  const hasAccess = planAllowsFeature(currentPlan, requiredFeature)
   
   if (!hasAccess) {
     return fallback || <UpgradePrompt currentPlan={currentPlan} feature={requiredFeature} />

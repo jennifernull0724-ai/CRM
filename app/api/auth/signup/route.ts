@@ -1,11 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
-import Stripe from 'stripe'
-
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2024-12-18.acacia',
-})
+import { PLAN_TIERS } from '@/lib/billing/planTiers'
+import { enforceCanAddUser } from '@/lib/billing/enforcement'
+import { ensureCompliancePresets } from '@/lib/compliance/presets'
 
 export async function POST(req: NextRequest) {
   try {
@@ -31,28 +29,38 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // Create Stripe customer
-    const customer = await stripe.customers.create({
-      email,
-      name,
-      metadata: {
-        source: 'trex-crm-signup'
-      }
-    })
-
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 10)
 
-    // Create user
+    const now = new Date()
+    const starterDurationDays = PLAN_TIERS.starter.durationDays ?? 14
+    const starterExpiresAt = new Date(now)
+    starterExpiresAt.setDate(starterExpiresAt.getDate() + starterDurationDays)
+
+    const company = await prisma.company.create({
+      data: {
+        name: `${name}'s Workspace`,
+        industry: 'Other',
+        kind: 'account',
+        planKey: 'starter',
+        starterStartedAt: now,
+        starterExpiresAt,
+      },
+    })
+
+    await ensureCompliancePresets(company.id)
+
+    await enforceCanAddUser(company.id, 'owner')
+
     const user = await prisma.user.create({
       data: {
         email,
         name,
         password: hashedPassword,
-        role: 'user',
-        stripeCustomerId: customer.id,
-        subscriptionStatus: 'trial'
-      }
+        role: 'owner',
+        subscriptionStatus: 'trial',
+        companyId: company.id,
+      },
     })
 
     // Log activity
@@ -70,7 +78,8 @@ export async function POST(req: NextRequest) {
         id: user.id,
         email: user.email,
         name: user.name,
-        role: user.role
+        role: user.role,
+        planKey: company.planKey,
       }
     })
   } catch (error) {

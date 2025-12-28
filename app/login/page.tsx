@@ -29,7 +29,8 @@ export default function LoginPage() {
       } else {
         router.push('/dashboard/user')
       }
-    } catch (err) {
+    } catch (error) {
+      console.error('Login error', error)
       setError('An error occurred. Please try again.')
     } finally {
       setLoading(false)
@@ -102,7 +103,7 @@ export default function LoginPage() {
 
           <div className="mt-6 text-center">
             <p className="text-gray-400 text-sm">
-              Don't have an account?{' '}
+              Don&apos;t have an account?{' '}
               <Link href="/signup" className="text-blue-400 hover:text-blue-300 font-medium">
                 Create account
               </Link>

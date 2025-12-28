@@ -9,6 +9,189 @@ datasource db {
   provider = "postgresql"
 }
 
+enum PlanKey {
+  starter
+  growth
+  pro
+  enterprise
+}
+
+enum CompanyKind {
+  account
+  client
+}
+
+enum ComplianceStatus {
+  PASS
+  FAIL
+  INCOMPLETE
+}
+
+enum CertificationStatus {
+  PASS
+  FAIL
+  EXPIRED
+  INCOMPLETE
+}
+
+enum ComplianceCategory {
+  BASE
+  RAILROAD
+  CONSTRUCTION
+  ENVIRONMENTAL
+}
+
+enum ComplianceActivityType {
+  CERT_ADDED
+  CERT_IMAGE_UPLOADED
+  CERT_IMAGE_VERSIONED
+  CERT_EXPIRED
+  SNAPSHOT_CREATED
+  QR_GENERATED
+  COMPLIANCE_PRINTED
+  COMPLIANCE_EXPORTED
+}
+
+enum EstimateStatus {
+  DRAFT
+  AWAITING_APPROVAL
+  APPROVED
+  SENT_TO_DISPATCH
+  REVISION_REQUIRED
+}
+
+enum EstimateIndustry {
+  RAIL
+  CONSTRUCTION
+  ENVIRONMENTAL
+}
+
+enum EstimateDocumentKind {
+  ESTIMATE
+  QUOTE
+}
+
+enum ContactActivityState {
+  NEW
+  ACTIVE
+  STALE
+  AT_RISK
+}
+
+enum ContactCallDirection {
+  INBOUND
+  OUTBOUND
+}
+
+enum ContactMeetingType {
+  DISCOVERY
+  REVIEW
+  SITE_VISIT
+  OTHER
+}
+
+enum ContactSocialPlatform {
+  LINKEDIN
+  X
+  INSTAGRAM
+  FIELD
+  OTHER
+}
+
+enum EmailDirection {
+  INBOUND
+  OUTBOUND
+}
+
+enum EstimatePresetIndustry {
+  BASE
+  RAILROAD
+  CONSTRUCTION
+  ENVIRONMENTAL
+}
+
+enum DispatchRequestStatus {
+  QUEUED
+  PENDING_ASSIGNMENT
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum WorkOrderStatus {
+  OPEN
+  IN_PROGRESS
+  CLOSED
+}
+
+enum AccessAuditAction {
+  INVITE_CREATED
+  INVITE_REVOKED
+  INVITE_ACCEPTED
+  ROLE_CHANGED
+  USER_DISABLED
+  USER_ENABLED
+  INVITE_TOGGLE_UPDATED
+  DISPATCH_REASSIGNED
+  WORK_ORDER_CLOSED
+  COMPLIANCE_OVERRIDE_APPROVED
+  COMPLIANCE_POLICY_UPDATED
+  WORK_ORDER_MANUAL_CREATED
+  ESTIMATE_APPROVED
+  ESTIMATE_CREATED
+  ESTIMATE_UPDATED
+  ESTIMATE_RETURNED_TO_USER
+  CONTACT_CREATED
+  CONTACT_UPDATED
+  TASK_CREATED
+  TASK_UPDATED
+  TASK_COMPLETED
+  NOTE_ADDED
+  CALL_LOGGED
+  MEETING_LOGGED
+  SOCIAL_LOGGED
+  ESTIMATE_REQUESTED
+  ESTIMATE_VIEWED
+  ESTIMATE_EMAILED
+  ESTIMATE_SENT_TO_DISPATCH
+  PDF_GENERATED
+  EMAIL_SENT
+  EMAIL_RECEIVED
+  EMAIL_ATTACHMENT_UPLOADED
+  MENTION_CREATED
+  DEAL_CREATED_FROM_CONTACT
+  WORKORDER_CREATED_FROM_CONTACT
+  EMAIL_SETTINGS_CHANGED
+  EMAIL_PROVIDER_CONNECTED
+  EMAIL_PROVIDER_DISCONNECTED
+  EMAIL_TEMPLATE_CREATED
+  EMAIL_TEMPLATE_UPDATED
+  EMAIL_TEMPLATE_DELETED
+  EMAIL_TEMPLATE_DEFAULT_SET
+  EMAIL_SIGNATURE_CREATED
+  EMAIL_SIGNATURE_UPDATED
+  EMAIL_SIGNATURE_DELETED
+  EMAIL_SIGNATURE_ACTIVATED
+  EMAIL_RECIPIENT_TOGGLED
+  LOGO_UPLOADED
+  LOGO_UPDATED
+  CUSTOM_ACTIVITY_LOGGED
+
+}
+
+enum EmailProvider {
+  gmail
+  outlook
+}
+
+enum EmailTemplateScope {
+  crm
+  estimating
+  dispatch
+  work_orders
+  global
+}
+
 model User {
   id              String    @id @default(cuid())
   email           String    @unique
@@ -17,19 +200,45 @@ model User {
   password        String?   // hashed password
   image           String?
   role            String    @default("user") // user, estimator, admin, owner
+  disabled        Boolean   @default(false)
   stripeCustomerId String?
   subscriptionStatus String? @default("trial") // trial, active, cancelled, expired
+  companyId       String?
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
   
+  company         Company?  @relation(fields: [companyId], references: [id], onDelete: SetNull)
   assignedDeals   Deal[]    @relation("AssignedEstimator")
   createdDeals    Deal[]    @relation("DealCreator")
   ownedContacts   Contact[] @relation("ContactOwner")
+  createdContacts Contact[] @relation("ContactCreator")
   activities      Activity[]
   tasks           Task[]
   notes           Note[]
+  contactCalls    ContactCall[] @relation("ContactCallCreator")
+  contactMeetings ContactMeeting[] @relation("ContactMeetingCreator")
+  contactSocials  ContactSocialTouch[] @relation("ContactSocialCreator")
+  emailAccounts   EmailAccount[]
+  authoredEmails  Email[] @relation("EmailAuthor")
+  emailOAuthStates EmailOAuthState[]
   accounts        Account[]
   sessions        Session[]
+  complianceImages ComplianceCertificationImage[] @relation("ComplianceImageUploader")
+  complianceSnapshots ComplianceSnapshot[] @relation("ComplianceSnapshotCreator")
+  accessActorLogs AccessAuditLog[] @relation("AccessActor")
+  accessTargetLogs AccessAuditLog[] @relation("AccessTarget")
+  dispatchOwnerships DispatchRequest[] @relation("DispatchOwner")
+  workOrderOverrides WorkOrder[] @relation("WorkOrderOverrideApprover")
+  sentInvites UserInvite[] @relation("InviteSender")
+  estimateRevisionsSubmitted EstimateRevision[] @relation("EstimateRevisionSubmitter")
+  estimateRevisionsApproved EstimateRevision[] @relation("EstimateRevisionApprover")
+  estimatesCreated Estimate[] @relation("EstimateCreator")
+  estimateDocumentsGenerated EstimateDocument[] @relation("EstimateDocumentGenerator")
+  estimateEmailsSent EstimateEmail[] @relation("EstimateEmailSender")
+  settingsUpdated SystemSetting[] @relation("SystemSettingUpdatedBy")
+  emailTemplatesCreated EmailTemplate[] @relation("EmailTemplateCreator")
+  emailTemplatesUpdated EmailTemplate[] @relation("EmailTemplateUpdater")
+  emailSignaturesCreated EmailSignature[]
 }
 
 model Account {
@@ -68,46 +277,97 @@ model VerificationToken {
 }
 
 model Company {
-  id          String   @id @default(cuid())
-  name        String
-  industry    String   // Construction, Railroad, Environmental, Other
-  address     String?
-  city        String?
-  state       String?
-  zipCode     String?
-  phone       String?
-  email       String?
-  website     String?
-  notes       String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
+  id                   String      @id @default(cuid())
+  name                 String
+  industry             String      // Construction, Railroad, Environmental, Other
+  address              String?
+  city                 String?
+  state                String?
+  zipCode              String?
+  phone                String?
+  email                String?
+  website              String?
+  notes                String?
+  kind                 CompanyKind @default(client)
+  planKey              PlanKey     @default(starter)
+  starterStartedAt     DateTime?
+  starterExpiresAt     DateTime?
+  stripeCustomerId     String?
+  stripeSubscriptionId String?
+  createdAt            DateTime    @default(now())
+  updatedAt            DateTime    @updatedAt
+
+  users       User[]
   contacts    Contact[]
   deals       Deal[]
+  complianceEmployees ComplianceEmployee[]
+  compliancePresets   CompliancePreset[]
+  estimates   Estimate[]
+  dispatchRequests DispatchRequest[]
+  workOrders  WorkOrder[]
+  activities  Activity[]
+  userInvites UserInvite[]
+  accessAuditLogs AccessAuditLog[]
+  systemSettings SystemSetting[]
+  emailTemplates EmailTemplate[]
+  emailSignatures EmailSignature[]
+  emailRecipientPreferences EmailRecipientPreference[]
+  emailAccounts EmailAccount[]
+  emailOAuthStates EmailOAuthState[]
+  emailIngestionQueue EmailIngestionQueue[]
+  emails Email[]
+  emailAttachments EmailAttachment[]
+  estimatingPresets EstimatingPreset[]
+  estimateLineItems EstimateLineItem[]
+  estimateDocuments EstimateDocument[]
+  estimateEmails EstimateEmail[]
+  contactCalls ContactCall[]
+  contactMeetings ContactMeeting[]
+  contactSocialTouches ContactSocialTouch[]
 }
 
 model Contact {
-  id              String    @id @default(cuid())
-  firstName       String
-  lastName        String
-  email           String    @unique
-  phone           String?
-  mobile          String?
-  title           String?   // Job Title
-  companyId       String?
-  company         Company?  @relation(fields: [companyId], references: [id], onDelete: SetNull)
-  ownerId         String?   // Contact Owner
-  owner           User?     @relation("ContactOwner", fields: [ownerId], references: [id], onDelete: SetNull)
-  createdById     String?
-  lastActivityAt  DateTime? // System-derived, updated on any activity
-  archived        Boolean   @default(false)
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-  
-  deals           Deal[]
-  tasks           Task[]
-  notes           Note[]
-  activities      Activity[]
+  id                  String                 @id @default(cuid())
+  companyId           String
+  firstName           String
+  lastName            String
+  email               String
+  phone               String?
+  mobile              String?
+  jobTitle            String?
+  derivedCompanyName  String                 @default("")
+  companyOverrideName String?
+  ownerId             String
+  createdById         String
+  lastActivityAt      DateTime               @default(now())
+  activityState       ContactActivityState   @default(NEW)
+  archived            Boolean                @default(false)
+  createdAt           DateTime               @default(now())
+  updatedAt           DateTime               @updatedAt
+
+  company             Company                @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  owner               User                   @relation("ContactOwner", fields: [ownerId], references: [id], onDelete: Restrict)
+  createdBy           User                   @relation("ContactCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  deals               Deal[]
+  tasks               Task[]
+  notes               Note[]
+  activities          Activity[]
+  estimates           Estimate[]
+  calls               ContactCall[]
+  meetings            ContactMeeting[]
+  socials             ContactSocialTouch[]
+  dealPdfs            DealPdf[]
+  dealEmails          DealEmail[]
+  estimateDocuments   EstimateDocument[]
+  estimateEmails      EstimateEmail[]
+  dispatchRequests    DispatchRequest[]
+  workOrders          WorkOrder[]
+  emails              Email[]
+  emailAttachments    EmailAttachment[]
+
+  @@unique([companyId, email])
+  @@index([companyId, archived])
+  @@index([ownerId])
 }
 
 model Deal {
@@ -140,6 +400,7 @@ model Deal {
   activities      Activity[]
   tasks           Task[]
   notes           Note[]
+  estimate        Estimate?
 }
 
 model DealVersion {
@@ -181,6 +442,7 @@ model DealLineItem {
 model DealPdf {
   id          String   @id @default(cuid())
   dealId      String
+  contactId   String
   deal        Deal     @relation(fields: [dealId], references: [id], onDelete: Cascade)
   versionId   String
   version     DealVersion @relation(fields: [versionId], references: [id], onDelete: Cascade)
@@ -188,11 +450,16 @@ model DealPdf {
   fileUrl     String   // Storage path or signed URL
   fileSize    Int?
   generatedAt DateTime @default(now())
+
+  contact     Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@index([contactId])
 }
 
 model DealEmail {
   id          String   @id @default(cuid())
   dealId      String
+  contactId   String
   deal        Deal     @relation(fields: [dealId], references: [id], onDelete: Cascade)
   subject     String
   body        String
@@ -202,22 +469,30 @@ model DealEmail {
   bcc         String?
   sentAt      DateTime @default(now())
   status      String   @default("sent") // sent, delivered, opened, bounced
+
+  contact     Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@index([contactId])
 }
 
 model Activity {
   id          String   @id @default(cuid())
-  type        String   // CONTACT_CREATED, TASK_COMPLETED, TASK_CREATED, MENTION, CALL, MEETING, SOCIAL, EMAIL_SENT, EMAIL_RECEIVED, NOTE_ADDED, DEAL_CREATED, STAGE_CHANGED, PDF_GENERATED, CUSTOM
+  companyId   String
+  type        String
   subject     String
   description String?
-  metadata    String?  // JSON string for additional data (call duration, meeting attendees, etc.)
-  contactId   String?
-  contact     Contact? @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  metadata    Json?
+  contactId   String
   dealId      String?
-  deal        Deal?    @relation(fields: [dealId], references: [id], onDelete: Cascade)
   userId      String?
-  user        User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
   createdAt   DateTime @default(now())
-  
+
+  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  contact     Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  deal        Deal?    @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  user        User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([companyId])
   @@index([contactId])
   @@index([dealId])
   @@index([userId])
@@ -234,8 +509,8 @@ model Task {
   completedAt   DateTime?
   priority      String    @default("medium") // low, medium, high
   notes         String?
-  contactId     String?
-  contact       Contact?  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  contactId     String
+  contact       Contact   @relation(fields: [contactId], references: [id], onDelete: Cascade)
   dealId        String?
   deal          Deal?     @relation(fields: [dealId], references: [id], onDelete: Cascade)
   assignedToId  String?   // Owner
@@ -246,18 +521,727 @@ model Task {
   @@index([assignedToId])
   @@index([dueDate])
   @@index([completed])
+  @@index([contactId])
 }
 
 model Note {
   id          String   @id @default(cuid())
   content     String   // Rich text with @mentions
   mentions    String?  // JSON array of mentioned user IDs
-  contactId   String?
-  contact     Contact? @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  contactId   String
+  contact     Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
   dealId      String?
   deal        Deal?    @relation(fields: [dealId], references: [id], onDelete: Cascade)
   createdById String?
   createdBy   User?    @relation(fields: [createdById], references: [id], onDelete: SetNull)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+  @@index([contactId])
+}
+
+model ContactCall {
+  id              String               @id @default(cuid())
+  companyId       String
+  contactId       String
+  createdById     String
+  direction       ContactCallDirection
+  result          String
+  durationMinutes Int?
+  notes           String?
+  happenedAt      DateTime             @default(now())
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+
+  company         Company              @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  contact         Contact              @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  createdBy       User                 @relation("ContactCallCreator", fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@index([companyId])
+  @@index([contactId])
+  @@index([createdById])
+  @@index([happenedAt])
+}
+
+model ContactMeeting {
+  id              String              @id @default(cuid())
+  companyId       String
+  contactId       String
+  createdById     String
+  meetingType     ContactMeetingType
+  scheduledFor    DateTime
+  durationMinutes Int?
+  attendees       Json?
+  outcome         String?
+  notes           String?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  company         Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  contact         Contact             @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  createdBy       User                @relation("ContactMeetingCreator", fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@index([companyId])
+  @@index([contactId])
+  @@index([createdById])
+  @@index([scheduledFor])
+}
+
+model ContactSocialTouch {
+  id          String                @id @default(cuid())
+  companyId   String
+  contactId   String
+  createdById String
+  platform    ContactSocialPlatform
+  action      String
+  notes       String?
+  occurredAt  DateTime              @default(now())
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
+
+  company     Company               @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  contact     Contact               @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  createdBy   User                  @relation("ContactSocialCreator", fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@index([companyId])
+  @@index([contactId])
+  @@index([createdById])
+  @@index([occurredAt])
+}
+
+model EmailAccount {
+  id                    String        @id @default(cuid())
+  companyId             String
+  userId                String
+  provider              EmailProvider
+  emailAddress          String
+  displayName           String?
+  label                 String?
+  refreshToken          String
+  accessToken           String?
+  accessTokenExpiresAt  DateTime?
+  scopes                Json?
+  syncCursor            String?
+  syncStatus            String        @default("idle")
+  syncError             String?
+  lastSyncedAt          DateTime?
+  metadata              Json?
+  isPrimary             Boolean       @default(false)
+  deauthorizedAt        DateTime?
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
+
+  company               Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user                  User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  emails                Email[]
+  ingestionJobs         EmailIngestionQueue[]
+  attachments           EmailAttachment[]
+
+  @@unique([companyId, emailAddress])
+  @@index([companyId])
+  @@index([userId])
+  @@index([provider])
+}
+
+model EmailOAuthState {
+  id           String        @id @default(cuid())
+  companyId    String
+  userId       String
+  provider     EmailProvider
+  state        String        @unique
+  codeVerifier String
+  redirectUri  String
+  scopes       Json?
+  expiresAt    DateTime
+  createdAt    DateTime      @default(now())
+
+  company      Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@index([provider])
+  @@index([expiresAt])
+}
+
+model Email {
+  id             String         @id @default(cuid())
+  companyId      String
+  contactId      String
+  accountId      String
+  provider       EmailProvider
+  direction      EmailDirection
+  subject        String
+  snippet        String?
+  bodyHtml       String?
+  bodyText       String?
+  fromAddress    String
+  replyToAddress String?
+  toAddresses    Json
+  ccAddresses    Json?
+  bccAddresses   Json?
+  threadId       String?
+  messageId      String
+  externalId     String?
+  references     Json?
+  authorId       String?
+  sentAt         DateTime
+  receivedAt     DateTime?
+  syncedAt       DateTime       @default(now())
+  status         String?        @default("recorded")
+  error          String?
+
+  company        Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  contact        Contact        @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  account        EmailAccount   @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  author         User?          @relation("EmailAuthor", fields: [authorId], references: [id], onDelete: SetNull)
+  attachments    EmailAttachment[]
+
+  @@unique([companyId, messageId])
+  @@index([companyId])
+  @@index([contactId, sentAt])
+  @@index([accountId, sentAt])
+  @@index([authorId])
+  @@index([direction])
+  @@index([threadId])
+}
+
+model EmailAttachment {
+  id          String       @id @default(cuid())
+  companyId   String
+  contactId   String
+  emailId     String
+  accountId   String?
+  fileName    String
+  mimeType    String
+  size        Int?
+  storageKey  String
+  externalId  String?
+  checksum    String?
+  createdAt   DateTime     @default(now())
+
+  company     Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  contact     Contact      @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  email       Email        @relation(fields: [emailId], references: [id], onDelete: Cascade)
+  account     EmailAccount? @relation(fields: [accountId], references: [id], onDelete: SetNull)
+
+  @@index([companyId])
+  @@index([contactId])
+  @@index([emailId])
+}
+
+model EmailIngestionQueue {
+  id         String       @id @default(cuid())
+  companyId  String
+  accountId  String
+  runAt      DateTime     @default(now())
+  lockedAt   DateTime?
+  lockedBy   String?
+  syncCursor String?
+  attempts   Int          @default(0)
+  lastError  String?
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+
+  company    Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  account    EmailAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@index([accountId])
+  @@index([runAt])
+}
+
+model ComplianceEmployee {
+  id               String            @id @default(cuid())
+  employeeId       String            @unique
+  companyId        String
+  firstName        String
+  lastName         String
+  title            String
+  role             String
+  active           Boolean           @default(true)
+  complianceStatus ComplianceStatus  @default(INCOMPLETE)
+  lastVerifiedAt   DateTime?
+  complianceHash   String?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  company       Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  certifications ComplianceCertification[]
+  documents      ComplianceDocument[]
+  activities     ComplianceActivity[]
+  snapshots      ComplianceSnapshot[]
+  qrTokens       ComplianceQrToken[]
+  assignments    WorkOrderAssignment[]
+}
+
+model ComplianceCertification {
+  id            String               @id @default(cuid())
+  employeeId    String
+  presetKey     String?
+  customName    String?
+  category      ComplianceCategory
+  required      Boolean              @default(true)
+  issueDate     DateTime
+  expiresAt     DateTime
+  status        CertificationStatus  @default(INCOMPLETE)
+  missingProof  Boolean              @default(true)
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+
+  employee      ComplianceEmployee   @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  images        ComplianceCertificationImage[]
+
+  @@index([employeeId])
+}
+
+model ComplianceCertificationImage {
+  id               String                   @id @default(cuid())
+  certificationId  String
+  version          Int
+  bucket           String
+  objectKey        String
+  filename         String
+  mimeType         String
+  size             Int
+  sha256           String
+  uploadedById     String
+  uploadedAt       DateTime                 @default(now())
+
+  certification    ComplianceCertification  @relation(fields: [certificationId], references: [id], onDelete: Cascade)
+  uploadedBy       User                     @relation("ComplianceImageUploader", fields: [uploadedById], references: [id], onDelete: Restrict)
+
+  @@unique([certificationId, version])
+  @@index([uploadedById])
+}
+
+model ComplianceDocument {
+  id         String   @id @default(cuid())
+  employeeId String
+  title      String
+  version    Int
+  bucket     String
+  objectKey  String
+  filename   String
+  size       Int
+  sha256     String
+  createdAt  DateTime @default(now())
+
+  employee   ComplianceEmployee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@unique([employeeId, version])
+}
+
+model ComplianceActivity {
+  id         String                 @id @default(cuid())
+  employeeId String
+  type       ComplianceActivityType
+  metadata   Json?
+  createdAt  DateTime               @default(now())
+
+  employee   ComplianceEmployee     @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([employeeId])
+  @@index([type])
+}
+
+model ComplianceSnapshot {
+  id            String            @id @default(cuid())
+  employeeId    String
+  snapshotHash  String
+  payload       Json
+  createdAt     DateTime          @default(now())
+  createdById   String
+
+  employee      ComplianceEmployee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  createdBy     User               @relation("ComplianceSnapshotCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  qrToken       ComplianceQrToken?
+
+  @@index([employeeId])
+}
+
+model ComplianceQrToken {
+  id          String             @id @default(cuid())
+  token       String             @unique
+  employeeId  String
+  snapshotId  String             @unique
+  createdAt   DateTime           @default(now())
+
+  employee    ComplianceEmployee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  snapshot    ComplianceSnapshot @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
+}
+
+model CompliancePreset {
+  id        String             @id @default(cuid())
+  companyId String
+  category  ComplianceCategory
+  baseKey   String
+  name      String
+  enabled   Boolean            @default(true)
+  order     Int
+  isOther   Boolean            @default(false)
+  locked    Boolean            @default(false)
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+
+  company   Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, category, baseKey])
+  @@index([companyId, category])
+}
+
+model Estimate {
+  id             String         @id @default(cuid())
+  companyId      String
+  dealId         String?        @unique
+  contactId      String
+  quoteNumber    String         @unique
+  createdById    String
+  currentRevisionId String?       @unique
+  status         EstimateStatus @default(DRAFT)
+  currentRevisionNumber Int     @default(1)
+  revisionCount  Int            @default(0)
+  submittedAt    DateTime?
+  approvedAt     DateTime?
+  sentToDispatchAt DateTime?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  company        Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  deal           Deal?          @relation(fields: [dealId], references: [id], onDelete: SetNull)
+  contact        Contact        @relation(fields: [contactId], references: [id], onDelete: Restrict)
+  createdBy      User           @relation("EstimateCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  currentRevision EstimateRevision? @relation("EstimateCurrentRevision", fields: [currentRevisionId], references: [id], onDelete: SetNull)
+  revisions      EstimateRevision[]
+  lineItems      EstimateLineItem[]
+  documents      EstimateDocument[]
+  emails         EstimateEmail[]
+  dispatchRequests DispatchRequest[]
+
+  @@index([companyId])
+  @@index([contactId])
+}
+
+model EstimateRevision {
+  id             String         @id @default(cuid())
+  estimateId     String
+  revisionNumber Int
+  status         EstimateStatus @default(DRAFT)
+  submittedById  String?
+  approvedById   String?
+  submittedAt    DateTime?
+  approvedAt     DateTime?
+  notes          String?
+  quoteNumber    String
+  projectName    String
+  projectLocation String?
+  industry       EstimateIndustry
+  scopeOfWork    String
+  assumptions    String?
+  exclusions     String?
+  contactNameSnapshot String
+  contactEmailSnapshot String?
+  subtotal       Decimal        @default(0) @db.Decimal(18, 2)
+  markupPercent  Decimal?       @db.Decimal(5, 2)
+  markupAmount   Decimal?       @db.Decimal(18, 2)
+  overheadPercent Decimal?      @db.Decimal(5, 2)
+  overheadAmount Decimal?       @db.Decimal(18, 2)
+  grandTotal     Decimal        @default(0) @db.Decimal(18, 2)
+  manualOverrideTotal Decimal?  @db.Decimal(18, 2)
+  overrideReason String?
+  pricingNotes   String?
+  locked         Boolean        @default(false)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  estimate       Estimate       @relation(fields: [estimateId], references: [id], onDelete: Cascade)
+  submittedBy    User?          @relation("EstimateRevisionSubmitter", fields: [submittedById], references: [id], onDelete: SetNull)
+  approvedBy     User?          @relation("EstimateRevisionApprover", fields: [approvedById], references: [id], onDelete: SetNull)
+  currentFor     Estimate?      @relation("EstimateCurrentRevision")
+  lineItems      EstimateLineItem[]
+  documents      EstimateDocument[]
+  emails         EstimateEmail[]
+
+  @@unique([estimateId, revisionNumber])
+  @@index([submittedById])
+  @@index([approvedById])
+}
+
+model EstimatingPreset {
+  id                 String                  @id @default(cuid())
+  companyId          String
+  baseKey            String
+  label              String
+  defaultDescription String
+  defaultUnit        String
+  defaultUnitCost    Decimal                 @default(0) @db.Decimal(18, 2)
+  industry           EstimatePresetIndustry
+  enabled            Boolean                 @default(true)
+  sortOrder          Int                     @default(0)
+  isOther            Boolean                 @default(false)
+  locked             Boolean                 @default(false)
+  createdAt          DateTime                @default(now())
+  updatedAt          DateTime                @updatedAt
+
+  company            Company                 @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  lineItems          EstimateLineItem[]
+
+  @@unique([companyId, baseKey])
+  @@index([companyId, industry])
+}
+
+model EstimateLineItem {
+  id              String                @id @default(cuid())
+  companyId       String
+  estimateId      String
+  revisionId      String
+  presetId        String
+  presetBaseKey   String
+  presetLabel     String
+  presetIndustry  EstimatePresetIndustry
+  description     String
+  quantity        Decimal               @default(1) @db.Decimal(12, 2)
+  unit            String
+  unitCost        Decimal               @db.Decimal(18, 2)
+  lineTotal       Decimal               @db.Decimal(18, 2)
+  notes           String?
+  sortOrder       Int                   @default(0)
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+
+  company         Company               @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  estimate        Estimate              @relation(fields: [estimateId], references: [id], onDelete: Cascade)
+  revision        EstimateRevision      @relation(fields: [revisionId], references: [id], onDelete: Cascade)
+  preset          EstimatingPreset      @relation(fields: [presetId], references: [id], onDelete: Restrict)
+
+  @@index([companyId])
+  @@index([estimateId])
+  @@index([revisionId])
+}
+
+model EstimateDocument {
+  id            String                @id @default(cuid())
+  companyId     String
+  estimateId    String
+  revisionId    String
+  contactId     String
+  kind          EstimateDocumentKind
+  storageKey    String
+  fileName      String
+  fileSize      Int
+  hash          String
+  generatedById String
+  generatedAt   DateTime              @default(now())
+
+  company       Company               @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  estimate      Estimate              @relation(fields: [estimateId], references: [id], onDelete: Cascade)
+  revision      EstimateRevision      @relation(fields: [revisionId], references: [id], onDelete: Cascade)
+  contact       Contact               @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  generatedBy   User                  @relation("EstimateDocumentGenerator", fields: [generatedById], references: [id], onDelete: Restrict)
+  emailUsages   EstimateEmail[]       @relation("EstimateEmailDocument")
+
+  @@index([companyId])
+  @@index([estimateId, kind])
+  @@index([contactId])
+}
+
+model EstimateEmail {
+  id             String           @id @default(cuid())
+  companyId      String
+  estimateId     String
+  revisionId     String
+  contactId      String
+  templateId     String?
+  signatureId    String?
+  toRecipients   Json
+  ccRecipients   Json?
+  bccRecipients  Json?
+  subject        String
+  body           String
+  sentById       String
+  pdfDocumentId  String?
+  sentAt         DateTime         @default(now())
+
+  company        Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  estimate       Estimate         @relation(fields: [estimateId], references: [id], onDelete: Cascade)
+  revision       EstimateRevision @relation(fields: [revisionId], references: [id], onDelete: Cascade)
+  contact        Contact          @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  template       EmailTemplate?   @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  signature      EmailSignature?  @relation(fields: [signatureId], references: [id], onDelete: SetNull)
+  pdfDocument    EstimateDocument? @relation("EstimateEmailDocument", fields: [pdfDocumentId], references: [id], onDelete: SetNull)
+  sentBy         User             @relation("EstimateEmailSender", fields: [sentById], references: [id], onDelete: Restrict)
+
+  @@index([companyId])
+  @@index([contactId])
+}
+
+model DispatchRequest {
+  id             String                @id @default(cuid())
+  companyId      String
+  estimateId     String?
+  contactId      String
+  dispatcherId   String?
+  status         DispatchRequestStatus @default(QUEUED)
+  priority       String                @default("standard")
+  queuedAt       DateTime              @default(now())
+  scheduledFor   DateTime?
+  complianceBlocked Boolean            @default(false)
+  blockReason    String?
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+
+  company        Company               @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  estimate       Estimate?             @relation(fields: [estimateId], references: [id], onDelete: SetNull)
+  contact        Contact               @relation(fields: [contactId], references: [id], onDelete: Restrict)
+  dispatcher     User?                 @relation("DispatchOwner", fields: [dispatcherId], references: [id], onDelete: SetNull)
+  workOrders     WorkOrder[]
+
+  @@index([companyId])
+  @@index([contactId])
+  @@index([status])
+}
+
+model WorkOrder {
+  id                 String          @id @default(cuid())
+  companyId          String
+  dispatchRequestId  String?
+  contactId          String
+  title              String
+  status             WorkOrderStatus @default(OPEN)
+  manualEntry        Boolean         @default(false)
+  complianceBlocked  Boolean         @default(false)
+  blockReason        String?
+  overrideApproved   Boolean         @default(false)
+  overrideApprovedById String?
+  overrideApprovedAt DateTime?
+  closedAt           DateTime?
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+
+  company            Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  dispatchRequest    DispatchRequest? @relation(fields: [dispatchRequestId], references: [id], onDelete: SetNull)
+  contact            Contact         @relation(fields: [contactId], references: [id], onDelete: Restrict)
+  overrideApprovedBy User?           @relation("WorkOrderOverrideApprover", fields: [overrideApprovedById], references: [id], onDelete: SetNull)
+  assignments        WorkOrderAssignment[]
+
+  @@index([companyId])
+  @@index([contactId])
+  @@index([status])
+}
+
+model WorkOrderAssignment {
+  id          String             @id @default(cuid())
+  workOrderId String
+  employeeId  String
+  assignedAt  DateTime           @default(now())
+  unassignedAt DateTime?
+
+  workOrder   WorkOrder          @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+  employee    ComplianceEmployee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([employeeId])
+}
+
+model UserInvite {
+  id           String   @id @default(cuid())
+  companyId    String
+  email        String
+  role         String
+  token        String   @unique
+  invitedById  String?
+  acceptedAt   DateTime?
+  revokedAt    DateTime?
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  company      Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  invitedBy    User?    @relation("InviteSender", fields: [invitedById], references: [id], onDelete: SetNull)
+  auditLogs    AccessAuditLog[]
+
+  @@index([companyId])
+}
+
+model AccessAuditLog {
+  id             String           @id @default(cuid())
+  companyId      String
+  actorId        String?
+  targetUserId   String?
+  targetInviteId String?
+  action         AccessAuditAction
+  metadata       Json?
+  createdAt      DateTime         @default(now())
+
+  company        Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  actor          User?            @relation("AccessActor", fields: [actorId], references: [id], onDelete: SetNull)
+  targetUser     User?            @relation("AccessTarget", fields: [targetUserId], references: [id], onDelete: SetNull)
+  targetInvite   UserInvite?      @relation(fields: [targetInviteId], references: [id], onDelete: SetNull)
+
+  @@index([companyId])
+  @@index([action])
+}
+
+model SystemSetting {
+  id          String   @id @default(cuid())
+  companyId   String
+  key         String
+  value       Json
+  updatedById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  updatedBy   User?    @relation("SystemSettingUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+
+  @@unique([companyId, key])
+}
+
+model EmailTemplate {
+  id          String             @id @default(cuid())
+  companyId   String
+  name        String
+  subject     String
+  body        String
+  scope       EmailTemplateScope @default(global)
+  isDefault   Boolean            @default(false)
+  createdById String
+  updatedById String
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+
+  company     Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdBy   User               @relation("EmailTemplateCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  updatedBy   User               @relation("EmailTemplateUpdater", fields: [updatedById], references: [id], onDelete: Restrict)
+  estimateEmails EstimateEmail[]
+
+  @@unique([companyId, name])
+  @@index([companyId, scope])
+}
+
+model EmailSignature {
+  id          String   @id @default(cuid())
+  companyId   String
+  name        String
+  content     String
+  isActive    Boolean  @default(false)
+  createdById String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdBy   User     @relation(fields: [createdById], references: [id], onDelete: Restrict)
+  estimateEmails EstimateEmail[]
+}
+
+model EmailRecipientPreference {
+  id         String   @id @default(cuid())
+  companyId  String
+  email      String
+  sendEnabled Boolean @default(true)
+  reason     String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  company    Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, email])
 }

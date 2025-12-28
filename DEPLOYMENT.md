@@ -120,9 +120,9 @@ gsutil cors set cors.json gs://trex-crm-files
 
 1. Go to "Products" in Stripe Dashboard
 2. Create pricing tiers:
-   - **Starter**: $49/month
-   - **Professional**: $99/month
-   - **Enterprise**: $299/month
+   - **Starter**: 
+   - **Professional**: 
+   - **Enterprise**: 
 3. Note the Price IDs for each tier
 
 ### Setup Webhook

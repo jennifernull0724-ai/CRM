@@ -8,18 +8,15 @@ interface AppShellProps {
   children: React.ReactNode
   userRole?: 'user' | 'estimator' | 'admin' | 'owner'
   userName?: string
-  userEmail?: string
 }
 
-export default function AppShell({ children, userRole = 'user', userName, userEmail }: AppShellProps) {
+export default function AppShell({ children, userRole = 'user', userName }: AppShellProps) {
   const pathname = usePathname()
   const [sidebarOpen, setSidebarOpen] = useState(true)
 
   const isActive = (path: string) => {
     return pathname === path || pathname.startsWith(`${path}/`)
   }
-
-  const canAccessCompliance = userRole === 'admin' || userRole === 'owner'
 
   const navItems = [
     { path: '/dashboard/user', label: 'Dashboard', icon: '📊', roles: ['user', 'estimator', 'admin', 'owner'] },

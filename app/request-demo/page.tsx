@@ -15,7 +15,7 @@ export default function RequestDemoPage() {
             <div className="text-green-500 text-5xl mb-4">✓</div>
             <h1 className="text-2xl font-bold text-white mb-4">Request Received</h1>
             <p className="text-gray-400 mb-6">
-              We'll contact you within 24 hours to schedule your live walkthrough.
+              We&apos;ll contact you within 24 hours to schedule your live walkthrough.
             </p>
             <Link
               href="/"

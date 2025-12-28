@@ -1,205 +1,313 @@
-import Link from 'next/link'
+import { redirect } from 'next/navigation'
+import { getServerSession } from 'next-auth'
+import { formatDistanceToNow } from 'date-fns'
+import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { listContactsForCompany, type ContactListFilters } from '@/lib/contacts/listContacts'
+import { ContactCreateSheet } from '@/components/contacts/contact-create-sheet'
+import { BulkImportPanel } from '@/app/contacts/_components/bulk-import-panel'
 
-export const dynamic = 'force-dynamic'
+const LAST_ACTIVITY_WINDOWS = [
+  { value: '', label: 'Any activity' },
+  { value: '7', label: 'Last 7 days' },
+  { value: '14', label: 'Last 14 days' },
+  { value: '30', label: 'Last 30 days' },
+  { value: '60', label: 'Last 60 days' },
+]
 
-export default async function ContactsPage({
-  searchParams,
-}: {
-  searchParams: { search?: string; owner?: string; archived?: string }
-}) {
-  const search = searchParams.search || ''
-  const ownerFilter = searchParams.owner || ''
-  const showArchived = searchParams.archived === 'true'
+type SearchParams = Record<string, string | string[] | undefined>
 
-  const contacts = await prisma.contact.findMany({
-    where: {
-      AND: [
-        {
-          OR: search
-            ? [
-                { firstName: { contains: search, mode: 'insensitive' } },
-                { lastName: { contains: search, mode: 'insensitive' } },
-                { email: { contains: search, mode: 'insensitive' } },
-                { company: { name: { contains: search, mode: 'insensitive' } } },
-              ]
-            : undefined,
-        },
-        ownerFilter ? { ownerId: ownerFilter } : {},
-        { archived: showArchived },
-      ],
-    },
-    include: {
-      company: true,
-      owner: true,
-      tasks: {
-        where: { completed: false },
-      },
-      _count: {
-        select: {
-          deals: true,
-        },
-      },
-    },
-    orderBy: {
-      lastActivityAt: 'desc',
-    },
-  })
+function toBoolean(param?: string | string[]) {
+  if (Array.isArray(param)) return param[0] === 'true'
+  return param === 'true'
+}
 
-  const users = await prisma.user.findMany({
-    select: { id: true, name: true },
-  })
+function toStringValue(param?: string | string[]) {
+  if (Array.isArray(param)) return param[0]
+  return param ?? ''
+}
+
+function toNumberValue(param?: string | string[]) {
+  const raw = toStringValue(param)
+  if (!raw) return undefined
+  const parsed = Number(raw)
+  return Number.isFinite(parsed) ? parsed : undefined
+}
+
+function buildFilters(searchParams: SearchParams): ContactListFilters {
+  return {
+    search: toStringValue(searchParams.search) || undefined,
+    ownerId: toStringValue(searchParams.ownerId) || undefined,
+    archived: searchParams.archived === 'true' ? true : false,
+    hasOpenTasks: toBoolean(searchParams.hasOpenTasks),
+    hasOverdueTasks: toBoolean(searchParams.hasOverdueTasks),
+    hasCalls: toBoolean(searchParams.hasLoggedCalls),
+    hasMeetings: toBoolean(searchParams.hasMeetings),
+    lastActivityWindowDays: toNumberValue(searchParams.lastActivityDays) ?? null,
+    sort: searchParams.sort === 'activity' ? 'activity' : 'attention',
+    page: toNumberValue(searchParams.page) ?? 1,
+    perPage: toNumberValue(searchParams.perPage) ?? 25,
+  }
+}
+
+export default async function ContactsPage({ searchParams }: { searchParams: SearchParams }) {
+  const session = await getServerSession(authOptions)
+  if (!session?.user?.companyId) {
+    redirect('/login?from=/contacts')
+  }
+
+  const filters = buildFilters(searchParams)
+  const [{ contacts, pagination }, owners] = await Promise.all([
+    listContactsForCompany(session.user.companyId, filters),
+    prisma.user.findMany({
+      where: { companyId: session.user.companyId },
+      select: { id: true, name: true },
+      orderBy: { name: 'asc' },
+    }),
+  ])
+
+  const attentionLeaders = [...contacts].sort((a, b) => b.attention.score - a.attention.score).slice(0, 3)
+  const urgentCount = contacts.filter((contact) => contact.attention.level === 'urgent').length
+  const watchCount = contacts.filter((contact) => contact.attention.level === 'watch').length
+  const stableCount = contacts.filter((contact) => contact.attention.level === 'stable').length
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-3xl font-bold text-gray-900">Contacts</h1>
-          <div className="flex gap-3">
-            <Link
-              href="/contacts/import"
-              className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 font-medium"
-            >
-              Import Contacts
-            </Link>
-            <Link
-              href="/contacts/new"
-              className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 font-medium"
-            >
-              + New Contact
-            </Link>
+    <div className="min-h-screen bg-slate-950 text-slate-50">
+      <div className="mx-auto max-w-7xl px-4 py-10">
+        <section className="rounded-3xl border border-slate-800 bg-gradient-to-br from-slate-900 via-slate-900 to-slate-950 p-8 shadow-2xl">
+          <div className="flex flex-col gap-8 lg:flex-row lg:items-start lg:justify-between">
+            <div className="space-y-4">
+              <p className="text-xs uppercase tracking-[0.5em] text-slate-400">Attention radar</p>
+              <h1 className="text-4xl font-semibold leading-tight">Who needs attention right now?</h1>
+              <p className="text-base text-slate-300">
+                Dynamic filters, sentiment scoring, and last-touch telemetry keep every role aligned on the next conversation. Columnar data is still here—but the
+                runway starts with signal.
+              </p>
+              <div className="grid gap-4 sm:grid-cols-3">
+                <StatCard label="Urgent" value={urgentCount} tone="rose" helper="Overdue tasks or silent for 14+ days" />
+                <StatCard label="Watch" value={watchCount} tone="amber" helper="Needs a touch soon" />
+                <StatCard label="Stable" value={stableCount} tone="emerald" helper="Healthy cadence" />
+              </div>
+            </div>
+            <div className="space-y-4 rounded-2xl border border-slate-800 bg-slate-950/60 p-5">
+              <p className="text-xs uppercase tracking-[0.5em] text-slate-500">Create</p>
+              <ContactCreateSheet triggerLabel="New contact" source="contacts:index" variant="solid" />
+              <p className="text-xs text-slate-500">
+                Owners, estimators, dispatchers, and admins hit the same intake. Ownership defaults to creator, company derivation is automatic, and audit logging is forced.
+              </p>
+              <div className="text-xs text-slate-500">
+                <p>Entry points wired:</p>
+                <ul className="mt-1 list-inside list-disc space-y-0.5">
+                  <li>Deal creation drawer</li>
+                  <li>Estimate composer</li>
+                  <li>Email launchpad</li>
+                  <li>Dispatch blank work order</li>
+                </ul>
+              </div>
+            </div>
           </div>
-        </div>
 
-        {/* Search and Filters */}
-        <div className="bg-white rounded-lg shadow p-4 mb-6">
-          <form className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div>
-              <input
-                type="text"
-                name="search"
-                defaultValue={search}
-                placeholder="Search contacts..."
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
+          {attentionLeaders.length ? (
+            <div className="mt-8 grid gap-4 md:grid-cols-3">
+              {attentionLeaders.map((contact) => (
+                <article key={contact.id} className="rounded-2xl border border-slate-800 bg-slate-950/60 p-4">
+                  <p className="text-xs uppercase tracking-[0.3em] text-slate-500">Needs attention</p>
+                  <h3 className="text-lg font-semibold text-white">
+                    <a href={`/contacts/${contact.id}`} className="hover:underline">
+                      {contact.firstName} {contact.lastName}
+                    </a>
+                  </h3>
+                  <p className="text-sm text-slate-400">{contact.companyLabel}</p>
+                  <p className="mt-3 text-sm text-amber-300">{contact.attention.primaryReason}</p>
+                  <p className="text-xs text-slate-500">
+                    Last touch {contact.lastActivityAt ? formatDistanceToNow(new Date(contact.lastActivityAt), { addSuffix: true }) : 'never'}
+                  </p>
+                </article>
+              ))}
             </div>
-            <div>
-              <select
-                name="owner"
-                defaultValue={ownerFilter}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">All Owners</option>
-                {users.map((user) => (
-                  <option key={user.id} value={user.id}>
-                    {user.name}
-                  </option>
-                ))}
-              </select>
+          ) : null}
+        </section>
+
+        <section className="mt-10 grid gap-6 lg:grid-cols-[2fr,1fr]">
+          <form className="rounded-3xl border border-slate-800 bg-slate-900/80 p-5 text-sm text-slate-100" method="GET">
+            <div className="grid gap-4 md:grid-cols-3">
+              <label className="text-xs uppercase tracking-wide text-slate-400">
+                Search (name · email · company)
+                <input
+                  name="search"
+                  defaultValue={toStringValue(searchParams.search)}
+                  placeholder="ex: bridge, @rrco.com"
+                  className="mt-2 w-full rounded-2xl border border-slate-700 bg-slate-950/60 px-3 py-2 text-sm focus:border-emerald-400 focus:outline-none"
+                />
+              </label>
+              <label className="text-xs uppercase tracking-wide text-slate-400">
+                Owner
+                <select
+                  name="ownerId"
+                  defaultValue={toStringValue(searchParams.ownerId)}
+                  className="mt-2 w-full rounded-2xl border border-slate-700 bg-slate-950/60 px-3 py-2 text-sm focus:border-emerald-400 focus:outline-none"
+                >
+                  <option value="">Any owner</option>
+                  {owners.map((owner) => (
+                    <option key={owner.id} value={owner.id}>
+                      {owner.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="text-xs uppercase tracking-wide text-slate-400">
+                Last activity
+                <select
+                  name="lastActivityDays"
+                  defaultValue={toStringValue(searchParams.lastActivityDays)}
+                  className="mt-2 w-full rounded-2xl border border-slate-700 bg-slate-950/60 px-3 py-2 text-sm focus:border-emerald-400 focus:outline-none"
+                >
+                  {LAST_ACTIVITY_WINDOWS.map((window) => (
+                    <option key={window.value} value={window.value}>
+                      {window.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
             </div>
-            <div>
-              <select
-                name="archived"
-                defaultValue={showArchived ? 'true' : 'false'}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="false">Active</option>
-                <option value="true">Archived</option>
-              </select>
+
+            <div className="mt-4 grid gap-3 md:grid-cols-3">
+              <ToggleChip defaultChecked={toBoolean(searchParams.hasOpenTasks)} name="hasOpenTasks" label="Has open tasks" />
+              <ToggleChip defaultChecked={toBoolean(searchParams.hasOverdueTasks)} name="hasOverdueTasks" label="Has overdue tasks" />
+              <ToggleChip defaultChecked={toBoolean(searchParams.hasLoggedCalls)} name="hasLoggedCalls" label="Has logged calls" />
+              <ToggleChip defaultChecked={toBoolean(searchParams.hasMeetings)} name="hasMeetings" label="Has meetings" />
+              <ToggleChip defaultChecked={toBoolean(searchParams.archived)} name="archived" label="Show archived" value="true" />
             </div>
-            <div>
-              <button
-                type="submit"
-                className="w-full bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 font-medium"
-              >
-                Apply Filters
-              </button>
+
+            <div className="mt-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <label className="text-xs uppercase tracking-wide text-slate-400">
+                Sort
+                <select
+                  name="sort"
+                  defaultValue={toStringValue(searchParams.sort) || 'attention'}
+                  className="mt-2 w-full rounded-2xl border border-slate-700 bg-slate-950/60 px-3 py-2 text-sm focus:border-emerald-400 focus:outline-none"
+                >
+                  <option value="attention">Needs attention</option>
+                  <option value="activity">Last activity</option>
+                </select>
+              </label>
+              <div className="flex flex-col gap-2 text-xs text-slate-500 md:text-right">
+                <p>
+                  {pagination.total} contacts · page {pagination.page} of {pagination.pages}
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    type="submit"
+                    className="rounded-2xl bg-emerald-400 px-6 py-2 text-sm font-semibold text-slate-900 hover:bg-emerald-300"
+                  >
+                    Apply filters
+                  </button>
+                  <a
+                    href="/contacts"
+                    className="rounded-2xl border border-slate-700 px-6 py-2 text-sm font-semibold text-slate-200 hover:border-slate-200"
+                  >
+                    Reset
+                  </a>
+                </div>
+              </div>
             </div>
           </form>
-        </div>
 
-        {/* Contacts Table */}
-        <div className="bg-white rounded-lg shadow overflow-hidden">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
+          <BulkImportPanel />
+        </section>
+
+        <section className="mt-8 overflow-hidden rounded-3xl border border-slate-800 bg-slate-900/80">
+          <table className="min-w-full divide-y divide-slate-800 text-sm">
+            <thead className="bg-slate-900/70 text-xs uppercase tracking-wide text-slate-400">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Name
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Company
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Contact Owner
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Last Activity
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Open Tasks
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Deals
-                </th>
+                <th className="px-4 py-3 text-left">Name</th>
+                <th className="px-4 py-3 text-left">Company</th>
+                <th className="px-4 py-3 text-left">Owner</th>
+                <th className="px-4 py-3 text-left">Last activity</th>
+                <th className="px-4 py-3 text-left">Open tasks</th>
+                <th className="px-4 py-3 text-left">Overdue</th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
+            <tbody>
               {contacts.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
-                    No contacts found. Create your first contact to get started.
+                  <td colSpan={6} className="px-4 py-10 text-center text-slate-500">
+                    No contacts match the current filters.
                   </td>
                 </tr>
               ) : (
-                contacts.map((contact) => {
-                  const overdueTasks = contact.tasks.filter(
-                    (task) => task.dueDate && task.dueDate < new Date()
-                  )
-                  return (
-                    <tr key={contact.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <Link
-                          href={`/contacts/${contact.id}`}
-                          className="text-blue-600 hover:text-blue-800 font-medium"
-                        >
+                contacts.map((contact) => (
+                  <tr key={contact.id} className="border-b border-slate-800/70 text-slate-200 hover:bg-slate-900">
+                    <td className="px-4 py-4">
+                      <div className="font-semibold text-white">
+                        <a href={`/contacts/${contact.id}`} className="hover:underline">
                           {contact.firstName} {contact.lastName}
-                        </Link>
-                        <div className="text-sm text-gray-500">{contact.email}</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {contact.company?.name || '-'}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {contact.owner?.name || 'Unassigned'}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {contact.lastActivityAt
-                          ? new Date(contact.lastActivityAt).toLocaleDateString()
-                          : 'Never'}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm">
+                        </a>
+                      </div>
+                      <p className="text-xs text-slate-400">{contact.email}</p>
+                      <p className="text-xs text-amber-300">{contact.attention.primaryReason}</p>
+                    </td>
+                    <td className="px-4 py-4 text-slate-300">{contact.companyLabel}</td>
+                    <td className="px-4 py-4 text-slate-300">{contact.owner?.name ?? 'Unassigned'}</td>
+                    <td className="px-4 py-4 text-slate-300">
+                      {contact.lastActivityAt ? formatDistanceToNow(new Date(contact.lastActivityAt), { addSuffix: true }) : 'Never'}
+                    </td>
+                    <td className="px-4 py-4">
+                      <span className="rounded-full bg-slate-800 px-3 py-1 text-xs font-semibold text-slate-100">
+                        {contact.openTasksCount}
+                        {contact.overdueTaskCount > 0 ? ` • ${contact.overdueTaskCount} overdue` : ''}
+                      </span>
+                    </td>
+                    <td className="px-4 py-4">
+                      <div className="flex items-center gap-2">
                         <span
-                          className={`${
-                            overdueTasks.length > 0
-                              ? 'text-red-600 font-semibold'
-                              : 'text-gray-900'
+                          className={`h-2.5 w-2.5 rounded-full ${
+                            contact.overdueTaskCount > 0
+                              ? 'bg-rose-400 shadow-[0_0_12px_rgba(248,113,113,0.8)]'
+                              : 'bg-slate-600'
                           }`}
-                        >
-                          {contact.tasks.length}
-                          {overdueTasks.length > 0 && ` (${overdueTasks.length} overdue)`}
+                        />
+                        <span className="text-xs text-slate-400">
+                          {contact.overdueTaskCount > 0 ? 'Action required' : 'Clear'}
                         </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {contact._count.deals}
-                      </td>
-                    </tr>
-                  )
-                })
+                      </div>
+                    </td>
+                  </tr>
+                ))
               )}
             </tbody>
           </table>
-        </div>
+        </section>
       </div>
     </div>
+  )
+}
+
+function StatCard({ label, value, helper, tone }: { label: string; value: number; helper: string; tone: 'rose' | 'amber' | 'emerald' }) {
+  const toneClass =
+    tone === 'rose'
+      ? 'from-rose-500/30 to-rose-600/10 border-rose-500/40 text-rose-100'
+      : tone === 'amber'
+        ? 'from-amber-400/30 to-amber-500/10 border-amber-400/40 text-amber-100'
+        : 'from-emerald-400/30 to-emerald-500/10 border-emerald-400/40 text-emerald-100'
+  return (
+    <div className={`rounded-2xl border bg-gradient-to-br ${toneClass} p-4`}>
+      <p className="text-xs uppercase tracking-[0.3em]">{label}</p>
+      <p className="text-3xl font-semibold">{value}</p>
+      <p className="text-xs text-white/70">{helper}</p>
+    </div>
+  )
+}
+
+function ToggleChip({ name, label, defaultChecked, value = 'true' }: { name: string; label: string; defaultChecked?: boolean; value?: string }) {
+  return (
+    <label
+      className={`flex cursor-pointer items-center justify-between rounded-2xl border px-4 py-2 ${
+        defaultChecked ? 'border-emerald-400 bg-emerald-400/10 text-emerald-200' : 'border-slate-600 bg-slate-900/50 text-slate-300'
+      }`}
+    >
+      <span className="text-xs font-semibold uppercase tracking-wide">{label}</span>
+      <input type="checkbox" name={name} value={value} defaultChecked={defaultChecked} className="h-4 w-4 rounded border border-slate-500 text-emerald-400 focus:ring-emerald-400" />
+    </label>
   )
 }
