@@ -9,10 +9,25 @@ datasource db {
   provider = "postgresql"
 }
 
+model User {
+  id            String   @id @default(cuid())
+  email         String   @unique
+  name          String
+  role          String   @default("user") // user, estimator, admin, owner
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  assignedDeals Deal[]   @relation("AssignedEstimator")
+  createdDeals  Deal[]   @relation("DealCreator")
+  activities    Activity[]
+  tasks         Task[]
+  notes         Note[]
+}
+
 model Company {
   id          String   @id @default(cuid())
   name        String
-  industry    String   // Construction, Railroad, Environmental
+  industry    String   // Construction, Railroad, Environmental, Other
   address     String?
   city        String?
   state       String?
@@ -25,7 +40,7 @@ model Company {
   updatedAt   DateTime @updatedAt
   
   contacts    Contact[]
-  projects    Project[]
+  deals       Deal[]
 }
 
 model Contact {
@@ -36,44 +51,157 @@ model Contact {
   email       String?
   phone       String?
   mobile      String?
-  notes       String?
   companyId   String?
   company     Company? @relation(fields: [companyId], references: [id], onDelete: SetNull)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   
+  deals       Deal[]
+  tasks       Task[]
+  notes       Note[]
   activities  Activity[]
 }
 
-model Project {
+model Deal {
+  id              String    @id @default(cuid())
+  name            String
+  description     String?
+  stage           String    @default("New") // New, Qualifying, Estimating, Proposal Sent, Negotiation, Won, Lost
+  pipeline        String    @default("Main") // Main pipeline or custom
+  value           Float?
+  probability     Int?      // 0-100
+  closeDate       DateTime?
+  lostReason      String?
+  contactId       String
+  contact         Contact   @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  companyId       String?
+  company         Company?  @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  assignedToId    String?
+  assignedTo      User?     @relation("AssignedEstimator", fields: [assignedToId], references: [id], onDelete: SetNull)
+  createdById     String?
+  createdBy       User?     @relation("DealCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  currentVersion  Int       @default(1)
+  isApproved      Boolean   @default(false)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  versions        DealVersion[]
+  lineItems       DealLineItem[]
+  pdfs            DealPdf[]
+  emails          DealEmail[]
+  activities      Activity[]
+  tasks           Task[]
+  notes           Note[]
+}
+
+model DealVersion {
   id          String   @id @default(cuid())
-  name        String
+  dealId      String
+  deal        Deal     @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  version     Int
   description String?
-  status      String   @default("Planning") // Planning, Active, On Hold, Completed, Cancelled
-  type        String?  // Construction, Railroad, Environmental
-  startDate   DateTime?
-  endDate     DateTime?
-  budget      Float?
-  location    String?
-  companyId   String?
-  company     Company? @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  totalValue  Float    @default(0)
+  approvedAt  DateTime?
+  approvedBy  String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  
+  lineItems   DealLineItem[]
+  pdfs        DealPdf[]
+  
+  @@unique([dealId, version])
+}
+
+model DealLineItem {
+  id          String   @id @default(cuid())
+  dealId      String
+  deal        Deal     @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  versionId   String
+  version     DealVersion @relation(fields: [versionId], references: [id], onDelete: Cascade)
+  category    String   // Construction, Railroad, Environmental, Other
+  description String
+  quantity    Float    @default(1)
+  unit        String?  // ea, ft, yd, ton, etc.
+  unitPrice   Float
+  totalPrice  Float
+  notes       String?
+  sortOrder   Int      @default(0)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-  
-  activities  Activity[]
+}
+
+model DealPdf {
+  id          String   @id @default(cuid())
+  dealId      String
+  deal        Deal     @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  versionId   String
+  version     DealVersion @relation(fields: [versionId], references: [id], onDelete: Cascade)
+  fileName    String
+  fileUrl     String   // Storage path or signed URL
+  fileSize    Int?
+  generatedAt DateTime @default(now())
+}
+
+model DealEmail {
+  id          String   @id @default(cuid())
+  dealId      String
+  deal        Deal     @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  subject     String
+  body        String
+  to          String
+  from        String
+  cc          String?
+  bcc         String?
+  sentAt      DateTime @default(now())
+  status      String   @default("sent") // sent, delivered, opened, bounced
 }
 
 model Activity {
   id          String   @id @default(cuid())
-  type        String   // Call, Email, Meeting, Note
+  type        String   // call, email, meeting, note, status_change
   subject     String
+  description String?
+  metadata    String?  // JSON string for additional data
+  contactId   String?
+  contact     Contact? @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  dealId      String?
+  deal        Deal?    @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  userId      String?
+  user        User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  createdAt   DateTime @default(now())
+  
+  @@index([contactId])
+  @@index([dealId])
+  @@index([createdAt])
+}
+
+model Task {
+  id          String   @id @default(cuid())
+  title       String
   description String?
   dueDate     DateTime?
   completed   Boolean  @default(false)
+  completedAt DateTime?
+  priority    String   @default("medium") // low, medium, high
   contactId   String?
-  contact     Contact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
-  projectId   String?
-  project     Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  contact     Contact? @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  dealId      String?
+  deal        Deal?    @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  assignedToId String?
+  assignedTo  User?    @relation(fields: [assignedToId], references: [id], onDelete: SetNull)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Note {
+  id          String   @id @default(cuid())
+  content     String
+  contactId   String?
+  contact     Contact? @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  dealId      String?
+  deal        Deal?    @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  createdById String?
+  createdBy   User?    @relation(fields: [createdById], references: [id], onDelete: SetNull)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }

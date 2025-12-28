@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import Navigation from "@/components/navigation";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -14,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "CRM - Construction, Railroad & Environmental",
-  description: "Customer Relationship Management system for Construction, Railroad, and Environmental industries",
+  title: "T-REX CRM - Construction, Railroad & Environmental",
+  description: "Deal-Centric Customer Relationship Management system for Construction, Railroad, and Environmental industries",
 };
 
 export default function RootLayout({
@@ -28,10 +27,7 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <Navigation />
-        <main className="min-h-screen bg-gray-50">
-          {children}
-        </main>
+        {children}
       </body>
     </html>
   );
