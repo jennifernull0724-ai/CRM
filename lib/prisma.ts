@@ -8,16 +8,31 @@ const globalForPrisma = globalThis as unknown as {
 
 const createPrismaClient = () => {
   const connectionString = process.env.DATABASE_URL
-  
+
   if (!connectionString) {
     // For build time when DATABASE_URL might not be set
-    return new PrismaClient()
+    return new PrismaClient({
+      log: ['error', 'warn'],
+      __internal: {
+        engine: {
+          tracing: false,
+        },
+      },
+    })
   }
-  
+
   const pool = new Pool({ connectionString })
   const adapter = new PrismaNeon(pool)
-  
-  return new PrismaClient({ adapter })
+
+  return new PrismaClient({
+    adapter,
+    log: ['error', 'warn'],
+    __internal: {
+      engine: {
+        tracing: false,
+      },
+    },
+  })
 }
 
 export const prisma = globalForPrisma.prisma ?? createPrismaClient()
