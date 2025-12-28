@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
+import { enforceCanCreateDeal, enforceCanWrite, PricingEnforcementError } from '@/lib/billing/enforcement'
 
 const dealSchema = z.object({
   name: z.string().min(1),
@@ -66,6 +67,17 @@ export async function POST(req: NextRequest) {
     const session = await getServerSession(authOptions)
     if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Enforce pricing: Check if user can create deals
+    try {
+      await enforceCanCreateDeal(session.user.id)
+      await enforceCanWrite(session.user.id)
+    } catch (error) {
+      if (error instanceof PricingEnforcementError) {
+        return NextResponse.json({ error: error.message }, { status: 403 })
+      }
+      throw error
     }
 
     const body = await req.json()
