@@ -158,6 +158,8 @@ enum AccessAuditAction {
   EMAIL_SENT
   EMAIL_RECEIVED
   EMAIL_ATTACHMENT_UPLOADED
+  EMAIL_RECEIVED_UNLINKED
+  EMAIL_LINKED_TO_CONTACT
   MENTION_CREATED
   DEAL_CREATED_FROM_CONTACT
   WORKORDER_CREATED_FROM_CONTACT
@@ -339,6 +341,7 @@ model Contact {
   companyOverrideName String?
   ownerId             String
   createdById         String
+  isSystem            Boolean                @default(false)
   lastActivityAt      DateTime               @default(now())
   activityState       ContactActivityState   @default(NEW)
   archived            Boolean                @default(false)
@@ -368,6 +371,7 @@ model Contact {
   @@unique([companyId, email])
   @@index([companyId, archived])
   @@index([ownerId])
+  @@index([companyId, isSystem])
 }
 
 model Deal {
@@ -689,6 +693,7 @@ model Email {
   syncedAt       DateTime       @default(now())
   status         String?        @default("recorded")
   error          String?
+  requiresContactResolution Boolean @default(false)
 
   company        Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
   contact        Contact        @relation(fields: [contactId], references: [id], onDelete: Cascade)
@@ -717,6 +722,7 @@ model EmailAttachment {
   storageKey  String
   externalId  String?
   checksum    String?
+  isInline    Boolean      @default(false)
   createdAt   DateTime     @default(now())
 
   company     Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)

@@ -1,6 +1,6 @@
 import { subDays } from 'date-fns'
 import { simpleParser, AddressObject } from 'mailparser'
-import type { EmailAccount, EmailDirection } from '@prisma/client'
+import type { EmailAccount, EmailDirection, AccessAuditAction } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { needsAccessTokenRefresh, refreshAccountAccessToken } from '@/lib/email/accounts'
 import { getGmailMessage, listGmailMessages } from '@/lib/email/providers/gmail'
@@ -20,9 +20,68 @@ type ParserAttachment = {
   contentType?: string
   content?: Buffer | Uint8Array | string
   size?: number
+  contentDisposition?: string
 }
 
-export async function ingestRecentEmailsForAccount(accountId: string) {
+type SchedulerOptions = { schedulerKey?: string }
+
+const INGESTION_RATE_WINDOW_MS = 60_000
+
+type IngestionResult = {
+  accountId: string
+  emailAddress: string
+  status: 'ok' | 'error'
+  error?: string
+}
+
+export async function ingestRecentEmailsForAllAccounts(
+  options?: SchedulerOptions & { accountIds?: string[] }
+): Promise<IngestionResult[]> {
+  const schedulerKey = options?.schedulerKey ?? process.env.EMAIL_INGESTION_SCHEDULER_KEY
+  assertSchedulerInvocation(schedulerKey)
+
+  const accountIds = options?.accountIds?.filter((value): value is string => typeof value === 'string' && value.length > 0)
+
+  const accounts = await prisma.emailAccount.findMany({
+    where: {
+      deauthorizedAt: null,
+      ...(accountIds?.length ? { id: { in: accountIds } } : {}),
+    },
+    select: { id: true, emailAddress: true },
+  })
+
+  const results: IngestionResult[] = []
+
+  for (const account of accounts) {
+    try {
+      await prisma.emailAccount.update({ where: { id: account.id }, data: { syncStatus: 'syncing', syncError: null } })
+    } catch (error) {
+      console.error('Failed to mark email account as syncing', account.id, error)
+    }
+
+    try {
+      await ingestRecentEmailsForAccount(account.id, { schedulerKey })
+      results.push({ accountId: account.id, emailAddress: account.emailAddress, status: 'ok' })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown ingestion error'
+      const status = message.includes('rate limited') ? 'idle' : 'error'
+
+      try {
+        await prisma.emailAccount.update({ where: { id: account.id }, data: { syncStatus: status, syncError: message } })
+      } catch (updateError) {
+        console.error('Failed to persist ingestion failure state', account.id, updateError)
+      }
+
+      results.push({ accountId: account.id, emailAddress: account.emailAddress, status: 'error', error: message })
+    }
+  }
+
+  return results
+}
+
+export async function ingestRecentEmailsForAccount(accountId: string, options?: SchedulerOptions) {
+  assertSchedulerInvocation(options?.schedulerKey)
+
   const account = await prisma.emailAccount.findUnique({ where: { id: accountId } })
   if (!account) {
     throw new Error('Email account not found')
@@ -33,15 +92,20 @@ export async function ingestRecentEmailsForAccount(accountId: string) {
     throw new Error('Email account token missing')
   }
 
+  enforceRateLimit(hydratedAccount)
+
   if (hydratedAccount.provider === 'gmail') {
     await ingestGmailAccount(hydratedAccount)
   } else {
     await ingestOutlookAccount(hydratedAccount)
   }
+
+  await prisma.emailAccount.update({ where: { id: hydratedAccount.id }, data: { lastSyncedAt: new Date(), syncStatus: 'idle', syncError: null } })
 }
 
 async function ingestGmailAccount(account: EmailAccount) {
-  const since = `newer_than:${LOOKBACK_DAYS}d`
+  const after = account.lastSyncedAt ? Math.floor(account.lastSyncedAt.getTime() / 1000) : null
+  const since = after ? `after:${after}` : `newer_than:${LOOKBACK_DAYS}d`
   const response = await listGmailMessages({
     accessToken: account.accessToken!,
     maxResults: MAX_MESSAGES_PER_RUN,
@@ -77,8 +141,19 @@ async function ingestGmailAccount(account: EmailAccount) {
 
     const direction: EmailDirection = fromAddress.address?.toLowerCase() === account.emailAddress ? 'OUTBOUND' : 'INBOUND'
     const counterparty = direction === 'INBOUND' ? fromAddress : recipient
-    const contact = await findContactForEmail(account.companyId, counterparty.address ?? '')
-    if (!contact) {
+    const matchedContact = await findContactForEmail(account.companyId, counterparty.address ?? '')
+
+    let contactId = matchedContact?.id
+    let requiresResolution = false
+
+    if (!matchedContact && direction === 'INBOUND') {
+      const sentinel = await ensureSystemUnlinkedContact(account.companyId)
+      contactId = sentinel.id
+      requiresResolution = true
+    }
+
+    if (!contactId) {
+      // Outbound emails without a known contact are ignored to avoid creating orphaned records
       continue
     }
 
@@ -91,7 +166,7 @@ async function ingestGmailAccount(account: EmailAccount) {
     const emailRecord = await prisma.email.create({
       data: {
         companyId: account.companyId,
-        contactId: contact.id,
+        contactId,
         accountId: account.id,
         provider: account.provider,
         direction,
@@ -109,28 +184,24 @@ async function ingestGmailAccount(account: EmailAccount) {
         externalId: id,
         sentAt: parsed.date ?? new Date(),
         receivedAt: parsed.date ?? new Date(),
+        requiresContactResolution: requiresResolution,
       },
     })
 
-    await persistInboundAttachments(parsed.attachments ?? [], account, contact.id, emailRecord.id)
+    await persistInboundAttachments(parsed.attachments ?? [], account, contactId, emailRecord.id)
 
     if (direction === 'INBOUND') {
-      await prisma.activity.create({
-        data: {
-          companyId: account.companyId,
-          contactId: contact.id,
-          type: 'EMAIL_RECEIVED',
-          subject: `Email: ${parsed.subject ?? '(no subject)'}`,
-          description: snippet,
-          metadata: { accountId: account.id, provider: account.provider, emailId: emailRecord.id },
-        },
-      })
+      await logEmailActivity(account.companyId, contactId, requiresResolution ? 'EMAIL_RECEIVED_UNLINKED' : 'EMAIL_RECEIVED', {
+        accountId: account.id,
+        provider: account.provider,
+        emailId: emailRecord.id,
+      }, parsed.subject ?? '(no subject)', snippet)
     }
   }
 }
 
 async function ingestOutlookAccount(account: EmailAccount) {
-  const since = subDays(new Date(), LOOKBACK_DAYS).toISOString()
+  const since = account.lastSyncedAt ? new Date(account.lastSyncedAt).toISOString() : subDays(new Date(), LOOKBACK_DAYS).toISOString()
   const response = await listOutlookMessages({
     accessToken: account.accessToken!,
     top: MAX_MESSAGES_PER_RUN,
@@ -162,8 +233,18 @@ async function ingestOutlookAccount(account: EmailAccount) {
 
     const direction: EmailDirection = fromAddress.address?.toLowerCase() === account.emailAddress ? 'OUTBOUND' : 'INBOUND'
     const counterparty = direction === 'INBOUND' ? fromAddress : recipient
-    const contact = await findContactForEmail(account.companyId, counterparty.address ?? '')
-    if (!contact) {
+    const matchedContact = await findContactForEmail(account.companyId, counterparty.address ?? '')
+
+    let contactId = matchedContact?.id
+    let requiresResolution = false
+
+    if (!matchedContact && direction === 'INBOUND') {
+      const sentinel = await ensureSystemUnlinkedContact(account.companyId)
+      contactId = sentinel.id
+      requiresResolution = true
+    }
+
+    if (!contactId) {
       continue
     }
 
@@ -179,7 +260,7 @@ async function ingestOutlookAccount(account: EmailAccount) {
     const emailRecord = await prisma.email.create({
       data: {
         companyId: account.companyId,
-        contactId: contact.id,
+        contactId,
         accountId: account.id,
         provider: account.provider,
         direction,
@@ -197,23 +278,19 @@ async function ingestOutlookAccount(account: EmailAccount) {
         externalId: message.id,
         sentAt: detail.sentDateTime ? new Date(detail.sentDateTime) : new Date(),
         receivedAt: detail.receivedDateTime ? new Date(detail.receivedDateTime) : new Date(),
+        requiresContactResolution: requiresResolution,
       },
     })
 
     const attachments = detail.attachments ?? []
-    await persistGraphAttachments(attachments, account, contact.id, emailRecord.id)
+    await persistGraphAttachments(attachments, account, contactId, emailRecord.id)
 
     if (direction === 'INBOUND') {
-      await prisma.activity.create({
-        data: {
-          companyId: account.companyId,
-          contactId: contact.id,
-          type: 'EMAIL_RECEIVED',
-          subject: `Email: ${detail.subject ?? '(no subject)'}`,
-          description: snippet,
-          metadata: { accountId: account.id, provider: account.provider, emailId: emailRecord.id },
-        },
-      })
+      await logEmailActivity(account.companyId, contactId, requiresResolution ? 'EMAIL_RECEIVED_UNLINKED' : 'EMAIL_RECEIVED', {
+        accountId: account.id,
+        provider: account.provider,
+        emailId: emailRecord.id,
+      }, detail.subject ?? '(no subject)', snippet)
     }
   }
 }
@@ -246,12 +323,15 @@ async function persistInboundAttachments(
         return
       }
 
+      const isInline = attachment.contentDisposition === 'inline'
+
       const upload = await saveEmailAttachment({
         companyId: account.companyId,
         contactId,
         filename: attachment.filename,
         contentType: attachment.contentType ?? 'application/octet-stream',
         buffer,
+        isInline,
       })
 
       await prisma.emailAttachment.create({
@@ -265,8 +345,11 @@ async function persistInboundAttachments(
           size: attachment.size ?? buffer.length,
           storageKey: upload.key,
           checksum: upload.hash,
+          isInline,
         },
       })
+
+      await logAttachmentAudit(account.companyId, account.userId, attachment.filename, emailId, contactId, upload.hash)
     })
   )
 }
@@ -290,6 +373,7 @@ async function persistGraphAttachments(
           filename: attachment.name,
           contentType: attachment.contentType ?? 'application/octet-stream',
           buffer,
+          isInline: attachment.isInline ?? false,
         })
 
         await prisma.emailAttachment.create({
@@ -303,8 +387,11 @@ async function persistGraphAttachments(
             size: attachment.size ?? buffer.length,
             storageKey: upload.key,
             checksum: upload.hash,
+            isInline: attachment.isInline ?? false,
           },
         })
+
+        await logAttachmentAudit(account.companyId, account.userId, attachment.name, emailId, contactId, upload.hash)
       })
   )
 }
@@ -375,4 +462,102 @@ function bufferFromAttachment(content?: Buffer | Uint8Array | string) {
     return Buffer.from(content)
   }
   return Buffer.from(content)
+}
+
+function assertSchedulerInvocation(key?: string) {
+  const expected = process.env.EMAIL_INGESTION_SCHEDULER_KEY
+  if (!expected) {
+    throw new Error('EMAIL_INGESTION_SCHEDULER_KEY is not configured; scheduler invocation required')
+  }
+
+  if (key !== expected) {
+    throw new Error('Unauthorized ingestion invocation: scheduler key mismatch')
+  }
+}
+
+function enforceRateLimit(account: EmailAccount) {
+  if (account.lastSyncedAt) {
+    const elapsed = Date.now() - new Date(account.lastSyncedAt).getTime()
+    if (elapsed < INGESTION_RATE_WINDOW_MS) {
+      throw new Error('Ingestion rate limited for this account')
+    }
+  }
+}
+
+async function ensureSystemUnlinkedContact(companyId: string) {
+  const existing = await prisma.contact.findFirst({ where: { companyId, isSystem: true } })
+  if (existing) return existing
+
+  const owner = await prisma.user.findFirst({
+    where: { companyId, role: { in: ['owner', 'admin'] } },
+    orderBy: { createdAt: 'asc' },
+  })
+
+  if (!owner) {
+    throw new Error('Cannot create system unlinked contact without an owner or admin user')
+  }
+
+  const sentinelEmail = `unlinked+${companyId}@system.local`
+
+  return prisma.contact.create({
+    data: {
+      id: `unlinked-${companyId}`,
+      companyId,
+      firstName: 'Unlinked',
+      lastName: 'Inbound',
+      email: sentinelEmail,
+      ownerId: owner.id,
+      createdById: owner.id,
+      isSystem: true,
+      derivedCompanyName: 'System',
+      lastActivityAt: new Date(),
+    },
+  })
+}
+
+async function logEmailActivity(
+  companyId: string,
+  contactId: string,
+  type: string,
+  metadata: Record<string, unknown>,
+  subject: string,
+  description: string | null
+) {
+  await prisma.activity.create({
+    data: {
+      companyId,
+      contactId,
+      type,
+      subject: `Email: ${subject}`,
+      description,
+      metadata,
+    },
+  })
+
+  const auditAction = type as AccessAuditAction
+  await prisma.accessAuditLog.create({
+    data: {
+      companyId,
+      action: auditAction,
+      metadata: { contactId, ...metadata },
+    },
+  })
+}
+
+async function logAttachmentAudit(
+  companyId: string,
+  actorId: string | null,
+  filename: string,
+  emailId: string,
+  contactId: string,
+  checksum?: string
+) {
+  await prisma.accessAuditLog.create({
+    data: {
+      companyId,
+      actorId: actorId ?? undefined,
+      action: 'EMAIL_ATTACHMENT_UPLOADED',
+      metadata: { filename, emailId, contactId, checksum },
+    },
+  })
 }

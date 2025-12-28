@@ -135,6 +135,14 @@ npm run build
 npm start
 ```
 
+## Email ingestion (server-only)
+
+Owner/Admin-only trigger:
+
+```bash
+EMAIL_INGESTION_SCHEDULER_KEY=your_key npx ts-node scripts/runEmailIngestion.ts
+```
+
 ## Current Implementation Status
 
 ### Completed ✅

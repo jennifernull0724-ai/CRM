@@ -1,19 +1,9 @@
-import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3'
-import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import crypto from 'crypto'
 import type { Readable } from 'stream'
+import { bucket } from '@/lib/storage/gcs'
+import path from 'path'
 
-const s3Client = new S3Client({
-  region: process.env.AWS_REGION!,
-  credentials: {
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
-  },
-  ...(process.env.AWS_S3_ENDPOINT && { endpoint: process.env.AWS_S3_ENDPOINT }),
-  forcePathStyle: process.env.AWS_S3_FORCE_PATH_STYLE === 'true',
-})
-
-const bucket = process.env.AWS_S3_BUCKET!
+const BUCKET_NAME = bucket.name
 
 export interface UploadResult {
   key: string
@@ -50,58 +40,52 @@ async function streamToBuffer(stream: Readable | ReadableStream | Blob): Promise
 /**
  * Upload file to S3
  */
-export async function uploadFile(
-  file: Buffer,
-  path: string,
-  contentType: string
-): Promise<UploadResult> {
-  const key = `${path}/${Date.now()}-${crypto.randomBytes(8).toString('hex')}`
+export async function uploadFile(file: Buffer, objectKey: string, contentType: string): Promise<UploadResult> {
+  const key = objectKey.includes('.') ? objectKey : `${objectKey}/${crypto.randomUUID()}`
   const hash = crypto.createHash('sha256').update(file).digest('hex')
 
-  const command = new PutObjectCommand({
-    Bucket: bucket,
-    Key: key,
-    Body: file,
-    ContentType: contentType,
-    Metadata: {
+  const fileRef = bucket.file(key)
+  await fileRef.save(file, {
+    contentType,
+    metadata: {
       hash,
       uploadedAt: new Date().toISOString(),
     },
   })
 
-  await s3Client.send(command)
-
   return {
     key,
-    bucket,
-    url: `s3://${bucket}/${key}`,
+    bucket: BUCKET_NAME,
+    url: `gs://${BUCKET_NAME}/${key}`,
     hash,
     size: file.length,
   }
 }
 
+function buildObjectKey(companyId: string, contactId: string | null, entity: string, filename: string) {
+  const ext = path.extname(filename || '').replace('.', '') || 'bin'
+  const cleanEntity = entity.replace(/^\/+|\/+$/g, '')
+  const base = contactId ? `companies/${companyId}/contacts/${contactId}/${cleanEntity}` : `companies/${companyId}/${cleanEntity}`
+  return `${base}/${crypto.randomUUID()}.${ext}`
+}
+
 /**
  * Generate signed URL for download
  */
-export async function getDownloadUrl(key: string, expiresIn: number = 3600): Promise<string> {
-  const command = new GetObjectCommand({
-    Bucket: bucket,
-    Key: key,
+export async function getDownloadUrl(key: string, expiresIn: number = 900): Promise<string> {
+  const [signedUrl] = await bucket.file(key).getSignedUrl({
+    action: 'read',
+    expires: Date.now() + expiresIn * 1000,
   })
 
-  return await getSignedUrl(s3Client, command, { expiresIn })
+  return signedUrl
 }
 
 /**
  * Delete file from S3
  */
 export async function deleteFile(key: string): Promise<void> {
-  const command = new DeleteObjectCommand({
-    Bucket: bucket,
-    Key: key,
-  })
-
-  await s3Client.send(command)
+  await bucket.file(key).delete({ ignoreNotFound: true })
 }
 
 /**
@@ -114,23 +98,13 @@ export async function uploadComplianceFile(
   filename: string,
   contentType: string
 ): Promise<UploadResult> {
-  void filename
-  const path = `companies/${companyId}/compliance/${type}`
-  return uploadFile(file, path, contentType)
+  const key = buildObjectKey(companyId, null, `compliance/${type}`, filename)
+  return uploadFile(file, key, contentType)
 }
 
 export async function getFileBuffer(key: string): Promise<Buffer> {
-  const command = new GetObjectCommand({
-    Bucket: bucket,
-    Key: key,
-  })
-
-  const response = await s3Client.send(command)
-  if (!response.Body) {
-    throw new Error('Empty S3 body')
-  }
-
-  return streamToBuffer(response.Body as Readable)
+  const [stream] = await bucket.file(key).download()
+  return stream
 }
 
 export async function uploadComplianceCertificationImage(params: {
@@ -142,8 +116,15 @@ export async function uploadComplianceCertificationImage(params: {
   contentType: string
 }): Promise<UploadResult> {
   const { file, companyId, employeeId, certificationId, version, contentType } = params
-  const path = `companies/${companyId}/compliance/employees/${employeeId}/certifications/${certificationId}/images/${version}`
-  return uploadFile(file, path, contentType)
+  const ext = contentType.split('/')[1] ?? 'bin'
+  const filename = `cert-${certificationId}-${version}.${ext}`
+  const key = buildObjectKey(
+    companyId,
+    null,
+    `compliance/employees/${employeeId}/certifications/${certificationId}/images/${version}`,
+    filename
+  )
+  return uploadFile(file, key, contentType)
 }
 
 export async function getComplianceFileBuffer(key: string): Promise<Buffer> {
@@ -168,8 +149,8 @@ export async function uploadDealPdf(
   dealId: string,
   version: number
 ): Promise<UploadResult> {
-  const path = `companies/${companyId}/deals/${dealId}/versions/${version}/pdfs`
-  return uploadFile(file, path, 'application/pdf')
+  const key = buildObjectKey(companyId, null, `deals/${dealId}/versions/${version}/pdfs`, 'deal.pdf')
+  return uploadFile(file, key, 'application/pdf')
 }
 
 export async function uploadEstimatePdf(
@@ -179,6 +160,6 @@ export async function uploadEstimatePdf(
   revisionNumber: number,
   kind: 'estimate' | 'quote'
 ): Promise<UploadResult> {
-  const path = `companies/${companyId}/estimates/${estimateId}/revisions/${revisionNumber}/${kind}`
-  return uploadFile(file, path, 'application/pdf')
+  const key = buildObjectKey(companyId, null, `estimates/${estimateId}/revisions/${revisionNumber}/${kind}`, `${kind}.pdf`)
+  return uploadFile(file, key, 'application/pdf')
 }
