@@ -19,7 +19,7 @@ const updateSchema = z.object({
 // GET /api/contacts/[id] - Get contact details
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions)
@@ -27,8 +27,9 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const { id } = await params
     const contact = await prisma.contact.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: {
         company: true,
         owner: { select: { id: true, name: true, email: true } },
@@ -75,7 +76,7 @@ export async function GET(
 // PATCH /api/contacts/[id] - Update contact
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions)
@@ -83,8 +84,9 @@ export async function PATCH(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const { id } = await params
     const contact = await prisma.contact.findUnique({
-      where: { id: params.id },
+      where: { id },
     })
 
     if (!contact) {
@@ -108,7 +110,7 @@ export async function PATCH(
     }
 
     const updated = await prisma.contact.update({
-      where: { id: params.id },
+      where: { id },
       data: validated,
       include: {
         company: true,
@@ -139,7 +141,7 @@ export async function PATCH(
 // DELETE /api/contacts/[id] - Delete contact (admin/owner only)
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions)
@@ -152,8 +154,9 @@ export async function DELETE(
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
+    const { id } = await params
     const contact = await prisma.contact.findUnique({
-      where: { id: params.id },
+      where: { id },
     })
 
     if (!contact) {
@@ -161,7 +164,7 @@ export async function DELETE(
     }
 
     await prisma.contact.delete({
-      where: { id: params.id },
+      where: { id },
     })
 
     // Log activity
