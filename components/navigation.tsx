@@ -15,29 +15,19 @@ export default function Navigation() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           <div className="flex items-center">
-            <Link href="/" className="text-xl font-bold">
-              CRM
+            <Link href="/dashboard/user" className="text-xl font-bold">
+              T-REX CRM
             </Link>
             <div className="ml-10 flex items-baseline space-x-4">
               <Link
-                href="/"
+                href="/dashboard/user"
                 className={`px-3 py-2 rounded-md text-sm font-medium ${
-                  isActive('/') && pathname === '/'
+                  isActive('/dashboard')
                     ? 'bg-slate-900 text-white'
                     : 'text-slate-300 hover:bg-slate-700 hover:text-white'
                 }`}
               >
                 Dashboard
-              </Link>
-              <Link
-                href="/companies"
-                className={`px-3 py-2 rounded-md text-sm font-medium ${
-                  isActive('/companies')
-                    ? 'bg-slate-900 text-white'
-                    : 'text-slate-300 hover:bg-slate-700 hover:text-white'
-                }`}
-              >
-                Companies
               </Link>
               <Link
                 href="/contacts"
@@ -50,26 +40,34 @@ export default function Navigation() {
                 Contacts
               </Link>
               <Link
-                href="/projects"
+                href="/deals"
                 className={`px-3 py-2 rounded-md text-sm font-medium ${
-                  isActive('/projects')
+                  isActive('/deals')
                     ? 'bg-slate-900 text-white'
                     : 'text-slate-300 hover:bg-slate-700 hover:text-white'
                 }`}
               >
-                Projects
+                Deals
               </Link>
               <Link
-                href="/activities"
+                href="/settings"
                 className={`px-3 py-2 rounded-md text-sm font-medium ${
-                  isActive('/activities')
+                  isActive('/settings')
                     ? 'bg-slate-900 text-white'
                     : 'text-slate-300 hover:bg-slate-700 hover:text-white'
                 }`}
               >
-                Activities
+                Settings
               </Link>
             </div>
+          </div>
+          <div>
+            <Link
+              href="/login"
+              className="text-slate-300 hover:text-white text-sm font-medium"
+            >
+              Sign Out
+            </Link>
           </div>
         </div>
       </div>

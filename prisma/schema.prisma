@@ -10,18 +10,61 @@ datasource db {
 }
 
 model User {
-  id            String   @id @default(cuid())
-  email         String   @unique
-  name          String
-  role          String   @default("user") // user, estimator, admin, owner
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id              String    @id @default(cuid())
+  email           String    @unique
+  emailVerified   DateTime?
+  name            String
+  password        String?   // hashed password
+  image           String?
+  role            String    @default("user") // user, estimator, admin, owner
+  stripeCustomerId String?
+  subscriptionStatus String? @default("trial") // trial, active, cancelled, expired
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
   
-  assignedDeals Deal[]   @relation("AssignedEstimator")
-  createdDeals  Deal[]   @relation("DealCreator")
-  activities    Activity[]
-  tasks         Task[]
-  notes         Note[]
+  assignedDeals   Deal[]    @relation("AssignedEstimator")
+  createdDeals    Deal[]    @relation("DealCreator")
+  ownedContacts   Contact[] @relation("ContactOwner")
+  activities      Activity[]
+  tasks           Task[]
+  notes           Note[]
+  accounts        Account[]
+  sessions        Session[]
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
 }
 
 model Company {
@@ -44,22 +87,27 @@ model Company {
 }
 
 model Contact {
-  id          String   @id @default(cuid())
-  firstName   String
-  lastName    String
-  title       String?
-  email       String?
-  phone       String?
-  mobile      String?
-  companyId   String?
-  company     Company? @relation(fields: [companyId], references: [id], onDelete: SetNull)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id              String    @id @default(cuid())
+  firstName       String
+  lastName        String
+  email           String    @unique
+  phone           String?
+  mobile          String?
+  title           String?   // Job Title
+  companyId       String?
+  company         Company?  @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  ownerId         String?   // Contact Owner
+  owner           User?     @relation("ContactOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  createdById     String?
+  lastActivityAt  DateTime? // System-derived, updated on any activity
+  archived        Boolean   @default(false)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
   
-  deals       Deal[]
-  tasks       Task[]
-  notes       Note[]
-  activities  Activity[]
+  deals           Deal[]
+  tasks           Task[]
+  notes           Note[]
+  activities      Activity[]
 }
 
 model Deal {
@@ -158,10 +206,10 @@ model DealEmail {
 
 model Activity {
   id          String   @id @default(cuid())
-  type        String   // call, email, meeting, note, status_change
+  type        String   // CONTACT_CREATED, TASK_COMPLETED, TASK_CREATED, MENTION, CALL, MEETING, SOCIAL, EMAIL_SENT, EMAIL_RECEIVED, NOTE_ADDED, DEAL_CREATED, STAGE_CHANGED, PDF_GENERATED, CUSTOM
   subject     String
   description String?
-  metadata    String?  // JSON string for additional data
+  metadata    String?  // JSON string for additional data (call duration, meeting attendees, etc.)
   contactId   String?
   contact     Contact? @relation(fields: [contactId], references: [id], onDelete: Cascade)
   dealId      String?
@@ -172,30 +220,38 @@ model Activity {
   
   @@index([contactId])
   @@index([dealId])
+  @@index([userId])
   @@index([createdAt])
+  @@index([type])
 }
 
 model Task {
-  id          String   @id @default(cuid())
-  title       String
-  description String?
-  dueDate     DateTime?
-  completed   Boolean  @default(false)
-  completedAt DateTime?
-  priority    String   @default("medium") // low, medium, high
-  contactId   String?
-  contact     Contact? @relation(fields: [contactId], references: [id], onDelete: Cascade)
-  dealId      String?
-  deal        Deal?    @relation(fields: [dealId], references: [id], onDelete: Cascade)
-  assignedToId String?
-  assignedTo  User?    @relation(fields: [assignedToId], references: [id], onDelete: SetNull)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id            String    @id @default(cuid())
+  title         String
+  description   String?
+  dueDate       DateTime?
+  completed     Boolean   @default(false)
+  completedAt   DateTime?
+  priority      String    @default("medium") // low, medium, high
+  notes         String?
+  contactId     String?
+  contact       Contact?  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  dealId        String?
+  deal          Deal?     @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  assignedToId  String?   // Owner
+  assignedTo    User?     @relation(fields: [assignedToId], references: [id], onDelete: SetNull)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  @@index([assignedToId])
+  @@index([dueDate])
+  @@index([completed])
 }
 
 model Note {
   id          String   @id @default(cuid())
-  content     String
+  content     String   // Rich text with @mentions
+  mentions    String?  // JSON array of mentioned user IDs
   contactId   String?
   contact     Contact? @relation(fields: [contactId], references: [id], onDelete: Cascade)
   dealId      String?
