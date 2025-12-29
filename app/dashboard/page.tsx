@@ -5,6 +5,7 @@ import { authOptions } from '@/lib/auth'
 const ROLE_DESTINATION: Record<string, string> = {
   user: '/dashboard/user',
   estimator: '/dashboard/estimator',
+  dispatch: '/dashboard/dispatch',
   admin: '/dashboard/admin',
   owner: '/dashboard/owner',
 }

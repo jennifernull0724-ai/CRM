@@ -14,6 +14,12 @@ import { prisma } from '@/lib/prisma'
 import { createContactRecord, updateContactRecord } from '@/lib/contacts/mutations'
 import { sendMentionNotification } from '@/lib/email'
 import { sanitizeNoteBody } from '@/lib/contacts/noteRichText'
+import { sendContactEmail } from '@/lib/email/service'
+import type { EmailRecipientInput } from '@/lib/email/service'
+
+const MAX_ATTACHMENT_BYTES = 15 * 1024 * 1024
+const MAX_TOTAL_ATTACHMENT_BYTES = 25 * 1024 * 1024
+const MAX_ATTACHMENT_COUNT = 5
 
 export type ActionState = { success: boolean; message?: string; contactId?: string }
 
@@ -29,6 +35,7 @@ type ContactScope = {
 	companyId: string
 	firstName: string
 	lastName: string
+	email: string
 }
 
 async function requireWorkspaceContext(): Promise<WorkspaceContext> {
@@ -47,7 +54,7 @@ async function requireWorkspaceContext(): Promise<WorkspaceContext> {
 async function ensureContactScope(contactId: string, companyId: string): Promise<ContactScope> {
 	const contact = await prisma.contact.findFirst({
 		where: { id: contactId, companyId },
-		select: { id: true, companyId: true, firstName: true, lastName: true },
+		select: { id: true, companyId: true, firstName: true, lastName: true, email: true },
 	})
 
 	if (!contact) {
@@ -755,6 +762,145 @@ export async function logContactCustomActivityAction(
 		return { success: true, contactId: contact.id }
 	} catch (error) {
 		const message = error instanceof Error ? error.message : 'Unable to log custom activity'
+		return { success: false, message }
+	}
+}
+
+const emailComposerSchema = z.object({
+	accountId: z.string().min(1),
+	to: z.string().min(1),
+	cc: z.string().optional(),
+	bcc: z.string().optional(),
+	subject: z.string().min(1),
+	bodyHtml: z.string().min(1),
+	bodyText: z.string().optional(),
+})
+
+function normalizeRecipients(raw?: string | null): EmailRecipientInput[] {
+	if (!raw) return []
+	const emails = raw
+		.split(/[\n,;]+/)
+		.map((part) => part.trim())
+		.filter(Boolean)
+	const unique = Array.from(new Set(emails.map((value) => value.toLowerCase())))
+	return unique.map((email) => {
+		const parsed = z.string().email().safeParse(email)
+		if (!parsed.success) {
+			throw new Error(`Invalid email: ${email}`)
+		}
+		return { email: parsed.data }
+	})
+}
+
+function stripHtml(input: string): string {
+	return input.replace(/<style[\s\S]*?<\/style>/gi, '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim()
+}
+
+export async function sendContactEmailAction(
+	contactId: string,
+	stateOrFormData: ActionState | FormData,
+	maybeFormData?: FormData
+): Promise<ActionState> {
+	try {
+		const formData = resolveFormData(stateOrFormData, maybeFormData)
+		const { userId, companyId } = await requireWorkspaceContext()
+		const contact = await ensureContactScope(contactId, companyId)
+		const data = emailComposerSchema.parse({
+			accountId: formData.get('accountId')?.toString(),
+			to: formData.get('to')?.toString(),
+			cc: formData.get('cc')?.toString() ?? undefined,
+			bcc: formData.get('bcc')?.toString() ?? undefined,
+			subject: formData.get('subject')?.toString(),
+			bodyHtml: formData.get('bodyHtml')?.toString(),
+			bodyText: formData.get('bodyText')?.toString() ?? undefined,
+		})
+
+		const account = await prisma.emailAccount.findFirst({
+			where: { id: data.accountId, companyId, userId, deauthorizedAt: null },
+		})
+
+		if (!account) {
+			throw new Error('Email account is not available in this workspace')
+		}
+
+		const toRecipients = normalizeRecipients(data.to)
+		if (toRecipients.length === 0) {
+			throw new Error('At least one primary recipient is required')
+		}
+
+		const ccRecipients = normalizeRecipients(data.cc)
+		const bccRecipients = normalizeRecipients(data.bcc)
+		const everyone = [...toRecipients, ...ccRecipients, ...bccRecipients]
+		const contactEmail = contact.email.toLowerCase()
+		const includesContact = everyone.some((recipient) => recipient.email === contactEmail)
+		if (!includesContact) {
+			throw new Error('Contact email must be included')
+		}
+		const allEmails = everyone.map((recipient) => recipient.email)
+
+		const suppressed = await prisma.emailRecipientPreference.findMany({
+			where: { companyId, email: { in: allEmails } },
+		})
+		const blocked = suppressed.filter((preference) => !preference.sendEnabled)
+		if (blocked.length > 0) {
+			throw new Error(`Sending blocked for ${blocked.map((pref) => pref.email).join(', ')}`)
+		}
+
+		const files = formData.getAll('attachments').filter((value): value is File => value instanceof File && value.size > 0)
+		if (files.length > MAX_ATTACHMENT_COUNT) {
+			throw new Error(`Maximum ${MAX_ATTACHMENT_COUNT} attachments allowed`)
+		}
+
+		let totalBytes = 0
+		const attachments = await Promise.all(
+			files.map(async (file) => {
+				if (file.size > MAX_ATTACHMENT_BYTES) {
+					throw new Error(`${file.name} exceeds ${Math.round(MAX_ATTACHMENT_BYTES / (1024 * 1024))}MB limit`)
+				}
+				totalBytes += file.size
+				if (totalBytes > MAX_TOTAL_ATTACHMENT_BYTES) {
+					throw new Error('Attachments exceed total size limit')
+				}
+				const buffer = Buffer.from(await file.arrayBuffer())
+				return {
+					filename: file.name,
+					contentType: file.type || 'application/octet-stream',
+					buffer,
+				}
+			})
+		)
+
+		const textBody = data.bodyText?.trim() || stripHtml(data.bodyHtml)
+		if (!textBody) {
+			throw new Error('Email body cannot be empty')
+		}
+
+		const emailRecord = await sendContactEmail({
+			accountId: account.id,
+			companyId,
+			contactId: contact.id,
+			authorId: userId,
+			to: toRecipients,
+			cc: ccRecipients.length ? ccRecipients : undefined,
+			bcc: bccRecipients.length ? bccRecipients : undefined,
+			subject: data.subject,
+			html: data.bodyHtml,
+			text: textBody,
+			attachments,
+		})
+
+		await touchContactActivity(contact.id)
+		await logAuditEvent({
+			companyId,
+			actorId: userId,
+			action: 'EMAIL_SENT',
+			metadata: { contactId: contact.id, emailId: emailRecord.id, accountId: account.id },
+		})
+		revalidateContactSurfaces(contact.id)
+
+		return { success: true, contactId: contact.id, message: 'Email sent' }
+	} catch (error) {
+		const message = error instanceof Error ? error.message : 'Unable to send email'
 		return { success: false, message }
 	}
 }

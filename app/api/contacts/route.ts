@@ -49,7 +49,10 @@ export async function GET(req: NextRequest) {
 
     const { searchParams } = new URL(req.url)
     const filters = parseFilters(searchParams)
-    const result = await listContactsForCompany(session.user.companyId, filters)
+    const result = await listContactsForCompany(session.user.companyId, filters, {
+      userId: session.user.id,
+      role: session.user.role ?? 'user',
+    })
     return NextResponse.json(result)
   } catch (error) {
     console.error('GET /api/contacts error:', error)

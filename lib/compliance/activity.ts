@@ -1,38 +1,29 @@
 import { prisma } from '@/lib/prisma'
-import { ComplianceActivityType } from '@prisma/client'
+import type { ComplianceActivityType } from '@prisma/client'
 
-export async function logComplianceActivity({
-  employeeId,
-  type,
-  metadata,
-}: {
-  employeeId: string
+export type ComplianceActivityLog = {
+  companyId: string
+  actorId: string
   type: ComplianceActivityType
+  employeeId?: string
+  certificationId?: string
+  companyDocumentId?: string
+  companyDocumentVersionId?: string
   metadata?: Record<string, unknown>
-}): Promise<void> {
+}
+
+export async function logComplianceActivity(entry: ComplianceActivityLog): Promise<void> {
   await prisma.complianceActivity.create({
-    data: {
-      employeeId,
-      type,
-      metadata,
-    },
+    data: entry,
   })
 }
 
-export async function logActivities(batch: {
-  employeeId: string
-  type: ComplianceActivityType
-  metadata?: Record<string, unknown>
-}[]): Promise<void> {
+export async function logActivities(batch: ComplianceActivityLog[]): Promise<void> {
   if (!batch.length) {
     return
   }
 
   await prisma.complianceActivity.createMany({
-    data: batch.map(({ employeeId, type, metadata }) => ({
-      employeeId,
-      type,
-      metadata,
-    })),
+    data: batch,
   })
 }

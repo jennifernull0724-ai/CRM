@@ -5,6 +5,7 @@ import { planAllowsFeature, type PlanKey } from '@/lib/billing/planTiers'
 import { prisma } from '@/lib/prisma'
 import { generateComplianceBinder } from '@/lib/compliance/pdf'
 import { logComplianceActivity } from '@/lib/compliance/activity'
+import { createComplianceSnapshot } from '@/lib/compliance/snapshots'
 
 export async function POST(request: Request) {
   const session = await getServerSession(authOptions)
@@ -46,6 +47,17 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'One or more employees not found' }, { status: 404 })
   }
 
+  const snapshotHashes = new Map<string, string>()
+
+  for (const employee of employees) {
+    const { snapshot } = await createComplianceSnapshot({
+      employeeId: employee.id,
+      createdById: session.user.id,
+      source: 'print',
+    })
+    snapshotHashes.set(employee.id, snapshot.snapshotHash)
+  }
+
   const binderBuffer = await generateComplianceBinder(
     employees.map((employee) => ({
       employee,
@@ -60,7 +72,7 @@ export async function POST(request: Request) {
           version: image.version,
         })),
       })),
-      snapshotHash: employee.complianceHash ?? 'UNVERIFIED',
+      snapshotHash: snapshotHashes.get(employee.id) ?? employee.complianceHash ?? 'UNVERIFIED',
       includeFullPacket: false,
     }))
   )
@@ -68,11 +80,13 @@ export async function POST(request: Request) {
   await Promise.all(
     employees.map((employee) =>
       logComplianceActivity({
+        companyId: session.user.companyId,
+        actorId: session.user.id,
         employeeId: employee.id,
         type: 'COMPLIANCE_PRINTED',
         metadata: {
-          userId: session.user.id,
           mode: 'bulk',
+          snapshotHash: snapshotHashes.get(employee.id) ?? employee.complianceHash ?? 'UNVERIFIED',
         },
       })
     )

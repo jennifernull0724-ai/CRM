@@ -1,8 +1,9 @@
 import { redirect } from 'next/navigation'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { loadControlPlaneData } from '@/lib/dashboard/controlPlane'
-import { ControlPlaneDashboard } from '@/app/dashboard/_components/control-plane-dashboard'
+import { ContactAnalyticsCommand } from '@/app/dashboard/_components/contact-analytics-command'
+import { AssetSummaryPanel } from '@/app/dashboard/_components/asset-summary-panel'
+import { getAssetDashboardSummary } from '@/lib/assets/registry'
 
 export default async function OwnerDashboardPage() {
   const session = await getServerSession(authOptions)
@@ -21,7 +22,12 @@ export default async function OwnerDashboardPage() {
     redirect('/dashboard/admin')
   }
 
-  const data = await loadControlPlaneData(session.user.companyId)
+  const summary = await getAssetDashboardSummary(session.user.companyId)
 
-  return <ControlPlaneDashboard variant="owner" data={data} planKey={session.user.planKey} />
+  return (
+    <>
+      <ContactAnalyticsCommand variant="owner" />
+      <AssetSummaryPanel summary={summary} role="owner" />
+    </>
+  )
 }

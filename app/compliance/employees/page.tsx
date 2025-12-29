@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { createEmployeeAction } from './actions'
 import { planAllowsFeature, type PlanKey } from '@/lib/billing/planTiers'
+import type { ComplianceStatus, Prisma } from '@prisma/client'
 
 const STATUS_ORDER: Record<string, number> = { FAIL: 0, INCOMPLETE: 1, PASS: 2 }
 const STATUS_STYLES: Record<string, string> = {
@@ -25,65 +26,53 @@ function parseBooleanParam(value: string | string[] | undefined) {
   return normalized === 'true' || normalized === 'on' || normalized === '1'
 }
 
-export default async function ComplianceEmployeesPage({ searchParams }: { searchParams: SearchParams }) {
-  const session = await getServerSession(authOptions)
-
-  if (!session?.user?.companyId) {
-    throw new Error('Missing company context')
+type EmployeeWithRelations = Prisma.ComplianceEmployeeGetPayload<{
+  include: {
+    certifications: {
+      select: {
+        id: true
+        required: true
+        status: true
+        expiresAt: true
+      }
+    }
+    snapshots: {
+      orderBy: { createdAt: 'desc' }
+      take: 1
+    }
   }
+}>
 
-  const planKey = (session.user.planKey as PlanKey) ?? 'starter'
-  const isAdvanced = planAllowsFeature(planKey, 'advanced_compliance')
+type EmployeeFilters = {
+  status: string
+  role: string
+  missing: boolean
+  expiring: boolean
+}
 
-  const filters = {
-    status: (searchParams.status as string) || '',
-    role: (searchParams.role as string) || '',
-    missing: parseBooleanParam(searchParams.missing),
-    expiring: parseBooleanParam(searchParams.expiring),
-  }
+function buildEmployeeRows(employees: EmployeeWithRelations[], filters: EmployeeFilters) {
+  const now = Date.now()
+  const dayInMs = 1000 * 60 * 60 * 24
 
-  const employees = await prisma.complianceEmployee.findMany({
-    where: {
-      companyId: session.user.companyId,
-      complianceStatus: filters.status ? (filters.status as any) : undefined,
-      role: filters.role || undefined,
-    },
-    include: {
-      certifications: {
-        select: {
-          id: true,
-          required: true,
-          status: true,
-          expiresAt: true,
-        },
-      },
-      qrTokens: {
-        orderBy: { createdAt: 'desc' },
-        take: 1,
-      },
-      snapshots: {
-        orderBy: { createdAt: 'desc' },
-        take: 1,
-      },
-    },
-  })
-
-  const enriched = employees
+  return employees
     .map((employee) => {
       const missingCerts = employee.certifications.filter(
         (cert) => cert.required && cert.status !== 'PASS'
       ).length
+
       const expiringCerts = employee.certifications.filter((cert) => {
         if (cert.status !== 'PASS') return false
-        const daysUntilExpiry = (cert.expiresAt.getTime() - Date.now()) / (1000 * 60 * 60 * 24)
+        const daysUntilExpiry = (cert.expiresAt.getTime() - now) / dayInMs
         return daysUntilExpiry <= 30
       }).length
+
       const lastSnapshot = employee.snapshots[0]
-      let qrStatus = 'Pending'
-      if (employee.qrTokens[0]) {
-        const ageDays = lastSnapshot
-          ? (Date.now() - lastSnapshot.createdAt.getTime()) / (1000 * 60 * 60 * 24)
-          : Number.POSITIVE_INFINITY
+      const ageDays = lastSnapshot
+        ? (now - lastSnapshot.createdAt.getTime()) / dayInMs
+        : Number.POSITIVE_INFINITY
+
+      let qrStatus = 'No snapshot'
+      if (Number.isFinite(ageDays)) {
         qrStatus = ageDays > 30 ? 'Refresh' : 'Active'
       }
 
@@ -109,6 +98,48 @@ export default async function ComplianceEmployeesPage({ searchParams }: { search
       if (b.expiringCerts !== a.expiringCerts) return b.expiringCerts - a.expiringCerts
       return b.missingCerts - a.missingCerts
     })
+}
+
+export default async function ComplianceEmployeesPage({ searchParams }: { searchParams: SearchParams }) {
+  const session = await getServerSession(authOptions)
+
+  if (!session?.user?.companyId) {
+    throw new Error('Missing company context')
+  }
+
+  const planKey = (session.user.planKey as PlanKey) ?? 'starter'
+  const isAdvanced = planAllowsFeature(planKey, 'advanced_compliance')
+
+  const filters = {
+    status: (searchParams.status as string) || '',
+    role: (searchParams.role as string) || '',
+    missing: parseBooleanParam(searchParams.missing),
+    expiring: parseBooleanParam(searchParams.expiring),
+  }
+
+  const employees = await prisma.complianceEmployee.findMany({
+    where: {
+      companyId: session.user.companyId,
+      complianceStatus: filters.status ? (filters.status as ComplianceStatus) : undefined,
+      role: filters.role || undefined,
+    },
+    include: {
+      certifications: {
+        select: {
+          id: true,
+          required: true,
+          status: true,
+          expiresAt: true,
+        },
+      },
+      snapshots: {
+        orderBy: { createdAt: 'desc' },
+        take: 1,
+      },
+    },
+  })
+
+  const enriched = buildEmployeeRows(employees, filters)
 
   return (
     <div className="space-y-8">
@@ -123,6 +154,7 @@ export default async function ComplianceEmployeesPage({ searchParams }: { search
             <p className="text-sm font-semibold text-slate-700">Add employee</p>
             <div className="grid gap-2">
               <input name="employeeId" placeholder="Employee ID" className="rounded-lg border border-slate-200 px-3 py-2 text-sm" required />
+              <input name="email" type="email" placeholder="Work email" className="rounded-lg border border-slate-200 px-3 py-2 text-sm" required />
               <div className="grid grid-cols-2 gap-2">
                 <input name="firstName" placeholder="First name" className="rounded-lg border border-slate-200 px-3 py-2 text-sm" required />
                 <input name="lastName" placeholder="Last name" className="rounded-lg border border-slate-200 px-3 py-2 text-sm" required />

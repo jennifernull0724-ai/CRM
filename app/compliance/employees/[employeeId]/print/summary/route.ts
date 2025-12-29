@@ -67,11 +67,13 @@ export async function GET(_request: Request, { params }: { params: { employeeId:
   })
 
   await logComplianceActivity({
+    companyId: session.user.companyId,
+    actorId: session.user.id,
     employeeId: employee.id,
     type: 'COMPLIANCE_PRINTED',
     metadata: {
-      userId: session.user.id,
-      employeeId: employee.employeeId,
+      employeeIdentifier: employee.employeeId,
+      snapshotHash,
     },
   })
 

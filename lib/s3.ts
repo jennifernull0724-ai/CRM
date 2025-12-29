@@ -118,12 +118,7 @@ export async function uploadComplianceCertificationImage(params: {
   const { file, companyId, employeeId, certificationId, version, contentType } = params
   const ext = contentType.split('/')[1] ?? 'bin'
   const filename = `cert-${certificationId}-${version}.${ext}`
-  const key = buildObjectKey(
-    companyId,
-    null,
-    `compliance/employees/${employeeId}/certifications/${certificationId}/images/${version}`,
-    filename
-  )
+  const key = buildObjectKey(companyId, null, `compliance/employees/${employeeId}/certifications/${certificationId}/images/${version}`, filename)
   return uploadFile(file, key, contentType)
 }
 
@@ -132,12 +127,14 @@ export async function getComplianceFileBuffer(key: string): Promise<Buffer> {
 }
 
 export async function getComplianceSignedUrl(key: string, expiresIn: number = 900): Promise<string> {
-  const command = new GetObjectCommand({
-    Bucket: bucket,
-    Key: key,
+  const expires = Date.now() + expiresIn * 1000
+  const fileRef = bucket.file(key)
+  const [signedUrl] = await fileRef.getSignedUrl({
+    action: 'read',
+    expires,
   })
 
-  return getSignedUrl(s3Client, command, { expiresIn })
+  return signedUrl
 }
 
 /**
@@ -162,4 +159,21 @@ export async function uploadEstimatePdf(
 ): Promise<UploadResult> {
   const key = buildObjectKey(companyId, null, `estimates/${estimateId}/revisions/${revisionNumber}/${kind}`, `${kind}.pdf`)
   return uploadFile(file, key, 'application/pdf')
+}
+
+export async function uploadCompanyComplianceDocumentVersion(params: {
+  file: Buffer
+  companyId: string
+  documentId: string
+  versionId: string
+  fileName: string
+  contentType: string
+}): Promise<UploadResult> {
+  const { file, companyId, documentId, versionId, fileName, contentType } = params
+  const safeName = fileName?.trim() || 'company-document'
+  const ext = path.extname(safeName) || `.${contentType.split('/')[1] ?? 'bin'}`
+  const baseName = (ext ? safeName.slice(0, safeName.length - ext.length) : safeName) || 'company-document'
+  const sanitizedBase = baseName.replace(/[^a-zA-Z0-9._-]/g, '_') || 'company-document'
+  const key = `companies/${companyId}/compliance/company-documents/${documentId}/${versionId}/${sanitizedBase}${ext}`
+  return uploadFile(file, key, contentType)
 }

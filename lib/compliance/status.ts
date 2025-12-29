@@ -5,7 +5,7 @@ import {
   type ComplianceCertification,
   type ComplianceEmployee,
 } from '@prisma/client'
-import { logActivities } from './activity'
+import { logActivities, type ComplianceActivityLog } from './activity'
 
 const EXPIRING_WINDOW_DAYS = 30
 const MS_PER_DAY = 1000 * 60 * 60 * 24
@@ -19,20 +19,20 @@ export interface RefreshResult {
 
 function deriveCertificationStatus(
   cert: ComplianceCertification & { images: { id: string; mimeType: string }[] }
-) {
-  const hasProof = cert.images.some((image) => image.mimeType.startsWith('image/'))
+): CertificationStatus {
+  const hasProof = cert.images.length > 0
   const now = Date.now()
   const expiresAt = cert.expiresAt.getTime()
 
   if (expiresAt < now) {
-    return { status: CertificationStatus.EXPIRED, missingProof: !hasProof }
+    return CertificationStatus.EXPIRED
   }
 
   if (!hasProof) {
-    return { status: CertificationStatus.INCOMPLETE, missingProof: true }
+    return CertificationStatus.INCOMPLETE
   }
 
-  return { status: CertificationStatus.PASS, missingProof: false }
+  return CertificationStatus.PASS
 }
 
 function deriveEmployeeStatus(certifications: ComplianceCertification[]): ComplianceStatus {
@@ -47,7 +47,10 @@ function deriveEmployeeStatus(certifications: ComplianceCertification[]): Compli
   return ComplianceStatus.INCOMPLETE
 }
 
-export async function refreshEmployeeComplianceState(employeeId: string): Promise<RefreshResult | null> {
+export async function refreshEmployeeComplianceState(
+  employeeId: string,
+  context: { actorId: string; companyId: string }
+): Promise<RefreshResult | null> {
   const employee = await prisma.complianceEmployee.findUnique({
     where: { id: employeeId },
     include: {
@@ -66,33 +69,35 @@ export async function refreshEmployeeComplianceState(employeeId: string): Promis
   }
 
   const updates: Promise<unknown>[] = []
-  const activities: Parameters<typeof logActivities>[0] = []
+  const activities: ComplianceActivityLog[] = []
 
   for (const cert of employee.certifications) {
-    const { status, missingProof } = deriveCertificationStatus(cert)
-    const shouldUpdate = cert.status !== status || cert.missingProof !== missingProof
+    const status = deriveCertificationStatus(cert)
+    const shouldUpdate = cert.status !== status
 
     if (shouldUpdate) {
       if (status === CertificationStatus.EXPIRED && cert.status !== CertificationStatus.EXPIRED) {
         activities.push({
           employeeId,
+          companyId: context.companyId,
+          actorId: context.actorId,
           type: 'CERT_EXPIRED',
           metadata: {
             certificationId: cert.id,
             presetKey: cert.presetKey,
             name: cert.customName,
           },
+          certificationId: cert.id,
         })
       }
 
       updates.push(
         prisma.complianceCertification.update({
           where: { id: cert.id },
-          data: { status, missingProof },
+          data: { status },
         })
       )
       cert.status = status
-      cert.missingProof = missingProof
     }
   }
 

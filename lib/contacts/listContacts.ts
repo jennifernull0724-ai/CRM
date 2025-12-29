@@ -42,13 +42,27 @@ export type ContactListResult = {
   }
 }
 
-function buildContactWhere(filters: ContactListFilters, companyId: string): Prisma.ContactWhereInput {
+export type ContactListContext = {
+  userId: string
+  role: string
+}
+
+function buildContactWhere(
+  filters: ContactListFilters,
+  companyId: string,
+  context: ContactListContext
+): Prisma.ContactWhereInput {
   const where: Prisma.ContactWhereInput = {
     companyId,
     archived: filters.archived ?? false,
   }
 
-  if (filters.ownerId) {
+  const normalizedRole = context.role?.toLowerCase?.() ?? 'user'
+  const isLimitedRole = normalizedRole === 'user' || normalizedRole === 'estimator'
+
+  if (isLimitedRole) {
+    where.ownerId = context.userId
+  } else if (filters.ownerId) {
     where.ownerId = filters.ownerId
   }
 
@@ -110,8 +124,12 @@ const CONTACT_QUERY = Prisma.validator<Prisma.ContactDefaultArgs>()({
   },
 })
 
-export async function listContactsForCompany(companyId: string, filters: ContactListFilters): Promise<ContactListResult> {
-  const where = buildContactWhere(filters, companyId)
+export async function listContactsForCompany(
+  companyId: string,
+  filters: ContactListFilters,
+  context: ContactListContext
+): Promise<ContactListResult> {
+  const where = buildContactWhere(filters, companyId, context)
   const page = filters.page && filters.page > 0 ? filters.page : 1
   const perPage = filters.perPage && filters.perPage > 0 ? filters.perPage : 25
 
@@ -154,9 +172,22 @@ export async function listContactsForCompany(companyId: string, filters: Contact
     }
   })
 
-  const sorted = filters.sort === 'attention'
-    ? enriched.sort((a, b) => b.attention.score - a.attention.score)
-    : enriched
+  const sorted = enriched.sort((a, b) => {
+    const aOverdue = a.overdueTaskCount > 0
+    const bOverdue = b.overdueTaskCount > 0
+    if (aOverdue !== bOverdue) {
+      return aOverdue ? -1 : 1
+    }
+
+    const aLast = a.lastActivityAt ? new Date(a.lastActivityAt).getTime() : 0
+    const bLast = b.lastActivityAt ? new Date(b.lastActivityAt).getTime() : 0
+    if (aLast !== bLast) {
+      return aLast - bLast
+    }
+
+    // Fall back to attention score for deterministic ordering when timestamps match
+    return b.attention.score - a.attention.score
+  })
 
   return {
     contacts: sorted,

@@ -5,6 +5,17 @@ import AppShell from '@/components/app-shell'
 import { authOptions } from '@/lib/auth'
 import { planAllowsFeature, type PlanKey } from '@/lib/billing/planTiers'
 
+type ShellRole = 'user' | 'estimator' | 'admin' | 'owner'
+
+const allowedShellRoles: ShellRole[] = ['user', 'estimator', 'admin', 'owner']
+
+function resolveShellRole(role?: string | null): ShellRole {
+  if (role && allowedShellRoles.includes(role as ShellRole)) {
+    return role as ShellRole
+  }
+  return 'user'
+}
+
 export default async function ComplianceLayout({ children }: { children: ReactNode }) {
   const session = await getServerSession(authOptions)
 
@@ -24,8 +35,10 @@ export default async function ComplianceLayout({ children }: { children: ReactNo
     redirect('/upgrade?feature=compliance')
   }
 
+  const resolvedRole = resolveShellRole(session.user.role as string | undefined)
+
   return (
-    <AppShell userRole={session.user.role as any} userName={session.user.name ?? undefined}>
+    <AppShell userRole={resolvedRole} userName={session.user.name ?? undefined}>
       <div className="min-h-screen bg-slate-50 p-6">
         {children}
       </div>

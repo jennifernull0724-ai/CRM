@@ -58,7 +58,10 @@ export default async function ContactsPage({ searchParams }: { searchParams: Sea
 
   const filters = buildFilters(searchParams)
   const [{ contacts, pagination }, owners] = await Promise.all([
-    listContactsForCompany(session.user.companyId, filters),
+    listContactsForCompany(session.user.companyId, filters, {
+      userId: session.user.id,
+      role: session.user.role ?? 'user',
+    }),
     prisma.user.findMany({
       where: { companyId: session.user.companyId },
       select: { id: true, name: true },

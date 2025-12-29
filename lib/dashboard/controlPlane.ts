@@ -4,7 +4,7 @@ import { getGovernanceState, type GovernanceState } from '@/lib/dashboard/govern
 import { loadStandardSettings, type StandardSettingsData } from '@/lib/dashboard/standardSettings'
 import { getCompliancePolicies, type CompliancePolicies } from '@/lib/system/settings'
 import { listCompliancePresets } from '@/lib/compliance/presets'
-import type { CompliancePreset } from '@prisma/client'
+import type { CompliancePreset, CompanyComplianceDocumentCategory } from '@prisma/client'
 
 export type ControlPlaneCertification = {
   id: string
@@ -45,7 +45,18 @@ export type ControlPlaneData = {
   certifications: ControlPlaneCertification[]
   workOrders: ControlPlaneWorkOrder[]
   standardSettings: StandardSettingsData
+  companyDocuments: CompanyDocumentCoverage[]
 }
+
+export type CompanyDocumentCoverage = {
+  category: CompanyComplianceDocumentCategory
+  documentCount: number
+  lastUploadedAt: Date | null
+  expired: boolean
+}
+
+const COMPANY_DOCUMENT_CATEGORIES: CompanyComplianceDocumentCategory[] = ['INSURANCE', 'POLICIES', 'PROGRAMS', 'RAILROAD']
+const COMPANY_DOCUMENT_EXPIRY_DAYS = 365
 
 export async function loadControlPlaneData(companyId: string): Promise<ControlPlaneData> {
   const [
@@ -57,6 +68,7 @@ export async function loadControlPlaneData(companyId: string): Promise<ControlPl
     certificationsRaw,
     workOrdersRaw,
     standardSettings,
+    companyDocumentsRaw,
   ] =
     await Promise.all([
       getGlobalAnalytics(companyId),
@@ -106,6 +118,15 @@ export async function loadControlPlaneData(companyId: string): Promise<ControlPl
         },
       }),
       loadStandardSettings(companyId),
+      prisma.companyComplianceDocument.findMany({
+        where: { companyId },
+        include: {
+          versions: {
+            orderBy: { versionNumber: 'desc' },
+            take: 1,
+          },
+        },
+      }),
     ])
 
   const certifications: ControlPlaneCertification[] = certificationsRaw.map((cert) => ({
@@ -132,6 +153,26 @@ export async function loadControlPlaneData(companyId: string): Promise<ControlPl
     })),
   }))
 
+  const now = Date.now()
+  const companyDocuments: CompanyDocumentCoverage[] = COMPANY_DOCUMENT_CATEGORIES.map((category) => {
+    const docs = companyDocumentsRaw.filter((doc) => doc.category === category)
+    const latestVersion = docs
+      .map((doc) => doc.versions[0]?.uploadedAt)
+      .filter((value): value is Date => Boolean(value))
+      .sort((a, b) => b.getTime() - a.getTime())[0]
+    const lastUploadedAt = latestVersion ?? docs[0]?.createdAt ?? null
+    const expired = lastUploadedAt
+      ? (now - lastUploadedAt.getTime()) / (1000 * 60 * 60 * 24) > COMPANY_DOCUMENT_EXPIRY_DAYS
+      : false
+
+    return {
+      category,
+      documentCount: docs.length,
+      lastUploadedAt,
+      expired,
+    }
+  })
+
   return {
     analytics,
     governance,
@@ -141,5 +182,6 @@ export async function loadControlPlaneData(companyId: string): Promise<ControlPl
     certifications,
     workOrders,
     standardSettings,
+    companyDocuments,
   }
 }

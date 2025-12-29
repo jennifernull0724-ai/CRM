@@ -7,12 +7,15 @@ import { prisma } from '@/lib/prisma'
 import { GOVERNANCE_ROLES, type GovernanceRole } from '@/lib/dashboard/governance'
 import { getInviteToggle, setInviteToggle, updateCompliancePolicies, type CompliancePolicies } from '@/lib/system/settings'
 import { enforceCanUseEmailIntegration } from '@/lib/billing/enforcement'
-import type { AccessAuditAction, EmailProvider, EmailTemplateScope } from '@prisma/client'
+import type { AccessAuditAction, EmailProvider, EmailTemplateScope, WorkOrderStatus } from '@prisma/client'
 import { randomUUID } from 'crypto'
+import { transitionWorkOrderStatus, assertWorkOrderMutable } from '@/lib/dispatch/workOrderLifecycle'
+import { recordWorkOrderActivity } from '@/lib/dispatch/workOrderActivity'
 
 const DAY = 24 * 60 * 60 * 1000
 const EMAIL_PROVIDERS: EmailProvider[] = ['gmail', 'outlook', 'custom']
 const EMAIL_TEMPLATE_SCOPES: EmailTemplateScope[] = ['crm', 'estimating', 'dispatch', 'work_orders', 'global']
+const WORK_ORDER_STATUS_VALUES: WorkOrderStatus[] = ['DRAFT', 'SCHEDULED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED']
 
 function revalidateDashboards() {
   revalidatePath('/dashboard/admin')
@@ -148,7 +151,7 @@ export async function updateInviteToggleAction(formData: FormData) {
 }
 
 export async function updateUserRoleAction(formData: FormData) {
-  const { companyId, userId, role, isOwner } = await requireOwnerOrAdmin()
+  const { companyId, userId, isOwner } = await requireOwnerOrAdmin()
   const targetUserId = formData.get('userId')?.toString()
   const nextRoleRaw = formData.get('role')?.toString().trim().toLowerCase()
 
@@ -198,7 +201,7 @@ export async function updateUserRoleAction(formData: FormData) {
 }
 
 export async function setUserDisabledAction(formData: FormData) {
-  const { companyId, userId, role } = await requireOwnerOrAdmin()
+  const { companyId, userId } = await requireOwnerOrAdmin()
   const targetUserId = formData.get('userId')?.toString()
   const disabled = formData.get('disabled')?.toString() === 'true'
 
@@ -259,36 +262,54 @@ export async function reassignDispatchOwnerAction(formData: FormData) {
   revalidateDashboards()
 }
 
-export async function closeWorkOrderAction(formData: FormData) {
+function parseWorkOrderStatus(value: string | null | undefined): WorkOrderStatus {
+  if (!value) {
+    throw new Error('Missing target status')
+  }
+
+  const normalized = value.toUpperCase() as WorkOrderStatus
+  if (!WORK_ORDER_STATUS_VALUES.includes(normalized)) {
+    throw new Error('Invalid work order status')
+  }
+
+  return normalized
+}
+
+export async function transitionWorkOrderStatusAction(formData: FormData) {
   const { companyId, userId } = await requireOwnerOrAdmin()
   const workOrderId = formData.get('workOrderId')?.toString()
+  const nextStatus = parseWorkOrderStatus(formData.get('nextStatus')?.toString())
 
   if (!workOrderId) {
     throw new Error('Work order id required')
   }
 
-  const workOrder = await prisma.workOrder.findFirst({ where: { id: workOrderId, companyId } })
+  const workOrder = await prisma.workOrder.findFirst({
+    where: { id: workOrderId, companyId },
+    select: {
+      id: true,
+      companyId: true,
+      status: true,
+      scheduledAt: true,
+      startedAt: true,
+      completedAt: true,
+      cancelledAt: true,
+      closedAt: true,
+    },
+  })
+
   if (!workOrder) {
     throw new Error('Work order not found')
   }
 
-  if (workOrder.status === 'CLOSED') {
-    return
-  }
-
-  await prisma.workOrder.update({
-    where: { id: workOrderId },
-    data: {
-      status: 'CLOSED',
-      closedAt: new Date(),
-      complianceBlocked: false,
-    },
+  await transitionWorkOrderStatus({
+    workOrder,
+    nextStatus,
+    actorId: userId,
   })
 
-  await logAccessAction(companyId, userId, 'WORK_ORDER_CLOSED', {
-    metadata: { workOrderId },
-  })
   revalidateDashboards()
+  revalidatePath('/dashboard/dispatch')
 }
 
 export async function approveComplianceOverrideAction(formData: FormData) {
@@ -304,6 +325,8 @@ export async function approveComplianceOverrideAction(formData: FormData) {
     throw new Error('Work order not found')
   }
 
+  assertWorkOrderMutable(workOrder.status)
+
   await prisma.workOrder.update({
     where: { id: workOrderId },
     data: {
@@ -317,7 +340,15 @@ export async function approveComplianceOverrideAction(formData: FormData) {
   await logAccessAction(companyId, userId, 'COMPLIANCE_OVERRIDE_APPROVED', {
     metadata: { workOrderId },
   })
+  await recordWorkOrderActivity({
+    companyId,
+    workOrderId,
+    actorId: userId,
+    type: 'COMPLIANCE_OVERRIDE',
+    metadata: { overrideApproved: true },
+  })
   revalidateDashboards()
+  revalidatePath('/dashboard/dispatch')
 }
 
 function parseNumber(value: FormDataEntryValue | null, fallback: number): number {

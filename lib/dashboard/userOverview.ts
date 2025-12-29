@@ -217,7 +217,7 @@ async function collectMetrics(userId: string, companyId: string): Promise<UserDa
     prisma.workOrder.count({
       where: {
         companyId,
-        status: { not: 'CLOSED' },
+        status: { in: ['DRAFT', 'SCHEDULED', 'IN_PROGRESS'] },
         dispatchRequest: {
           estimate: { deal: { createdById: userId } },
         },

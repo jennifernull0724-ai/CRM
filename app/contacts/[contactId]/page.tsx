@@ -9,6 +9,7 @@ import {
   completeContactTaskAction,
   createContactNoteAction,
   createContactTaskAction,
+  sendContactEmailAction,
   logContactCallAction,
   logContactCustomActivityAction,
   logContactMeetingAction,
@@ -16,7 +17,9 @@ import {
   updateContactTaskAction,
 } from '@/app/contacts/actions'
 import { NoteComposer } from '@/app/contacts/[contactId]/_components/note-composer'
+import { ContactEmailComposer } from '@/app/contacts/[contactId]/_components/contact-email-composer'
 import { sanitizeNoteBody } from '@/lib/contacts/noteRichText'
+import { loadContactEmailComposerData } from '@/lib/contacts/emailComposer'
 
 export const dynamic = 'force-dynamic'
 
@@ -31,135 +34,6 @@ const TIMELINE_FILTERS = [
   { label: 'Social', value: 'SOCIAL_LOGGED' },
   { label: 'Custom', value: 'CUSTOM_ACTIVITY_LOGGED' },
   { label: 'Deal', value: 'DEAL_CREATED' },
-  { label: 'Estimate', value: 'ESTIMATE_CREATED' },
-  { label: 'Work Order', value: 'WORKORDER_CREATED_FROM_CONTACT' },
-]
-
-const VALID_TIMELINE_TYPES = new Set(TIMELINE_FILTERS.map((item) => item.value))
-
-type SearchParams = Record<string, string | string[] | undefined>
-
-function parseTimelineTypes(input: string | string[] | undefined) {
-  const values = Array.isArray(input) ? input : input ? [input] : []
-  return values.filter((value) => VALID_TIMELINE_TYPES.has(value))
-}
-
-function formatRelative(date: Date | string) {
-  return formatDistanceToNow(new Date(date), { addSuffix: true })
-}
-
-function parseMentionIds(raw: string | null) {
-  if (!raw) return [] as string[]
-  try {
-    const parsed = JSON.parse(raw)
-    return Array.isArray(parsed) ? parsed : []
-  } catch (error) {
-    return []
-  }
-}
-
-export default async function ContactWorkspacePage({
-  params,
-  searchParams,
-}: {
-  params: { contactId: string }
-  searchParams: SearchParams
-}) {
-  const session = await getServerSession(authOptions)
-  if (!session?.user?.companyId) {
-    redirect(`/login?from=/contacts/${params.contactId}`)
-  }
-
-  const timelineTypes = parseTimelineTypes(searchParams.timelineType)
-
-  const workspace = await getContactWorkspace(params.contactId, session.user.companyId, {
-    types: timelineTypes,
-    limit: 80,
-  })
-
-  if (!workspace) {
-    notFound()
-  }
-
-  const contact = workspace.contact
-  const contactName = `${contact.firstName} ${contact.lastName}`
-  const companyLabel = contact.companyOverrideName || contact.derivedCompanyName || 'Unlabeled company'
-
-  const openTasks = workspace.tasks.filter((task) => !task.completed)
-  const completedTasks = workspace.tasks.filter((task) => task.completed).slice(0, 5)
-  const overdueTasks = openTasks.filter((task) => task.dueDate && task.dueDate < new Date()).length
-
-  const mentionLookup = new Map(workspace.workspaceUsers.map((user) => [user.id, user]))
-
-  const createTask = createContactTaskAction.bind(null, contact.id)
-  const noteAction = createContactNoteAction.bind(null, contact.id)
-  const logCall = logContactCallAction.bind(null, contact.id)
-  const logMeeting = logContactMeetingAction.bind(null, contact.id)
-  const logSocial = logContactSocialAction.bind(null, contact.id)
-  const logCustom = logContactCustomActivityAction.bind(null, contact.id)
-
-  return (
-    <div className="min-h-screen bg-slate-950 text-slate-50">
-      <div className="mx-auto max-w-7xl px-4 py-10">
-        <section className="rounded-3xl border border-slate-800 bg-gradient-to-br from-slate-900 via-slate-900 to-slate-950 p-8">
-          <div className="flex flex-col gap-6 lg:flex-row lg:justify-between">
-            <div className="space-y-3">
-              <p className="text-xs uppercase tracking-[0.5em] text-slate-500">Contact Command Center</p>
-              <h1 className="text-4xl font-semibold text-white">{contactName}</h1>
-              <p className="text-base text-slate-300">{companyLabel}</p>
-              <div className="flex flex-wrap gap-4 text-sm text-slate-400">
-                {contact.email && (
-                  <a href={`mailto:${contact.email}`} className="hover:text-emerald-300">
-                    {contact.email}
-                  </a>
-                )}
-                {contact.phone && (
-                  <a href={`tel:${contact.phone}`} className="hover:text-emerald-300">
-                    {contact.phone}
-                  </a>
-                )}
-                <span>Owner · {contact.owner?.name ?? 'Unassigned'}</span>
-                <span>State · {contact.activityState}</span>
-                <span>Last activity · {formatRelative(contact.lastActivityAt)}</span>
-              </div>
-            </div>
-            <div className="grid w-full max-w-md grid-cols-3 gap-4 rounded-2xl border border-slate-800 bg-slate-950/60 p-4 text-center text-sm">
-              <Metric label="Open tasks" value={openTasks.length} helper={overdueTasks ? `${overdueTasks} overdue` : 'On track'} tone="emerald" />
-              <Metric label="Notes" value={workspace.notes.length} helper="Last 25" tone="amber" />
-              <Metric label="Deals" value={workspace.deals.length} helper="Linked" tone="violet" />
-            </div>
-          </div>
-        </section>
-
-        <div className="mt-10 grid gap-6 lg:grid-cols-[2fr,1fr]">
-          <div className="space-y-6">
-            <TasksPanel
-              tasks={openTasks}
-              completedTasks={completedTasks}
-              overdueTasks={overdueTasks}
-              users={workspace.workspaceUsers}
-              createAction={createTask}
-              updateAction={(taskId) => updateContactTaskAction.bind(null, contact.id, taskId)}
-              completeAction={(taskId) => completeContactTaskAction.bind(null, contact.id, taskId)}
-            />
-
-            <section className="rounded-3xl border border-slate-800 bg-slate-900/70 p-5">
-              <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-                <div>
-                  <p className="text-xs uppercase tracking-[0.4em] text-slate-500">Notes & Mentions</p>
-                  <h2 className="text-2xl font-semibold text-white">Threaded intelligence</h2>
-                </div>
-                <p className="text-xs text-slate-400">Rich text · immutable history</p>
-              </div>
-              <div className="mt-6 grid gap-8 lg:grid-cols-[1.1fr,1fr]">
-                <NoteComposer action={noteAction} mentionableUsers={workspace.workspaceUsers} />
-                <div className="space-y-4">
-                  {workspace.notes.length === 0 ? (
-                    <p className="rounded-2xl border border-dashed border-slate-700 p-6 text-sm text-slate-500">
-                      No notes recorded yet.
-                    </p>
-                  ) : (
-                    workspace.notes.map((note) => {
                       const mentionIds = parseMentionIds(note.mentions)
                       const mentionedUsers = mentionIds
                         .map((id) => mentionLookup.get(id))
@@ -208,7 +82,7 @@ export default async function ContactWorkspacePage({
           </div>
 
           <div className="space-y-6">
-            <EmailShell integration={workspace.emailIntegration} contactId={contact.id} />
+            <EmailShell integration={workspace.emailIntegration} contact={contact} />
             <RelatedObjectsPanel
               deals={workspace.deals}
               estimates={workspace.estimates}
@@ -531,33 +405,110 @@ function TimelinePanel({
   )
 }
 
-function EmailShell({
+async function EmailShell({
   integration,
-  contactId,
+  contact,
 }: {
   integration: { provider: string; status: string } | null
-  contactId: string
+  contact: {
+    id: string
+    firstName: string
+    lastName: string
+    email: string
+  }
 }) {
-  return (
-    <section className="rounded-3xl border border-slate-800 bg-slate-900/80 p-5">
-      <p className="text-xs uppercase tracking-[0.4em] text-slate-500">Email</p>
-      <h2 className="text-2xl font-semibold text-white">Workspace inbox</h2>
-      {integration ? (
-        <div className="mt-4 space-y-3 text-sm text-slate-300">
-          <p>Provider connected: {integration.provider}</p>
-          <p>Status: {integration.status}</p>
-          <Link href={`/contacts/${contactId}/email`} className="inline-flex items-center justify-center rounded-2xl bg-emerald-400 px-4 py-2 text-xs font-semibold text-slate-900">
-            Launch composer
-          </Link>
-        </div>
-      ) : (
+  if (!integration) {
+    return (
+      <section className="rounded-3xl border border-slate-800 bg-slate-900/80 p-5">
+        <p className="text-xs uppercase tracking-[0.4em] text-slate-500">Email</p>
+        <h2 className="text-2xl font-semibold text-white">Workspace inbox</h2>
         <div className="mt-4 space-y-3 text-sm text-slate-400">
-          <p>Email composer unlocks once Gmail/Outlook is connected.</p>
+          <p>Email composer unlocks once Gmail or Outlook is connected.</p>
           <Link href="/settings/profile" className="inline-flex items-center justify-center rounded-2xl border border-slate-700 px-4 py-2 text-xs font-semibold text-slate-200">
             Connect provider
           </Link>
         </div>
-      )}
+      </section>
+    )
+  }
+
+  if (!contact.email) {
+    return (
+      <section className="rounded-3xl border border-slate-800 bg-slate-900/80 p-5">
+        <p className="text-xs uppercase tracking-[0.4em] text-slate-500">Email</p>
+        <h2 className="text-2xl font-semibold text-white">Workspace inbox</h2>
+        <p className="mt-4 text-sm text-slate-400">This contact does not have an email address saved yet.</p>
+      </section>
+    )
+  }
+
+  const session = await getServerSession(authOptions)
+  if (!session?.user?.companyId) {
+    return null
+  }
+
+  const composerData = await loadContactEmailComposerData({
+    companyId: session.user.companyId,
+    userId: session.user.id,
+    contactEmail: contact.email,
+  })
+
+  if (!composerData.accounts.length) {
+    return (
+      <section className="rounded-3xl border border-slate-800 bg-slate-900/80 p-5">
+        <p className="text-xs uppercase tracking-[0.4em] text-slate-500">Email</p>
+        <h2 className="text-2xl font-semibold text-white">Workspace inbox</h2>
+        <div className="mt-4 space-y-3 text-sm text-slate-400">
+          <p>Your workspace is connected but you still need to authorize at least one personal mailbox.</p>
+          <Link href="/settings/profile" className="inline-flex items-center justify-center rounded-2xl border border-slate-700 px-4 py-2 text-xs font-semibold text-slate-200">
+            Connect mailbox
+          </Link>
+        </div>
+      </section>
+    )
+  }
+
+  if (composerData.suppressedRecipient) {
+    return (
+      <section className="rounded-3xl border border-slate-800 bg-slate-900/80 p-5">
+        <p className="text-xs uppercase tracking-[0.4em] text-slate-500">Email</p>
+        <h2 className="text-2xl font-semibold text-white">Workspace inbox</h2>
+        <div className="mt-4 space-y-3 text-sm text-rose-200">
+          <p>
+            Sending to {composerData.suppressedRecipient.email} is disabled
+            {composerData.suppressedRecipient.reason ? ` (${composerData.suppressedRecipient.reason})` : ''}.
+          </p>
+          <p className="text-slate-400">Head to settings to re-enable delivery before composing.</p>
+          <Link href="/settings/profile" className="inline-flex items-center justify-center rounded-2xl border border-slate-700 px-4 py-2 text-xs font-semibold text-slate-200">
+            Manage preferences
+          </Link>
+        </div>
+      </section>
+    )
+  }
+
+  const contactName = [contact.firstName, contact.lastName].filter(Boolean).join(' ').trim() || contact.email
+  const defaultTemplateId = composerData.templates.find((template) => template.isDefault)?.id ?? null
+  const sendEmail = (state: ActionState, formData: FormData) => sendContactEmailAction(contact.id, state, formData)
+
+  return (
+    <section className="rounded-3xl border border-slate-800 bg-slate-900/80 p-5">
+      <div className="flex flex-col gap-1">
+        <p className="text-xs uppercase tracking-[0.4em] text-slate-500">Email</p>
+        <h2 className="text-2xl font-semibold text-white">Workspace inbox</h2>
+        <p className="text-xs text-slate-500">{integration.provider} · {integration.status}</p>
+      </div>
+      <div className="mt-4">
+        <ContactEmailComposer
+          action={sendEmail}
+          initialTo={contact.email}
+          contactName={contactName}
+          accountOptions={composerData.accounts}
+          templateOptions={composerData.templates}
+          defaultTemplateId={defaultTemplateId}
+          signature={composerData.signature}
+        />
+      </div>
     </section>
   )
 }

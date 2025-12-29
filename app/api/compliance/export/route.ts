@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { planAllowsFeature, type PlanKey } from '@/lib/billing/planTiers'
 import { logComplianceActivity } from '@/lib/compliance/activity'
+import { createComplianceSnapshot } from '@/lib/compliance/snapshots'
 
 function csvEscape(value: string) {
   if (value.includes(',') || value.includes('"') || value.includes('\n')) {
@@ -34,19 +35,39 @@ export async function GET(request: Request) {
   const employees = await prisma.complianceEmployee.findMany({
     where: { companyId: session.user.companyId },
     include: {
-      certifications: true,
+      certifications: {
+        include: {
+          images: {
+            select: { id: true },
+          },
+        },
+      },
       documents: true,
     },
   })
 
+  const snapshotHashes = new Map<string, string>()
+
+  for (const employee of employees) {
+    const { snapshot } = await createComplianceSnapshot({
+      employeeId: employee.id,
+      createdById: session.user.id,
+      source: 'export',
+    })
+    snapshotHashes.set(employee.id, snapshot.snapshotHash)
+  }
+
   await Promise.all(
     employees.map((employee) =>
       logComplianceActivity({
+        companyId: session.user.companyId,
+        actorId: session.user.id,
         employeeId: employee.id,
         type: 'COMPLIANCE_EXPORTED',
         metadata: {
           format,
-          userId: session.user.id,
+          certificationCount: employee.certifications.length,
+          snapshotHash: snapshotHashes.get(employee.id) ?? employee.complianceHash ?? 'UNVERIFIED',
         },
       })
     )
@@ -75,7 +96,7 @@ export async function GET(request: Request) {
           String(cert.required),
           cert.issueDate.toISOString(),
           cert.expiresAt.toISOString(),
-          String(!cert.missingProof),
+          String(cert.images.length > 0),
         ]
       )
     )

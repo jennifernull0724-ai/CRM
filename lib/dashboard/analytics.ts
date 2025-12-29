@@ -104,10 +104,9 @@ export type GlobalAnalytics = {
       employeeName: string
       expiresAt: Date
       status: string
-      missingProof: boolean
       certificationName: string
+      proofCount: number
     }[]
-    missingProof: number
     auditVolume: {
       last7Days: number
       last30Days: number
@@ -142,7 +141,6 @@ export async function getGlobalAnalytics(companyId: string): Promise<GlobalAnaly
     complianceEmployees,
     dispatchBlocks,
     expiringCertifications,
-    missingProofCount,
     auditLast7Days,
     auditLast30Days,
   ] = await Promise.all([
@@ -267,12 +265,11 @@ export async function getGlobalAnalytics(companyId: string): Promise<GlobalAnaly
         employee: { select: { firstName: true, lastName: true } },
         expiresAt: true,
         status: true,
-        missingProof: true,
         customName: true,
         presetKey: true,
+        images: { select: { id: true } },
       },
     }),
-    prisma.complianceCertification.count({ where: { employee: { companyId }, missingProof: true } }),
     prisma.complianceActivity.count({ where: { employee: { companyId }, createdAt: { gte: sevenDaysAgo } } }),
     prisma.complianceActivity.count({ where: { employee: { companyId }, createdAt: { gte: thirtyDaysAgo } } }),
   ])
@@ -326,8 +323,8 @@ export async function getGlobalAnalytics(companyId: string): Promise<GlobalAnaly
       employeeName: `${cert.employee.firstName} ${cert.employee.lastName}`.trim(),
       expiresAt,
       status: cert.status,
-      missingProof: cert.missingProof,
       certificationName: cert.customName ?? cert.presetKey ?? 'Custom',
+      proofCount: cert.images.length,
     }
   })
 
@@ -381,7 +378,6 @@ export async function getGlobalAnalytics(companyId: string): Promise<GlobalAnaly
       blocks: dispatchBlocks,
       expiringByWindow: expiringSummary,
       expiringCertifications: expiringList,
-      missingProof: missingProofCount,
       auditVolume: {
         last7Days: auditLast7Days,
         last30Days: auditLast30Days,

@@ -41,13 +41,25 @@ enum ComplianceCategory {
   ENVIRONMENTAL
 }
 
+enum CompanyComplianceDocumentCategory {
+  INSURANCE
+  POLICIES
+  PROGRAMS
+  RAILROAD
+}
+
 enum ComplianceActivityType {
+  EMPLOYEE_CREATED
+  EMPLOYEE_DEACTIVATED
+  EMPLOYEE_REACTIVATED
   CERT_ADDED
+  CERT_EXPIRED
   CERT_IMAGE_UPLOADED
   CERT_IMAGE_VERSIONED
-  CERT_EXPIRED
   SNAPSHOT_CREATED
   QR_GENERATED
+  DOC_UPLOADED
+  DOC_VERSIONED
   COMPLIANCE_PRINTED
   COMPLIANCE_EXPORTED
 }
@@ -118,10 +130,42 @@ enum DispatchRequestStatus {
   CANCELLED
 }
 
+enum WorkOrderDiscipline {
+  CONSTRUCTION
+  RAILROAD
+  ENVIRONMENTAL
+}
+
 enum WorkOrderStatus {
-  OPEN
+  DRAFT
+  SCHEDULED
   IN_PROGRESS
-  CLOSED
+  COMPLETED
+  CANCELLED
+}
+
+enum DispatchPresetScope {
+  BASE
+  CONSTRUCTION
+  RAILROAD
+  ENVIRONMENTAL
+}
+
+enum WorkOrderActivityType {
+  STATUS_CHANGED
+  EMPLOYEE_ASSIGNED
+  EMPLOYEE_UNASSIGNED
+  COMPLIANCE_OVERRIDE
+  ASSET_ASSIGNED
+  ASSET_REMOVED
+  NOTE_ADDED
+  NOTE_UPDATED
+  DOCUMENT_UPLOADED
+  PDF_GENERATED
+  EMAIL_SENT
+  DISPATCH_PRESET_ADDED
+  DISPATCH_PRESET_REMOVED
+  DISPATCH_PRESET_NOTE_UPDATED
 }
 
 enum AccessAuditAction {
@@ -133,16 +177,24 @@ enum AccessAuditAction {
   USER_ENABLED
   INVITE_TOGGLE_UPDATED
   DISPATCH_REASSIGNED
+  DISPATCH_RECEIVED_ESTIMATE
+  DISPATCH_RECEIVED_QUOTE
+  DISPATCH_PRESET_APPLIED
+  DISPATCH_PRESET_UPDATED
+  DISPATCH_PRESET_REORDERED
   WORK_ORDER_CLOSED
   COMPLIANCE_OVERRIDE_APPROVED
   COMPLIANCE_POLICY_UPDATED
   WORK_ORDER_MANUAL_CREATED
+  WORKORDER_CREATED
+  BLANK_WORKORDER_CREATED
   ESTIMATE_APPROVED
   ESTIMATE_CREATED
   ESTIMATE_UPDATED
   ESTIMATE_RETURNED_TO_USER
   CONTACT_CREATED
   CONTACT_UPDATED
+  CONTACT_LINKED_TO_WORKORDER
   TASK_CREATED
   TASK_UPDATED
   TASK_COMPLETED
@@ -163,6 +215,21 @@ enum AccessAuditAction {
   MENTION_CREATED
   DEAL_CREATED_FROM_CONTACT
   WORKORDER_CREATED_FROM_CONTACT
+  WORKORDER_EMPLOYEE_ASSIGNED
+  WORKORDER_COMPLIANCE_OVERRIDE
+  WORKORDER_STATUS_CHANGED
+  WORKORDER_STATUS_UPDATED
+  WORKORDER_ASSET_ASSIGNED
+  WORKORDER_ASSET_REMOVED
+  ASSET_CREATED
+  ASSET_UPDATED
+  ASSET_STATUS_CHANGED
+  ASSET_ASSIGNED_TO_WORKORDER
+  ASSET_REMOVED_FROM_WORKORDER
+  EMPLOYEE_BLOCKED_BY_COMPLIANCE
+  COMPLIANCE_OVERRIDE_APPLIED
+  COMPLIANCE_CHECK_FAILED
+  WORKORDER_RETURNED_TO_USER
   EMAIL_SETTINGS_CHANGED
   EMAIL_PROVIDER_CONNECTED
   EMAIL_PROVIDER_DISCONNECTED
@@ -175,10 +242,17 @@ enum AccessAuditAction {
   EMAIL_SIGNATURE_DELETED
   EMAIL_SIGNATURE_ACTIVATED
   EMAIL_RECIPIENT_TOGGLED
+  DOCUMENT_UPLOADED
   LOGO_UPLOADED
   LOGO_UPDATED
   CUSTOM_ACTIVITY_LOGGED
 
+}
+
+enum AssetStatus {
+  IN_SERVICE
+  OUT_OF_SERVICE
+  MAINTENANCE
 }
 
 enum EmailProvider {
@@ -231,6 +305,13 @@ model User {
   accessTargetLogs AccessAuditLog[] @relation("AccessTarget")
   dispatchOwnerships DispatchRequest[] @relation("DispatchOwner")
   workOrderOverrides WorkOrder[] @relation("WorkOrderOverrideApprover")
+  workOrderAssignmentsAuthored WorkOrderAssignment[] @relation("WorkOrderAssignmentAssigner")
+  workOrderAssignmentsOverrides WorkOrderAssignment[] @relation("WorkOrderAssignmentOverrideActor")
+  workOrderAssetAssignmentsAuthored WorkOrderAssetAssignment[] @relation("WorkOrderAssetAssignmentAssigner")
+  workOrderAssetAssignmentsRemoved WorkOrderAssetAssignment[] @relation("WorkOrderAssetAssignmentRemover")
+  assetsCreated Asset[] @relation("AssetCreator")
+  workOrderActivities WorkOrderActivity[] @relation("WorkOrderActivityActor")
+  workOrderPresetsAdded WorkOrderPreset[] @relation("WorkOrderPresetAdder")
   sentInvites UserInvite[] @relation("InviteSender")
   estimateRevisionsSubmitted EstimateRevision[] @relation("EstimateRevisionSubmitter")
   estimateRevisionsApproved EstimateRevision[] @relation("EstimateRevisionApprover")
@@ -241,6 +322,9 @@ model User {
   emailTemplatesCreated EmailTemplate[] @relation("EmailTemplateCreator")
   emailTemplatesUpdated EmailTemplate[] @relation("EmailTemplateUpdater")
   emailSignaturesCreated EmailSignature[]
+  companyDocumentsCreated CompanyComplianceDocument[] @relation("CompanyComplianceDocumentCreator")
+  companyDocumentUploads CompanyComplianceDocumentVersion[] @relation("CompanyComplianceDocumentUploader")
+  complianceActivitiesAuthored ComplianceActivity[] @relation("ComplianceActivityActor")
 }
 
 model Account {
@@ -303,10 +387,13 @@ model Company {
   contacts    Contact[]
   deals       Deal[]
   complianceEmployees ComplianceEmployee[]
+  assets     Asset[]
   compliancePresets   CompliancePreset[]
+  dispatchPresets DispatchPreset[]
   estimates   Estimate[]
   dispatchRequests DispatchRequest[]
   workOrders  WorkOrder[]
+  workOrderActivities WorkOrderActivity[]
   activities  Activity[]
   userInvites UserInvite[]
   accessAuditLogs AccessAuditLog[]
@@ -326,6 +413,8 @@ model Company {
   contactCalls ContactCall[]
   contactMeetings ContactMeeting[]
   contactSocialTouches ContactSocialTouch[]
+  companyComplianceDocuments CompanyComplianceDocument[]
+  complianceActivities ComplianceActivity[]
 }
 
 model Contact {
@@ -759,6 +848,8 @@ model EmailIngestionQueue {
 model ComplianceEmployee {
   id               String            @id @default(cuid())
   employeeId       String            @unique
+  email            String?
+  qrToken          String            @unique
   companyId        String
   firstName        String
   lastName         String
@@ -790,12 +881,12 @@ model ComplianceCertification {
   issueDate     DateTime
   expiresAt     DateTime
   status        CertificationStatus  @default(INCOMPLETE)
-  missingProof  Boolean              @default(true)
   createdAt     DateTime             @default(now())
   updatedAt     DateTime             @updatedAt
 
   employee      ComplianceEmployee   @relation(fields: [employeeId], references: [id], onDelete: Cascade)
   images        ComplianceCertificationImage[]
+  activities    ComplianceActivity[]
 
   @@index([employeeId])
 }
@@ -837,15 +928,61 @@ model ComplianceDocument {
   @@unique([employeeId, version])
 }
 
+model CompanyComplianceDocument {
+  id          String                              @id @default(cuid())
+  companyId   String
+  category    CompanyComplianceDocumentCategory
+  title       String
+  createdById String
+  createdAt   DateTime                            @default(now())
+
+  company     Company                             @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdBy   User                                @relation("CompanyComplianceDocumentCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  versions    CompanyComplianceDocumentVersion[]
+  activities  ComplianceActivity[]
+
+  @@index([companyId, category])
+}
+
+model CompanyComplianceDocumentVersion {
+  id                String                        @id @default(cuid())
+  documentId        String
+  versionNumber     Int
+  gcsObjectKey      String
+  fileName          String
+  mimeType          String
+  fileHash          String
+  fileSize          Int
+  uploadedById      String
+  uploadedAt        DateTime                      @default(now())
+
+  document          CompanyComplianceDocument     @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  uploadedBy        User                          @relation("CompanyComplianceDocumentUploader", fields: [uploadedById], references: [id], onDelete: Restrict)
+  activities        ComplianceActivity[]
+
+  @@unique([documentId, versionNumber])
+}
+
 model ComplianceActivity {
-  id         String                 @id @default(cuid())
-  employeeId String
-  type       ComplianceActivityType
-  metadata   Json?
-  createdAt  DateTime               @default(now())
+  id                       String                           @id @default(cuid())
+  companyId                String?
+  employeeId               String?
+  certificationId          String?
+  companyDocumentId        String?
+  companyDocumentVersionId String?
+  type                     ComplianceActivityType
+  metadata                 Json?
+  actorId                  String?
+  createdAt                DateTime                         @default(now())
 
-  employee   ComplianceEmployee     @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  company                  Company?                         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  employee                 ComplianceEmployee?              @relation(fields: [employeeId], references: [id], onDelete: SetNull)
+  certification            ComplianceCertification?         @relation(fields: [certificationId], references: [id], onDelete: SetNull)
+  companyDocument          CompanyComplianceDocument?       @relation(fields: [companyDocumentId], references: [id], onDelete: SetNull)
+  companyDocumentVersion   CompanyComplianceDocumentVersion? @relation(fields: [companyDocumentVersionId], references: [id], onDelete: SetNull)
+  actor                    User?                            @relation("ComplianceActivityActor", fields: [actorId], references: [id], onDelete: SetNull)
 
+  @@index([companyId])
   @@index([employeeId])
   @@index([type])
 }
@@ -861,6 +998,7 @@ model ComplianceSnapshot {
   employee      ComplianceEmployee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
   createdBy     User               @relation("ComplianceSnapshotCreator", fields: [createdById], references: [id], onDelete: Restrict)
   qrToken       ComplianceQrToken?
+  workOrderAssignments WorkOrderAssignment[]
 
   @@index([employeeId])
 }
@@ -895,6 +1033,30 @@ model CompliancePreset {
   @@index([companyId, category])
 }
 
+model DispatchPreset {
+  id           String               @id @default(cuid())
+  companyId    String
+  scope        DispatchPresetScope
+  name         String
+  description  String?
+  defaultNotes String?
+  defaultScope String?
+  suggestedDisciplines Json?
+  suggestedEquipment Json?
+  locked       Boolean              @default(false)
+  isOther      Boolean              @default(false)
+  enabled      Boolean              @default(true)
+  sortOrder    Int                  @default(0)
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+
+  company      Company              @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  workOrderPresets WorkOrderPreset[]
+
+  @@unique([companyId, scope, name])
+  @@index([companyId, scope, sortOrder])
+}
+
 model Estimate {
   id             String         @id @default(cuid())
   companyId      String
@@ -922,6 +1084,7 @@ model Estimate {
   documents      EstimateDocument[]
   emails         EstimateEmail[]
   dispatchRequests DispatchRequest[]
+  workOrders     WorkOrder[]
 
   @@index([companyId])
   @@index([contactId])
@@ -1110,9 +1273,11 @@ model WorkOrder {
   id                 String          @id @default(cuid())
   companyId          String
   dispatchRequestId  String?
+  estimateId         String?
   contactId          String
   title              String
-  status             WorkOrderStatus @default(OPEN)
+  status             WorkOrderStatus @default(DRAFT)
+  discipline         WorkOrderDiscipline @default(CONSTRUCTION)
   manualEntry        Boolean         @default(false)
   complianceBlocked  Boolean         @default(false)
   blockReason        String?
@@ -1120,31 +1285,145 @@ model WorkOrder {
   overrideApprovedById String?
   overrideApprovedAt DateTime?
   closedAt           DateTime?
+  scheduledAt        DateTime?
+  startedAt          DateTime?
+  completedAt        DateTime?
+  cancelledAt        DateTime?
   createdAt          DateTime        @default(now())
   updatedAt          DateTime        @updatedAt
 
   company            Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
   dispatchRequest    DispatchRequest? @relation(fields: [dispatchRequestId], references: [id], onDelete: SetNull)
+  estimate           Estimate?       @relation(fields: [estimateId], references: [id], onDelete: SetNull)
   contact            Contact         @relation(fields: [contactId], references: [id], onDelete: Restrict)
   overrideApprovedBy User?           @relation("WorkOrderOverrideApprover", fields: [overrideApprovedById], references: [id], onDelete: SetNull)
   assignments        WorkOrderAssignment[]
+  assetAssignments   WorkOrderAssetAssignment[]
+  activities         WorkOrderActivity[]
+  presets            WorkOrderPreset[]
 
   @@index([companyId])
   @@index([contactId])
   @@index([status])
+  @@index([estimateId])
+  @@index([companyId, discipline])
+}
+
+model WorkOrderPreset {
+  id              String         @id @default(cuid())
+  workOrderId     String
+  presetId        String
+  scopeSnapshot   DispatchPresetScope
+  nameSnapshot    String
+  descriptionSnapshot String?
+  defaultNotesSnapshot String?
+  defaultScopeSnapshot String?
+  suggestedDisciplinesSnapshot Json?
+  suggestedEquipmentSnapshot Json?
+  lockedSnapshot  Boolean        @default(false)
+  isOtherSnapshot Boolean        @default(false)
+  overriddenNotes String?
+  addedById       String?
+  addedAt         DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  workOrder WorkOrder      @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+  preset    DispatchPreset @relation(fields: [presetId], references: [id], onDelete: Cascade)
+  addedBy   User?          @relation("WorkOrderPresetAdder", fields: [addedById], references: [id], onDelete: SetNull)
+
+  @@unique([workOrderId, presetId])
+  @@index([presetId])
 }
 
 model WorkOrderAssignment {
-  id          String             @id @default(cuid())
-  workOrderId String
-  employeeId  String
-  assignedAt  DateTime           @default(now())
-  unassignedAt DateTime?
+  id                    String             @id @default(cuid())
+  workOrderId           String
+  employeeId            String
+  assignedById          String?
+  complianceSnapshotId  String?
+  complianceSnapshotHash String?
+  complianceStatus      ComplianceStatus?
+  gapSummary            Json?
+  overrideAcknowledged  Boolean           @default(false)
+  overrideReason        String?
+  overrideActorId       String?
+  overrideAt            DateTime?
+  notifiedAt            DateTime?
+  assignedAt            DateTime          @default(now())
+  unassignedAt          DateTime?
 
-  workOrder   WorkOrder          @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
-  employee    ComplianceEmployee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  workOrder          WorkOrder          @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+  employee           ComplianceEmployee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  assignedBy         User?              @relation("WorkOrderAssignmentAssigner", fields: [assignedById], references: [id], onDelete: SetNull)
+  overrideActor      User?              @relation("WorkOrderAssignmentOverrideActor", fields: [overrideActorId], references: [id], onDelete: SetNull)
+  complianceSnapshot ComplianceSnapshot? @relation(fields: [complianceSnapshotId], references: [id], onDelete: SetNull)
 
   @@index([employeeId])
+  @@index([workOrderId, unassignedAt])
+}
+
+model Asset {
+  id           String      @id @default(cuid())
+  companyId    String
+  assetName    String
+  assetType    String
+  subType      String?
+  assetNumber  String
+  status       AssetStatus @default(IN_SERVICE)
+  location     String?
+  notes        String?
+  createdById  String
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdBy User     @relation("AssetCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  assignments WorkOrderAssetAssignment[]
+
+  @@index([companyId, status])
+  @@unique([companyId, assetNumber])
+}
+
+model WorkOrderAssetAssignment {
+  id                   String       @id @default(cuid())
+  workOrderId          String
+  assetId              String
+  assignedById         String?
+  removedById          String?
+  statusAtAssignment   AssetStatus
+  assetNameSnapshot    String
+  assetTypeSnapshot    String
+  assetNumberSnapshot  String
+  assignedAt           DateTime     @default(now())
+  removedAt            DateTime?
+
+  workOrder   WorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+  asset       Asset     @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  assignedBy  User?     @relation("WorkOrderAssetAssignmentAssigner", fields: [assignedById], references: [id], onDelete: SetNull)
+  removedBy   User?     @relation("WorkOrderAssetAssignmentRemover", fields: [removedById], references: [id], onDelete: SetNull)
+
+  @@index([workOrderId])
+  @@index([assetId, removedAt])
+  @@index([workOrderId, removedAt])
+}
+
+model WorkOrderActivity {
+  id             String                 @id @default(cuid())
+  companyId      String
+  workOrderId    String
+  actorId        String?
+  type           WorkOrderActivityType
+  previousStatus WorkOrderStatus?
+  newStatus      WorkOrderStatus?
+  metadata       Json?
+  createdAt      DateTime               @default(now())
+
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  workOrder WorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+  actor     User?    @relation("WorkOrderActivityActor", fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([companyId])
+  @@index([workOrderId, createdAt])
 }
 
 model UserInvite {

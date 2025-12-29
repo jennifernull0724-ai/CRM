@@ -4,6 +4,7 @@ import bcrypt from 'bcryptjs'
 import { PLAN_TIERS } from '@/lib/billing/planTiers'
 import { enforceCanAddUser } from '@/lib/billing/enforcement'
 import { ensureCompliancePresets } from '@/lib/compliance/presets'
+import { ensureDispatchPresets } from '@/lib/dispatch/presets'
 
 export async function POST(req: NextRequest) {
   try {
@@ -48,7 +49,10 @@ export async function POST(req: NextRequest) {
       },
     })
 
-    await ensureCompliancePresets(company.id)
+    await Promise.all([
+      ensureCompliancePresets(company.id),
+      ensureDispatchPresets(company.id),
+    ])
 
     await enforceCanAddUser(company.id, 'owner')
 

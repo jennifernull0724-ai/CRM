@@ -8,7 +8,6 @@ import { listCompliancePresets } from '@/lib/compliance/presets'
 import { getComplianceSignedUrl } from '@/lib/s3'
 import {
   createCertificationAction,
-  uploadCertificationImageAction,
   uploadComplianceDocumentAction,
   createSnapshotAction,
   createInspectionSnapshotAction,
@@ -83,8 +82,7 @@ export default async function ComplianceEmployeeDetailPage({ params }: { params:
   )
 
   const presets = await listCompliancePresets(session.user.companyId)
-  const snapshot = employee.snapshots[0]
-  const qrToken = snapshot?.qrToken?.token
+  const qrToken = employee.qrToken
 
   return (
     <div className="space-y-8">
@@ -96,6 +94,11 @@ export default async function ComplianceEmployeeDetailPage({ params }: { params:
               {employee.firstName} {employee.lastName}
             </h1>
             <p className="text-slate-600">{employee.title} · #{employee.employeeId}</p>
+            {employee.email ? (
+              <a href={`mailto:${employee.email}`} className="text-sm text-indigo-600 hover:underline">
+                {employee.email}
+              </a>
+            ) : null}
             <div className="mt-3 flex flex-wrap gap-3 text-sm text-slate-500">
               <span className={`rounded-full px-3 py-1 text-xs font-semibold ${STATUS_STYLES[employee.complianceStatus]}`}>
                 {employee.complianceStatus}
@@ -111,16 +114,13 @@ export default async function ComplianceEmployeeDetailPage({ params }: { params:
             >
               Print compliance packet
             </Link>
-            {qrToken ? (
-              <Link
-                href={`/verify/employee/${qrToken}`}
-                className="text-indigo-600 hover:underline"
-              >
-                Public QR snapshot
-              </Link>
-            ) : (
-              <span className="text-slate-500">Generate snapshot to activate QR</span>
-            )}
+            <Link
+              href={`/verify/employee/${qrToken}`}
+              className="text-indigo-600 hover:underline"
+            >
+              Public QR verification
+            </Link>
+            <p className="text-xs text-slate-500">QR resolves immediately and upgrades as new snapshots are created.</p>
           </div>
         </div>
       </div>
@@ -131,7 +131,7 @@ export default async function ComplianceEmployeeDetailPage({ params }: { params:
             <h2 className="text-xl font-semibold text-slate-900">Certifications</h2>
             <p className="text-sm text-slate-600">Proof images mandatory for PASS. Supplemental PDFs allowed but do not unlock compliance.</p>
           </div>
-          <form action={createCertificationAction} className="flex flex-col gap-2 rounded-xl border border-slate-200 p-4 md:w-96">
+          <form action={createCertificationAction} encType="multipart/form-data" className="flex flex-col gap-2 rounded-xl border border-slate-200 p-4 md:w-96">
             <input type="hidden" name="employeeId" value={employee.id} />
             <p className="text-sm font-semibold text-slate-700">Add certification</p>
             <label className="text-xs uppercase text-slate-500">Preset</label>
@@ -159,6 +159,9 @@ export default async function ComplianceEmployeeDetailPage({ params }: { params:
             <label className="flex items-center gap-2 text-sm text-slate-600">
               <input type="checkbox" name="required" defaultChecked className="rounded" /> Required
             </label>
+            <label className="text-xs uppercase text-slate-500">Proof files (PDF or images)</label>
+            <input type="file" name="proofFiles" accept="image/*,application/pdf" multiple required />
+            <p className="text-xs text-slate-500">All proofs upload atomically and become immutable.</p>
             <button type="submit" className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white">Save certification</button>
           </form>
         </div>
@@ -197,13 +200,6 @@ export default async function ComplianceEmployeeDetailPage({ params }: { params:
                 ))}
                 {cert.images.length === 0 && <p className="text-sm text-rose-600">No proof uploaded. Certification locked in INCOMPLETE state.</p>}
               </div>
-              <form action={uploadCertificationImageAction} encType="multipart/form-data" className="mt-4 flex flex-col gap-2 rounded-lg border border-dashed border-slate-300 p-3">
-                <input type="hidden" name="employeeId" value={employee.id} />
-                <input type="hidden" name="certificationId" value={cert.id} />
-                <label className="text-xs uppercase text-slate-500">Upload image proof</label>
-                <input type="file" name="file" accept="image/*,application/pdf" required />
-                <button type="submit" className="w-fit rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white">Upload proof</button>
-              </form>
             </div>
           ))}
           {certifications.length === 0 && <p className="text-sm text-slate-500">No certifications recorded.</p>}

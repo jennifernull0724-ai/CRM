@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { formatDistanceToNow } from 'date-fns'
+import type { WorkOrderStatus } from '@prisma/client'
 import { planAllowsFeature, type PlanKey } from '@/lib/billing/planTiers'
 import type { ControlPlaneData } from '@/lib/dashboard/controlPlane'
 import { StandardSettingsPanel } from '@/app/dashboard/_components/standard-settings-panel'
@@ -9,14 +10,13 @@ import {
   updateUserRoleAction,
   setUserDisabledAction,
   reassignDispatchOwnerAction,
-  closeWorkOrderAction,
+  transitionWorkOrderStatusAction,
   approveComplianceOverrideAction,
   updateCompliancePoliciesAction,
 } from '@/app/dashboard/actions'
 import {
   createEmployeeAction,
   createCertificationAction,
-  uploadCertificationImageAction,
   uploadComplianceDocumentAction,
   createSnapshotAction,
   createInspectionSnapshotAction,
@@ -26,6 +26,43 @@ import { updatePresetAction } from '@/app/compliance/actions'
 
 const numberFormatter = new Intl.NumberFormat('en-US')
 const currencyFormatter = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })
+const COMPANY_DOCUMENT_LABELS: Record<string, string> = {
+  INSURANCE: 'Insurance',
+  POLICIES: 'Policies',
+  PROGRAMS: 'Programs',
+  RAILROAD: 'Railroad-specific',
+}
+const WORK_ORDER_STATUS_LABELS: Record<WorkOrderStatus, string> = {
+  DRAFT: 'Draft',
+  SCHEDULED: 'Scheduled',
+  IN_PROGRESS: 'In progress',
+  COMPLETED: 'Completed',
+  CANCELLED: 'Cancelled',
+}
+
+const WORK_ORDER_STATUS_ACTIONS: Record<WorkOrderStatus, Array<{ label: string; target: WorkOrderStatus; intent: 'primary' | 'danger' }>> = {
+  DRAFT: [
+    { label: 'Schedule work order', target: 'SCHEDULED', intent: 'primary' },
+    { label: 'Cancel work order', target: 'CANCELLED', intent: 'danger' },
+  ],
+  SCHEDULED: [
+    { label: 'Start work order', target: 'IN_PROGRESS', intent: 'primary' },
+    { label: 'Cancel work order', target: 'CANCELLED', intent: 'danger' },
+  ],
+  IN_PROGRESS: [{ label: 'Mark complete', target: 'COMPLETED', intent: 'primary' }],
+  COMPLETED: [],
+  CANCELLED: [],
+}
+
+function formatDateTime(value: Date | null) {
+  if (!value) return '—'
+  return value.toLocaleDateString() + ' ' + value.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+}
+
+function formatWorkOrderStatusLabel(value: string): string {
+  const normalized = value.toUpperCase() as WorkOrderStatus
+  return WORK_ORDER_STATUS_LABELS[normalized] ?? value
+}
 
 type Props = {
   variant: 'owner' | 'admin'
@@ -52,7 +89,7 @@ function SectionCard({ title, helper, children }: { title: string; helper?: stri
 }
 
 export function ControlPlaneDashboard({ variant, data, planKey, viewer }: Props) {
-  const { analytics, governance, compliancePolicies, presets, employees, certifications, workOrders, standardSettings } = data
+  const { analytics, governance, compliancePolicies, presets, employees, workOrders, standardSettings, companyDocuments } = data
   const workOrderStatusMap = analytics.workOrders.summaries.reduce<Record<string, number>>((acc, summary) => {
     acc[summary.status] = summary.count
     return acc
@@ -66,7 +103,6 @@ export function ControlPlaneDashboard({ variant, data, planKey, viewer }: Props)
     return acc
   }, {})
   const hasEmployees = employees.length > 0
-  const hasCertifications = certifications.length > 0
   const dispatchEligibleUsers = governance.users.filter((user) => ['dispatch', 'admin', 'owner'].includes(user.role.toLowerCase()))
   const canBulkPrint = planAllowsFeature(planKey, 'advanced_compliance')
   const queuedQuotes = dispatchStatusMap.QUEUED ?? 0
@@ -77,13 +113,14 @@ export function ControlPlaneDashboard({ variant, data, planKey, viewer }: Props)
   const complianceBlocks = analytics.compliance.blocks
   const expiringWindows = analytics.compliance.expiringByWindow
   const auditVolume = analytics.compliance.auditVolume
-  const complianceMissingProof = analytics.compliance.missingProof
   const expiringCerts = analytics.compliance.expiringCertifications
   const complianceStatusOrder = ['PASS', 'FAIL', 'INCOMPLETE'] as const
   const workOrderStats = [
-    { label: 'Open', value: workOrderStatusMap.OPEN ?? 0 },
+    { label: 'Draft', value: workOrderStatusMap.DRAFT ?? 0 },
+    { label: 'Scheduled', value: workOrderStatusMap.SCHEDULED ?? 0 },
     { label: 'In progress', value: workOrderStatusMap.IN_PROGRESS ?? 0 },
-    { label: 'Closed', value: workOrderStatusMap.CLOSED ?? 0 },
+    { label: 'Completed', value: workOrderStatusMap.COMPLETED ?? 0 },
+    { label: 'Cancelled', value: workOrderStatusMap.CANCELLED ?? 0 },
     { label: 'Manual jobs', value: manualWorkOrders },
     { label: 'Unassigned', value: unassignedWorkOrders },
     { label: 'Compliance blocked', value: analytics.workOrders.blocked.count },
@@ -332,35 +369,52 @@ export function ControlPlaneDashboard({ variant, data, planKey, viewer }: Props)
                       )}
                     </td>
                     <td className="px-3 py-3 text-slate-700">
-                      <p className="font-semibold">{order.status}</p>
+                      <p className="font-semibold">{formatWorkOrderStatusLabel(order.status)}</p>
                       <p className="text-xs text-slate-500">Dispatch: {order.dispatchStatus ?? 'n/a'}</p>
                       <p className="text-xs text-slate-500">Priority: {order.dispatchPriority ?? 'standard'}</p>
                       {order.manualEntry ? <p className="text-xs font-semibold text-amber-600">Manual intake</p> : null}
                     </td>
                     <td className="px-3 py-3 text-slate-700">
                       <div className="space-y-2">
-                        {order.status !== 'CLOSED' ? (
-                          <form action={closeWorkOrderAction}>
-                            <input type="hidden" name="workOrderId" value={order.id} />
-                            <button
-                              type="submit"
-                              className="w-full rounded-lg bg-emerald-600 px-3 py-1 text-xs font-semibold text-white"
-                            >
-                              Close work order
-                            </button>
-                          </form>
-                        ) : null}
-                        {order.complianceBlocked ? (
-                          <form action={approveComplianceOverrideAction}>
-                            <input type="hidden" name="workOrderId" value={order.id} />
-                            <button
-                              type="submit"
-                              className="w-full rounded-lg bg-slate-900 px-3 py-1 text-xs font-semibold text-white"
-                            >
-                              Approve override
-                            </button>
-                          </form>
-                        ) : null}
+                        {(() => {
+                          const normalizedStatus = order.status.toUpperCase() as WorkOrderStatus
+                          const statusActions = WORK_ORDER_STATUS_ACTIONS[normalizedStatus] ?? []
+                          const canOverride = order.complianceBlocked && !['COMPLETED', 'CANCELLED'].includes(normalizedStatus)
+
+                          return (
+                            <>
+                              {statusActions.length === 0 ? (
+                                <p className="text-xs font-semibold text-slate-500">
+                                  Locked · {formatWorkOrderStatusLabel(order.status)}
+                                </p>
+                              ) : (
+                                statusActions.map((action) => (
+                                  <form key={`${order.id}-${action.target}`} action={transitionWorkOrderStatusAction}>
+                                    <input type="hidden" name="workOrderId" value={order.id} />
+                                    <input type="hidden" name="nextStatus" value={action.target} />
+                                    <button
+                                      type="submit"
+                                      className={`w-full rounded-lg px-3 py-1 text-xs font-semibold text-white ${action.intent === 'danger' ? 'bg-rose-600' : 'bg-emerald-600'}`}
+                                    >
+                                      {action.label}
+                                    </button>
+                                  </form>
+                                ))
+                              )}
+                              {canOverride ? (
+                                <form action={approveComplianceOverrideAction}>
+                                  <input type="hidden" name="workOrderId" value={order.id} />
+                                  <button
+                                    type="submit"
+                                    className="w-full rounded-lg bg-slate-900 px-3 py-1 text-xs font-semibold text-white"
+                                  >
+                                    Approve override
+                                  </button>
+                                </form>
+                              ) : null}
+                            </>
+                          )
+                        })()}
                       </div>
                     </td>
                   </tr>
@@ -524,7 +578,7 @@ export function ControlPlaneDashboard({ variant, data, planKey, viewer }: Props)
               </ul>
             </div>
             <div className="rounded-2xl border border-slate-100 bg-slate-50/50 p-4">
-              <p className="text-xs uppercase text-slate-500">Expiring + proof gaps</p>
+              <p className="text-xs uppercase text-slate-500">Expiring windows</p>
               <ul className="mt-2 space-y-1 text-sm text-slate-700">
                 <li className="flex justify-between">
                   <span>≤ 30 days</span>
@@ -537,10 +591,6 @@ export function ControlPlaneDashboard({ variant, data, planKey, viewer }: Props)
                 <li className="flex justify-between">
                   <span>61-90 days</span>
                   <span className="font-semibold">{numberFormatter.format(expiringWindows.within90)}</span>
-                </li>
-                <li className="flex justify-between text-amber-600">
-                  <span>Missing proof</span>
-                  <span className="font-semibold">{numberFormatter.format(complianceMissingProof)}</span>
                 </li>
               </ul>
             </div>
@@ -609,7 +659,7 @@ export function ControlPlaneDashboard({ variant, data, planKey, viewer }: Props)
             </div>
 
             <div className="space-y-4">
-              <form action={createCertificationAction} className="space-y-3 rounded-xl border border-slate-100 bg-white p-4">
+              <form action={createCertificationAction} encType="multipart/form-data" className="space-y-3 rounded-xl border border-slate-100 bg-white p-4">
                 <p className="text-sm font-semibold text-slate-700">Add certification</p>
                 <select
                   name="employeeId"
@@ -641,6 +691,8 @@ export function ControlPlaneDashboard({ variant, data, planKey, viewer }: Props)
                 <label className="inline-flex items-center gap-2 text-xs text-slate-500">
                   <input type="checkbox" name="required" defaultChecked /> Required cert
                 </label>
+                <input type="file" name="proofFiles" accept="image/*,application/pdf" multiple required className="w-full text-sm" />
+                <p className="text-xs text-slate-500">Proof files upload atomically with the certification.</p>
                 <button
                   type="submit"
                   disabled={!hasEmployees}
@@ -679,33 +731,6 @@ export function ControlPlaneDashboard({ variant, data, planKey, viewer }: Props)
                 </button>
               </form>
 
-              <form action={uploadCertificationImageAction} className="space-y-3 rounded-xl border border-slate-100 bg-white p-4" encType="multipart/form-data">
-                <p className="text-sm font-semibold text-slate-700">Upload certification proof</p>
-                <select
-                  name="certificationId"
-                  required
-                  defaultValue=""
-                  disabled={!hasCertifications}
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
-                >
-                  <option value="" disabled>
-                    {hasCertifications ? 'Select certification' : 'No certifications yet'}
-                  </option>
-                  {certifications.map((cert) => (
-                    <option key={cert.id} value={cert.id}>
-                      {cert.employeeName} · {cert.label}
-                    </option>
-                  ))}
-                </select>
-                <input type="file" name="file" accept="image/*,application/pdf" required className="w-full text-sm" />
-                <button
-                  type="submit"
-                  disabled={!hasCertifications}
-                  className={`w-full rounded-lg px-4 py-2 text-sm font-semibold text-white ${hasCertifications ? 'bg-slate-900' : 'bg-slate-300'}`}
-                >
-                  Upload proof
-                </button>
-              </form>
             </div>
 
             <div className="space-y-4">
@@ -894,7 +919,7 @@ export function ControlPlaneDashboard({ variant, data, planKey, viewer }: Props)
                       <td className="px-3 py-2 text-slate-700">
                         {new Date(cert.expiresAt).toLocaleDateString()} · {formatDistanceToNow(new Date(cert.expiresAt), { addSuffix: true })}
                       </td>
-                      <td className="px-3 py-2 text-slate-700">{cert.missingProof ? 'Missing proof' : 'Documented'}</td>
+                      <td className="px-3 py-2 text-slate-700">{cert.proofCount > 0 ? 'Documented' : 'Gap'}</td>
                     </tr>
                   ))
                 ) : (
@@ -904,6 +929,50 @@ export function ControlPlaneDashboard({ variant, data, planKey, viewer }: Props)
                     </td>
                   </tr>
                 )}
+              </tbody>
+            </table>
+          </div>
+        </SectionCard>
+
+        <SectionCard title="Company document coverage" helper="Shows immutable uploads for Insurance, Policies, Programs, and Railroad vaults.">
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-slate-100 text-sm">
+              <thead className="bg-slate-50 text-xs uppercase text-slate-500">
+                <tr>
+                  <th className="px-3 py-2 text-left">Category</th>
+                  <th className="px-3 py-2 text-left">Status</th>
+                  <th className="px-3 py-2 text-left">Expired</th>
+                  <th className="px-3 py-2 text-left">Last upload</th>
+                  <th className="px-3 py-2 text-left">Docs</th>
+                  <th className="px-3 py-2 text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {companyDocuments.map((doc) => {
+                  const hasDocument = doc.documentCount > 0
+                  return (
+                    <tr key={doc.category} className="odd:bg-white even:bg-slate-50/40">
+                      <td className="px-3 py-2 font-semibold text-slate-800">{COMPANY_DOCUMENT_LABELS[doc.category] ?? doc.category}</td>
+                      <td className="px-3 py-2">
+                        <span className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold ${hasDocument ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>
+                          {hasDocument ? 'Uploaded' : 'Missing'}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2">
+                        <span className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold ${doc.expired ? 'bg-amber-50 text-amber-700' : 'bg-slate-100 text-slate-600'}`}>
+                          {doc.expired ? 'Expired' : hasDocument ? 'Current' : '—'}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2 text-slate-600">{formatDateTime(doc.lastUploadedAt)}</td>
+                      <td className="px-3 py-2 text-slate-600">{numberFormatter.format(doc.documentCount)}</td>
+                      <td className="px-3 py-2 text-right">
+                        <Link href="/compliance/company-documents" className="text-sm font-semibold text-indigo-600 hover:underline">
+                          Manage
+                        </Link>
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>

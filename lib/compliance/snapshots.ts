@@ -1,4 +1,3 @@
-import crypto from 'crypto'
 import { prisma } from '@/lib/prisma'
 import { logComplianceActivity } from './activity'
 import { hashPayload } from '@/lib/utils/hash'
@@ -10,7 +9,7 @@ export async function createComplianceSnapshot({
 }: {
   employeeId: string
   createdById: string
-  source?: 'manual' | 'inspection' | 'print'
+  source?: 'manual' | 'inspection' | 'print' | 'export' | 'dispatch'
 }) {
   const employee = await prisma.complianceEmployee.findUnique({
     where: { id: employeeId },
@@ -28,6 +27,10 @@ export async function createComplianceSnapshot({
 
   if (!employee) {
     throw new Error('Employee not found')
+  }
+
+  if (!employee.qrToken) {
+    throw new Error('Employee missing QR token')
   }
 
   const payload = {
@@ -73,13 +76,18 @@ export async function createComplianceSnapshot({
     },
   })
 
-  const token = crypto.randomUUID().replace(/-/g, '')
+  const token = employee.qrToken
 
-  await prisma.complianceQrToken.create({
-    data: {
+  await prisma.complianceQrToken.upsert({
+    where: { token },
+    create: {
       employeeId,
       snapshotId: snapshot.id,
       token,
+    },
+    update: {
+      snapshotId: snapshot.id,
+      employeeId,
     },
   })
 
@@ -92,15 +100,11 @@ export async function createComplianceSnapshot({
   })
 
   await logComplianceActivity({
+    companyId: employee.companyId,
+    actorId: createdById,
     employeeId,
     type: 'SNAPSHOT_CREATED',
     metadata: { snapshotId: snapshot.id, hash: snapshotHash, source },
-  })
-
-  await logComplianceActivity({
-    employeeId,
-    type: 'QR_GENERATED',
-    metadata: { snapshotId: snapshot.id, token, source },
   })
 
   return { snapshot, token }

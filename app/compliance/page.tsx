@@ -1,10 +1,11 @@
+import Link from 'next/link'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { planAllowsFeature, type PlanKey } from '@/lib/billing/planTiers'
 import { listCompliancePresets } from '@/lib/compliance/presets'
 import { updatePresetAction } from './actions'
-import type { CompliancePreset, ComplianceCategory } from '@prisma/client'
+import type { CompliancePreset, ComplianceCategory, Prisma } from '@prisma/client'
 
 function groupPresets(presets: CompliancePreset[]) {
   return presets.reduce<Record<string, CompliancePreset[]>>((acc, preset) => {
@@ -18,6 +19,43 @@ function groupPresets(presets: CompliancePreset[]) {
 }
 
 const PRESET_CATEGORY_ORDER: ComplianceCategory[] = ['BASE', 'RAILROAD', 'CONSTRUCTION', 'ENVIRONMENTAL']
+
+type EmployeeWithCertifications = Prisma.ComplianceEmployeeGetPayload<{
+  include: {
+    certifications: {
+      select: {
+        id: true
+        required: true
+        status: true
+        expiresAt: true
+      }
+    }
+  }
+}>
+
+function summarizeEmployees(employees: EmployeeWithCertifications[]) {
+  const now = Date.now()
+  const dayInMs = 1000 * 60 * 60 * 24
+
+  return employees.reduce(
+    (acc, employee) => {
+      acc[employee.complianceStatus] = (acc[employee.complianceStatus] ?? 0) + 1
+      employee.certifications.forEach((cert) => {
+        if (cert.required && cert.status !== 'PASS') {
+          acc.missing += 1
+        }
+        if (cert.status === 'PASS') {
+          const daysUntilExpiry = (cert.expiresAt.getTime() - now) / dayInMs
+          if (daysUntilExpiry <= 30) {
+            acc.expiring += 1
+          }
+        }
+      })
+      return acc
+    },
+    { PASS: 0, FAIL: 0, INCOMPLETE: 0, missing: 0, expiring: 0 } as Record<string, number>
+  )
+}
 
 export default async function ComplianceDashboardPage() {
   const session = await getServerSession(authOptions)
@@ -71,25 +109,7 @@ export default async function ComplianceDashboardPage() {
     }),
   ])
 
-  const totals = employees.reduce(
-    (acc, employee) => {
-      acc[employee.complianceStatus] = (acc[employee.complianceStatus] ?? 0) + 1
-      const now = Date.now()
-      employee.certifications.forEach((cert) => {
-        if (cert.required && cert.status !== 'PASS') {
-          acc.missing += 1
-        }
-        if (cert.status === 'PASS') {
-          const daysUntilExpiry = (cert.expiresAt.getTime() - now) / (1000 * 60 * 60 * 24)
-          if (daysUntilExpiry <= 30) {
-            acc.expiring += 1
-          }
-        }
-      })
-      return acc
-    },
-    { PASS: 0, FAIL: 0, INCOMPLETE: 0, missing: 0, expiring: 0 } as Record<string, number>
-  )
+  const totals = summarizeEmployees(employees)
 
   const groupedPresets = groupPresets(presets)
 
@@ -148,8 +168,9 @@ export default async function ComplianceDashboardPage() {
         <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
           <p className="text-sm font-semibold text-slate-600">Quick links</p>
           <ul className="mt-4 space-y-2 text-sm text-slate-800">
-            <li><a className="text-indigo-600 hover:underline" href="/compliance/employees">Employee roster</a></li>
-            <li><a className="text-indigo-600 hover:underline" href="/compliance/documents">Document library</a></li>
+            <li><Link className="text-indigo-600 hover:underline" href="/compliance/employees">Employee roster</Link></li>
+            <li><Link className="text-indigo-600 hover:underline" href="/compliance/documents">Document library</Link></li>
+            <li><Link className="text-indigo-600 hover:underline" href="/compliance/company-documents">Company documents</Link></li>
             {isAdvanced ? (
               <li><a className="text-indigo-600 hover:underline" href="/api/compliance/export?format=json">Download JSON export</a></li>
             ) : (
@@ -206,7 +227,7 @@ export default async function ComplianceDashboardPage() {
           <div>
             <p className="text-sm uppercase tracking-wide text-slate-500">Certification presets</p>
             <h2 className="text-xl font-semibold text-slate-900">Global preset registry</h2>
-            <p className="text-sm text-slate-500">Rename, reorder, or disable presets ("Other" rows locked by policy).</p>
+            <p className="text-sm text-slate-500">Rename, reorder, or disable presets (“Other” rows locked by policy).</p>
           </div>
         </div>
         <div className="mt-6 space-y-6">

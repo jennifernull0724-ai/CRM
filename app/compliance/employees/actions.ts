@@ -1,5 +1,6 @@
 'use server'
 
+import crypto from 'crypto'
 import { revalidatePath } from 'next/cache'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
@@ -7,9 +8,11 @@ import { prisma } from '@/lib/prisma'
 import { planAllowsFeature, type PlanKey } from '@/lib/billing/planTiers'
 import type { ComplianceCategory } from '@prisma/client'
 import { refreshEmployeeComplianceState } from '@/lib/compliance/status'
-import { uploadComplianceCertificationImage, uploadComplianceFile } from '@/lib/s3'
+import { deleteFile, uploadComplianceCertificationImage, uploadComplianceFile } from '@/lib/s3'
 import { logComplianceActivity } from '@/lib/compliance/activity'
 import { createComplianceSnapshot } from '@/lib/compliance/snapshots'
+
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$
 
 async function requireComplianceContext(level: 'core' | 'advanced' = 'core') {
   const session = await getServerSession(authOptions)
@@ -51,17 +54,23 @@ function toBoolean(value: FormDataEntryValue | null): boolean {
 }
 
 export async function createEmployeeAction(formData: FormData) {
-  const { companyId } = await requireComplianceContext('core')
+  const { companyId, userId } = await requireComplianceContext('core')
 
   const employeeId = formData.get('employeeId')?.toString().trim()
+  const email = formData.get('email')?.toString().trim().toLowerCase()
   const firstName = formData.get('firstName')?.toString().trim()
   const lastName = formData.get('lastName')?.toString().trim()
   const title = formData.get('title')?.toString().trim()
   const role = formData.get('role')?.toString().trim()
   const active = toBoolean(formData.get('active'))
+  const qrToken = crypto.randomUUID().replace(/-/g, '')
 
-  if (!employeeId || !firstName || !lastName || !title || !role) {
+  if (!employeeId || !email || !firstName || !lastName || !title || !role) {
     throw new Error('Missing required employee fields')
+  }
+
+  if (!EMAIL_PATTERN.test(email)) {
+    throw new Error('Employee email is invalid')
   }
 
   const existing = await prisma.complianceEmployee.findFirst({
@@ -72,7 +81,7 @@ export async function createEmployeeAction(formData: FormData) {
     throw new Error('Employee ID already exists')
   }
 
-  await prisma.complianceEmployee.create({
+  const employee = await prisma.complianceEmployee.create({
     data: {
       employeeId,
       firstName,
@@ -81,6 +90,31 @@ export async function createEmployeeAction(formData: FormData) {
       role,
       active,
       companyId,
+      qrToken,
+      email,
+    },
+  })
+
+  await logComplianceActivity({
+    companyId,
+    actorId: userId,
+    employeeId: employee.id,
+    type: 'EMPLOYEE_CREATED',
+    metadata: {
+      employeeIdentifier: employeeId,
+      role,
+      title,
+    },
+  })
+
+  await logComplianceActivity({
+    companyId,
+    actorId: userId,
+    employeeId: employee.id,
+    type: 'QR_GENERATED',
+    metadata: {
+      qrToken,
+      source: 'employee_create',
     },
   })
 
@@ -99,9 +133,15 @@ export async function createCertificationAction(formData: FormData) {
   const required = toBoolean(formData.get('required'))
   const issueDate = formData.get('issueDate')?.toString()
   const expiresAt = formData.get('expiresAt')?.toString()
+  const proofEntries = formData.getAll('proofFiles')
+  const proofFiles = proofEntries.filter((value): value is File => value instanceof File && value.size > 0)
 
   if (!employeeId || !category || !issueDate || !expiresAt) {
     throw new Error('Missing certification fields')
+  }
+
+  if (!proofFiles.length) {
+    throw new Error('At least one proof file is required')
   }
 
   if (!presetKey && (!customName || customName.length < 3)) {
@@ -117,6 +157,12 @@ export async function createCertificationAction(formData: FormData) {
 
   if (expiresAtObj <= issueDateObj) {
     throw new Error('Expiration date must be after issue date')
+  }
+
+  const employeeExists = await prisma.complianceEmployee.findFirst({ where: { id: employeeId, companyId }, select: { id: true } })
+
+  if (!employeeExists) {
+    throw new Error('Employee not found')
   }
 
   let resolvedName = customName
@@ -137,120 +183,94 @@ export async function createCertificationAction(formData: FormData) {
     resolvedCategory = preset.category
   }
 
-  const certification = await prisma.complianceCertification.create({
-    data: {
-      employeeId,
-      presetKey: presetKey ?? undefined,
-      customName: resolvedName,
-      category: resolvedCategory,
-      required,
-      issueDate: issueDateObj,
-      expiresAt: expiresAtObj,
-    },
-  })
+  const certificationId = crypto.randomUUID()
+  const proofPayloads = await Promise.all(
+    proofFiles.map(async (file) => ({
+      file,
+      buffer: Buffer.from(await file.arrayBuffer()),
+    }))
+  )
+
+  const uploads: { version: number; file: File; key: string; hash: string; bucket: string; size: number; mimeType: string }[] = []
+
+  try {
+    let version = 1
+    for (const payload of proofPayloads) {
+      const upload = await uploadComplianceCertificationImage({
+        file: payload.buffer,
+        companyId,
+        employeeId,
+        certificationId,
+        version,
+        contentType: payload.file.type || 'application/octet-stream',
+      })
+      uploads.push({
+        version,
+        file: payload.file,
+        key: upload.key,
+        hash: upload.hash,
+        bucket: upload.bucket,
+        size: upload.size,
+        mimeType: payload.file.type,
+      })
+      version += 1
+    }
+
+    await prisma.$transaction(async (tx) => {
+      await tx.complianceCertification.create({
+        data: {
+          id: certificationId,
+          employeeId,
+          presetKey: presetKey ?? undefined,
+          customName: resolvedName,
+          category: resolvedCategory,
+          required,
+          issueDate: issueDateObj,
+          expiresAt: expiresAtObj,
+        },
+      })
+
+      await tx.complianceCertificationImage.createMany({
+        data: uploads.map((upload) => ({
+          certificationId,
+          version: upload.version,
+          bucket: upload.bucket,
+          objectKey: upload.key,
+          filename: upload.file.name,
+          mimeType: upload.mimeType,
+          size: upload.size,
+          sha256: upload.hash,
+          uploadedById: userId,
+        })),
+      })
+    })
+  } catch (error) {
+    await Promise.all(uploads.map((upload) => deleteFile(upload.key).catch(() => undefined)))
+    throw error
+  }
 
   await logComplianceActivity({
-    employeeId,
-    type: 'CERT_ADDED',
-    metadata: {
-      certificationId: certification.id,
-      presetKey,
-      customName: resolvedName,
-      createdBy: userId,
-    },
-  })
-
-  await refreshEmployeeComplianceState(employeeId)
-  revalidatePath('/compliance/employees')
-  revalidatePath(`/compliance/employees/${employeeId}`)
-  revalidatePath('/dashboard/admin')
-  revalidatePath('/dashboard/owner')
-}
-
-export async function uploadCertificationImageAction(formData: FormData) {
-  const { companyId, userId } = await requireComplianceContext('core')
-  let employeeId = formData.get('employeeId')?.toString()
-  const certificationId = formData.get('certificationId')?.toString()
-  const file = formData.get('file') as File | null
-
-  if (!certificationId || !file) {
-    throw new Error('Missing upload data')
-  }
-
-  const isImage = file.type.startsWith('image/')
-  const isPdf = file.type === 'application/pdf'
-
-  if (!isImage && !isPdf) {
-    throw new Error('Only image or PDF uploads accepted')
-  }
-
-  const certification = await prisma.complianceCertification.findFirst({
-    where: { id: certificationId, employee: { companyId } },
-    select: { employeeId: true },
-  })
-
-  if (!certification) {
-    throw new Error('Certification not found')
-  }
-
-  if (!employeeId) {
-    employeeId = certification.employeeId
-  }
-
-  if (!employeeId) {
-    throw new Error('Unable to resolve employee for certification')
-  }
-
-  const buffer = Buffer.from(await file.arrayBuffer())
-  const existingCount = await prisma.complianceCertificationImage.count({
-    where: { certificationId },
-  })
-  const version = existingCount + 1
-
-  const upload = await uploadComplianceCertificationImage({
-    file: buffer,
     companyId,
+    actorId: userId,
     employeeId,
     certificationId,
-    version,
-    contentType: file.type,
-  })
-
-  await prisma.complianceCertificationImage.create({
-    data: {
-      certificationId,
-      version,
-      bucket: upload.bucket,
-      objectKey: upload.key,
-      filename: file.name,
-      mimeType: file.type,
-      size: upload.size,
-      sha256: upload.hash,
-      uploadedById: userId,
-    },
-  })
-
-  await logComplianceActivity({
-    employeeId,
-    type: version === 1 ? 'CERT_IMAGE_UPLOADED' : 'CERT_IMAGE_VERSIONED',
+    type: 'CERT_ADDED',
     metadata: {
-      certificationId,
-      version,
-      hash: upload.hash,
-      size: upload.size,
-      mimeType: file.type,
+      presetKey,
+      customName: resolvedName,
+      proofCount: uploads.length,
     },
   })
 
-  await refreshEmployeeComplianceState(employeeId)
-  revalidatePath(`/compliance/employees/${employeeId}`)
+  await refreshEmployeeComplianceState(employeeId, { actorId: userId, companyId })
   revalidatePath('/compliance/employees')
+  revalidatePath(`/compliance/employees/${employeeId}`)
   revalidatePath('/dashboard/admin')
   revalidatePath('/dashboard/owner')
 }
 
 export async function uploadComplianceDocumentAction(formData: FormData) {
-  const { companyId } = await requireComplianceContext('core')
+  const { companyId, userId } = await requireComplianceContext('core')
   const employeeId = formData.get('employeeId')?.toString()
   const title = formData.get('title')?.toString()
   const file = formData.get('file') as File | null
@@ -269,7 +289,7 @@ export async function uploadComplianceDocumentAction(formData: FormData) {
 
   const upload = await uploadComplianceFile(buffer, companyId, 'documents', file.name, file.type)
 
-  await prisma.complianceDocument.create({
+  const document = await prisma.complianceDocument.create({
     data: {
       employeeId,
       title,
@@ -282,6 +302,20 @@ export async function uploadComplianceDocumentAction(formData: FormData) {
     },
   })
 
+  await logComplianceActivity({
+    companyId,
+    actorId: userId,
+    employeeId,
+    type: version === 1 ? 'DOC_UPLOADED' : 'DOC_VERSIONED',
+    metadata: {
+      documentId: document.id,
+      title,
+      version,
+      hash: upload.hash,
+      objectKey: upload.key,
+    },
+  })
+
   revalidatePath(`/compliance/employees/${employeeId}`)
   revalidatePath('/compliance/documents')
   revalidatePath('/dashboard/admin')
@@ -289,7 +323,7 @@ export async function uploadComplianceDocumentAction(formData: FormData) {
 }
 
 export async function createSnapshotAction(formData: FormData) {
-  const { userId } = await requireComplianceContext('core')
+  const { userId, companyId } = await requireComplianceContext('core')
   const employeeId = formData.get('employeeId')?.toString()
 
   if (!employeeId) {
@@ -297,7 +331,7 @@ export async function createSnapshotAction(formData: FormData) {
   }
 
   await createComplianceSnapshot({ employeeId, createdById: userId, source: 'manual' })
-  await refreshEmployeeComplianceState(employeeId)
+  await refreshEmployeeComplianceState(employeeId, { actorId: userId, companyId })
   revalidatePath(`/compliance/employees/${employeeId}`)
   revalidatePath('/compliance/employees')
   revalidatePath('/dashboard/admin')
@@ -305,7 +339,7 @@ export async function createSnapshotAction(formData: FormData) {
 }
 
 export async function createInspectionSnapshotAction(formData: FormData) {
-  const { userId } = await requireComplianceContext('advanced')
+  const { userId, companyId } = await requireComplianceContext('advanced')
   const employeeId = formData.get('employeeId')?.toString()
 
   if (!employeeId) {
@@ -313,7 +347,7 @@ export async function createInspectionSnapshotAction(formData: FormData) {
   }
 
   await createComplianceSnapshot({ employeeId, createdById: userId, source: 'inspection' })
-  await refreshEmployeeComplianceState(employeeId)
+  await refreshEmployeeComplianceState(employeeId, { actorId: userId, companyId })
   revalidatePath(`/compliance/employees/${employeeId}`)
   revalidatePath('/compliance/employees')
   revalidatePath('/dashboard/admin')
@@ -321,7 +355,7 @@ export async function createInspectionSnapshotAction(formData: FormData) {
 }
 
 export async function setEmployeeActiveStateAction(formData: FormData) {
-  const { companyId } = await requireComplianceContext('core')
+  const { companyId, userId } = await requireComplianceContext('core')
   const employeeId = formData.get('employeeId')?.toString()
   const active = formData.get('active') === 'true'
 
@@ -335,6 +369,17 @@ export async function setEmployeeActiveStateAction(formData: FormData) {
   }
 
   await prisma.complianceEmployee.update({ where: { id: employeeId }, data: { active } })
+
+  await logComplianceActivity({
+    companyId,
+    actorId: userId,
+    employeeId,
+    type: active ? 'EMPLOYEE_REACTIVATED' : 'EMPLOYEE_DEACTIVATED',
+    metadata: {
+      previousState: employee.active,
+      nextState: active,
+    },
+  })
   revalidatePath('/dashboard/admin')
   revalidatePath('/dashboard/owner')
   revalidatePath('/compliance/employees')
