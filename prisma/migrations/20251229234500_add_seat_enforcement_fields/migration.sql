@@ -1,0 +1,11 @@
+-- Add Stripe seat tracking fields
+ALTER TABLE "Company"
+  ADD COLUMN "stripeSeatQuantity" INTEGER,
+  ADD COLUMN "stripeSeatItemId" TEXT;
+
+-- Extend AccessAuditAction enum with seat enforcement actions
+ALTER TYPE "AccessAuditAction" ADD VALUE IF NOT EXISTS 'SEAT_CAP_REACHED';
+ALTER TYPE "AccessAuditAction" ADD VALUE IF NOT EXISTS 'INVITE_BLOCKED_SEAT_LIMIT';
+ALTER TYPE "AccessAuditAction" ADD VALUE IF NOT EXISTS 'ROLE_CHANGE_BLOCKED_SEAT_LIMIT';
+ALTER TYPE "AccessAuditAction" ADD VALUE IF NOT EXISTS 'SEAT_COUNT_MISMATCH_STRIPE';
+ALTER TYPE "AccessAuditAction" ADD VALUE IF NOT EXISTS 'SEAT_QUANTITY_UPDATED';
