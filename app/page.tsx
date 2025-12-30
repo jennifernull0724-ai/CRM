@@ -105,7 +105,6 @@ export default function LandingPage() {
           <div className="absolute inset-0 bg-slate-950/90" />
           <div className="relative mx-auto flex max-w-7xl flex-col gap-12 px-6 py-32">
             <div className="max-w-4xl space-y-8">
-              <p className="text-sm font-semibold uppercase tracking-[0.3em] text-orange-400">Operational System</p>
               <h1 className="text-5xl font-bold leading-[1.1] tracking-tight text-white md:text-7xl">
                 Operational control for construction, railroad, and environmental teams.
               </h1>
