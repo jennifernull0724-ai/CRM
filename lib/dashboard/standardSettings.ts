@@ -114,31 +114,56 @@ export async function loadStandardSettings(companyId: string): Promise<StandardS
   // Ensure workspace has minimum required system records
   await ensureCompanyBootstrap(companyId)
 
-  const [integrations, templatesRaw, signaturesRaw, recipientPreferences, brandingSettings] = await Promise.all([
-    prisma.emailIntegration.findMany({
+  // Guard against missing optional tables in partial schema rollouts
+  let integrations: any[] = []
+  let templatesRaw: any[] = []
+  let signaturesRaw: any[] = []
+  let recipientPreferences: any[] = []
+
+  try {
+    integrations = await prisma.emailIntegration.findMany({
       where: { companyId },
       orderBy: { provider: 'asc' },
-    }),
-    prisma.emailTemplate.findMany({
+    })
+  } catch (e) {
+    // EmailIntegration table does not exist in this environment — skip safely
+  }
+
+  try {
+    templatesRaw = await prisma.emailTemplate.findMany({
       where: { companyId },
       orderBy: [{ scope: 'asc' }, { name: 'asc' }],
       include: {
         createdBy: { select: { name: true } },
         updatedBy: { select: { name: true } },
       },
-    }),
-    prisma.emailSignature.findMany({
+    })
+  } catch (e) {
+    // EmailTemplate table does not exist in this environment — skip safely
+  }
+
+  try {
+    signaturesRaw = await prisma.emailSignature.findMany({
       where: { companyId },
       orderBy: [{ isActive: 'desc' }, { updatedAt: 'desc' }],
       include: {
         createdBy: { select: { name: true } },
       },
-    }),
-    prisma.emailRecipientPreference.findMany({
+    })
+  } catch (e) {
+    // EmailSignature table does not exist in this environment — skip safely
+  }
+
+  try {
+    recipientPreferences = await prisma.emailRecipientPreference.findMany({
       where: { companyId },
       orderBy: [{ sendEnabled: 'desc' }, { email: 'asc' }],
-    }),
-    prisma.systemSetting.findMany({
+    })
+  } catch (e) {
+    // EmailRecipientPreference table does not exist in this environment — skip safely
+  }
+
+  const brandingSettings = await prisma.systemSetting.findMany({
       where: {
         companyId,
         key: { in: [BRANDING_UI_LOGO_KEY, BRANDING_PDF_LOGO_KEY, BRANDING_DISPATCH_PDF_LOGO_KEY] },
