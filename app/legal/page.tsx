@@ -1,3 +1,6 @@
+import { MarketingHeader } from '@/components/public/marketing-header'
+import { MarketingFooter } from '@/components/public/marketing-footer'
+
 const sections = [
   {
     title: 'Terms of Service',
@@ -26,7 +29,9 @@ const sections = [
 
 export default function LegalPage() {
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-gray-950">
+      <MarketingHeader />
+      <div className="bg-slate-50 min-h-[calc(100vh-4rem)]">
       <div className="mx-auto max-w-4xl px-6 py-12 space-y-8">
         <header>
           <p className="text-sm uppercase tracking-wide text-slate-500">Legal</p>
@@ -47,6 +52,8 @@ export default function LegalPage() {
           </section>
         ))}
       </div>
+      </div>
+      <MarketingFooter />
     </div>
   )
 }

@@ -1,4 +1,6 @@
 import Link from 'next/link'
+import { MarketingHeader } from '@/components/public/marketing-header'
+import { MarketingFooter } from '@/components/public/marketing-footer'
 
 type RequestDemoPageProps = {
   searchParams?: Record<string, string | string[] | undefined>
@@ -18,7 +20,9 @@ export default function RequestDemoPage({ searchParams }: RequestDemoPageProps) 
 
   if (success === 'true') {
     return (
-      <div className="min-h-screen bg-gray-950 flex items-center justify-center px-4">
+      <div className="min-h-screen bg-gray-950">
+        <MarketingHeader />
+        <div className="flex items-center justify-center px-4 min-h-[calc(100vh-4rem)]">
         <div className="max-w-md w-full text-center">
           <div className="bg-gray-900 p-8 rounded-lg border border-gray-800">
             <div className="text-green-500 text-5xl mb-4">✓</div>
@@ -34,12 +38,15 @@ export default function RequestDemoPage({ searchParams }: RequestDemoPageProps) 
             </Link>
           </div>
         </div>
+        </div>
+        <MarketingFooter />
       </div>
     )
   }
 
   return (
     <div className="min-h-screen bg-gray-950">
+      <MarketingHeader />
       <div className="max-w-3xl mx-auto px-4 py-16">
         <Link href="/" className="text-orange-500 hover:text-orange-400 mb-8 inline-block">
           ← Back to home
@@ -139,6 +146,7 @@ export default function RequestDemoPage({ searchParams }: RequestDemoPageProps) 
             >
               Request Demo
             </button>
+      <MarketingFooter />
           </form>
         </div>
       </div>

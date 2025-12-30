@@ -2,6 +2,8 @@
 
 import { FormEvent, useState } from 'react'
 import Link from 'next/link'
+import { MarketingHeader } from '@/components/public/marketing-header'
+import { MarketingFooter } from '@/components/public/marketing-footer'
 
 const supportTopics = [
   'General Question',
@@ -19,6 +21,22 @@ type FormState = 'idle' | 'submitting' | 'success' | 'error'
 export default function SupportPage() {
   const [formState, setFormState] = useState<FormState>('idle')
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+
+  return (
+    <div className="min-h-screen bg-gray-950">
+      <MarketingHeader />
+      <SupportContent formState={formState} setFormState={setFormState} errorMessage={errorMessage} setErrorMessage={setErrorMessage} />
+      <MarketingFooter />
+    </div>
+  )
+}
+
+function SupportContent({ formState, setFormState, errorMessage, setErrorMessage }: {
+  formState: FormState
+  setFormState: (state: FormState) => void
+  errorMessage: string | null
+  setErrorMessage: (msg: string | null) => void
+}) {
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -56,8 +74,8 @@ export default function SupportPage() {
   }
 
   return (
-    <main className="min-h-screen bg-gray-950 text-white">
-      <div className="max-w-4xl mx-auto px-4 py-16">
+    <div className="bg-gray-950 text-white py-16">
+      <div className="max-w-4xl mx-auto px-4">
         <Link href="/" className="text-sm text-orange-500 hover:text-orange-400">
           ← Back to home
         </Link>
@@ -167,6 +185,6 @@ export default function SupportPage() {
           </form>
         </section>
       </div>
-    </main>
+    </div>
   )
 }

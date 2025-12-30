@@ -2,6 +2,8 @@
 
 import { FormEvent, useState } from 'react'
 import Link from 'next/link'
+import { MarketingHeader } from '@/components/public/marketing-header'
+import { MarketingFooter } from '@/components/public/marketing-footer'
 
 const topics = [
   'Enterprise Rollout',
@@ -16,6 +18,22 @@ type FormState = 'idle' | 'submitting' | 'success' | 'error'
 export default function ContactSalesPage() {
   const [formState, setFormState] = useState<FormState>('idle')
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+
+  return (
+    <div className="min-h-screen bg-gray-950">
+      <MarketingHeader />
+      <ContactSalesContent formState={formState} setFormState={setFormState} errorMessage={errorMessage} setErrorMessage={setErrorMessage} />
+      <MarketingFooter />
+    </div>
+  )
+}
+
+function ContactSalesContent({ formState, setFormState, errorMessage, setErrorMessage }: {
+  formState: FormState
+  setFormState: (state: FormState) => void
+  errorMessage: string | null
+  setErrorMessage: (msg: string | null) => void
+}) {
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -53,8 +71,8 @@ export default function ContactSalesPage() {
   }
 
   return (
-    <main className="min-h-screen bg-gray-950 text-white">
-      <div className="max-w-4xl mx-auto px-4 py-16">
+    <div className="bg-gray-950 text-white py-16">
+      <div className="max-w-4xl mx-auto px-4">
         <Link href="/pricing" className="text-sm text-orange-500 hover:text-orange-400">
           ← Back to pricing
         </Link>
@@ -177,6 +195,6 @@ export default function ContactSalesPage() {
           </form>
         </section>
       </div>
-    </main>
+    </div>
   )
 }

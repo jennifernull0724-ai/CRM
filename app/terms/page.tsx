@@ -1,4 +1,6 @@
 import type { Metadata } from 'next'
+import { MarketingHeader } from '@/components/public/marketing-header'
+import { MarketingFooter } from '@/components/public/marketing-footer'
 
 export const metadata: Metadata = {
   title: 'Terms of Service | T-REX AI OS',
@@ -15,7 +17,9 @@ export const metadata: Metadata = {
 
 export default function TermsPage() {
   return (
-    <main className="min-h-screen bg-gray-950 text-white">
+    <div className="min-h-screen bg-gray-950">
+      <MarketingHeader />
+      <main className="bg-gray-950 text-white">
       <div className="max-w-4xl mx-auto px-4 py-16 space-y-10">
         <header className="space-y-4">
           <p className="text-xs uppercase tracking-[0.4em] text-orange-400">Legal</p>
@@ -102,6 +106,8 @@ export default function TermsPage() {
           </section>
         </div>
       </div>
-    </main>
+      </main>
+      <MarketingFooter />
+    </div>
   )
 }

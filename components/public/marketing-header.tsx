@@ -20,10 +20,7 @@ export function MarketingHeader() {
     <header className="border-b border-white/10 bg-[#050d1a] text-white">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4">
         <Link href="/" className="flex items-center gap-2 text-xl font-semibold tracking-wide text-white" onClick={closeMobile}>
-          <Image src="/favicon-32x32.png" alt="T-REX AI OS" width={32} height={32} />
-          <span className="text-white">
-            T-RE<span className="text-orange-500">X</span> AI OS
-          </span>
+          <Image src="/og/T-REX.png" alt="T-REX AI OS" width={120} height={40} className="h-10 w-auto" />
         </Link>
         <nav className="hidden items-center gap-6 text-sm font-medium md:flex">
           {navLinks.map((item) => (
