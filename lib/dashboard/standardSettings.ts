@@ -140,9 +140,11 @@ export async function loadStandardSettings(companyId: string): Promise<StandardS
         key: { in: [BRANDING_UI_LOGO_KEY, BRANDING_PDF_LOGO_KEY, BRANDING_DISPATCH_PDF_LOGO_KEY] },
       },
       include: {
-        updatedBy: { select: { name: true } },
+        updatedBy: {
+          select: { name: true }
+        },
       },
-    }),
+    }).catch(() => []), // ✅ Return empty array if query fails on fresh account
   ])
 
   const brandingMap = brandingSettings.reduce<
