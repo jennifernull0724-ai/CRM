@@ -128,25 +128,25 @@ export default function LandingPage() {
             </div>
             <div className="grid gap-8 text-base text-slate-200 md:grid-cols-3">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.25em] text-orange-400">Mandate</p>
-                <p className="mt-3 text-lg font-semibold leading-snug text-white">One operating record from contact through compliance.</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.25em] text-orange-500/80">Mandate</p>
+                <p className="mt-3 text-lg font-semibold leading-snug text-slate-100">One operating record from contact through compliance.</p>
               </div>
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.25em] text-orange-400">Enforcement</p>
-                <p className="mt-3 text-lg font-semibold leading-snug text-white">Role-based controls and immutable audit logs by default.</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.25em] text-orange-500/80">Enforcement</p>
+                <p className="mt-3 text-lg font-semibold leading-snug text-slate-100">Role-based controls and immutable audit logs by default.</p>
               </div>
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.25em] text-orange-400">Audience</p>
-                <p className="mt-3 text-lg font-semibold leading-snug text-white">Operators, estimators, dispatch leaders, compliance owners.</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.25em] text-orange-500/80">Audience</p>
+                <p className="mt-3 text-lg font-semibold leading-snug text-slate-100">Operators, estimators, dispatch leaders, compliance owners.</p>
               </div>
             </div>
           </div>
         </section>
 
-        <section className="border-b border-slate-800 bg-slate-900/60">
+        <section className="border-b border-slate-800 bg-slate-900">
           <div className="mx-auto grid max-w-7xl gap-8 px-6 py-12 md:grid-cols-5">
             {trustSignals.map((item) => (
-              <p key={item} className="text-base font-semibold text-orange-400">
+              <p key={item} className="text-base font-medium text-slate-300">
                 {item}
               </p>
             ))}
