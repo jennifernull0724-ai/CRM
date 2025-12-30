@@ -161,7 +161,7 @@ export default function LandingPage() {
             </header>
             <div className="grid gap-8 md:grid-cols-3">
               {industrySections.map((industry) => (
-                <article key={industry.title} className="flex h-full flex-col rounded-2xl border border-white/5 bg-slate-950/40 p-8 shadow-xl shadow-black/20">
+                <article key={industry.title} className="flex h-full flex-col rounded-2xl border border-slate-700/50 bg-slate-900/80 p-8 shadow-2xl shadow-black/40 backdrop-blur-sm">
                   <div className="text-sm font-bold uppercase tracking-[0.25em] text-orange-400">{industry.title}</div>
                   <p className="mt-6 text-lg font-semibold leading-snug text-white">{industry.challenge}</p>
                   <p className="mt-4 text-base leading-relaxed text-slate-400">{industry.response}</p>
