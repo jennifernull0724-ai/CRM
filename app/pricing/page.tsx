@@ -23,8 +23,10 @@ type Tier = {
   seats: string
   included: string[]
   notIncluded: string[]
-  ctaLabel: string
-  ctaHref: string
+  primaryCtaLabel: string
+  primaryCtaHref: string
+  secondaryCtaLabel?: string
+  secondaryCtaHref?: string
   ctaVariant: 'primary' | 'secondary'
 }
 
@@ -53,8 +55,8 @@ const tiers: Tier[] = [
       'Basic analytics + pipeline exports',
     ],
     notIncluded: ['Estimating PDFs', 'Dispatch board', 'Compliance snapshots'],
-    ctaLabel: 'Start free trial',
-    ctaHref: '/signup',
+    primaryCtaLabel: 'Start 14-day trial',
+    primaryCtaHref: '/signup',
     ctaVariant: 'primary',
   },
   {
@@ -70,8 +72,10 @@ const tiers: Tier[] = [
       'Embedded email + timeline logging',
     ],
     notIncluded: ['Enterprise compliance automations'],
-    ctaLabel: 'Talk to sales',
-    ctaHref: '/request-demo',
+    primaryCtaLabel: 'Buy Growth',
+    primaryCtaHref: '/upgrade?plan=growth',
+    secondaryCtaLabel: 'Talk to sales',
+    secondaryCtaHref: '/request-demo',
     ctaVariant: 'secondary',
   },
   {
@@ -86,8 +90,10 @@ const tiers: Tier[] = [
       'Advanced analytics with audit trails',
     ],
     notIncluded: [],
-    ctaLabel: 'Request alignment call',
-    ctaHref: '/request-demo',
+    primaryCtaLabel: 'Buy Pro',
+    primaryCtaHref: '/upgrade?plan=pro',
+    secondaryCtaLabel: 'Request alignment call',
+    secondaryCtaHref: '/request-demo',
     ctaVariant: 'secondary',
   },
   {
@@ -103,8 +109,8 @@ const tiers: Tier[] = [
       'Platform APIs and integrations',
     ],
     notIncluded: [],
-    ctaLabel: 'Contact enterprise team',
-    ctaHref: '/request-demo',
+    primaryCtaLabel: 'Contact enterprise team',
+    primaryCtaHref: '/request-demo',
     ctaVariant: 'primary',
   },
 ]
@@ -209,15 +215,23 @@ export default function PricingPage() {
 
                 <div className="mt-auto pt-8">
                   <Link
-                    href={tier.ctaHref}
+                    href={tier.primaryCtaHref}
                     className={
                       tier.ctaVariant === 'primary'
                         ? 'block rounded-full bg-orange-500 px-4 py-3 text-center text-sm font-semibold text-white hover:bg-orange-600'
                         : 'block rounded-full border border-slate-600 px-4 py-3 text-center text-sm font-semibold text-white hover:border-white'
                     }
                   >
-                    {tier.ctaLabel}
+                    {tier.primaryCtaLabel}
                   </Link>
+                  {tier.secondaryCtaLabel && tier.secondaryCtaHref && (
+                    <Link
+                      href={tier.secondaryCtaHref}
+                      className="mt-3 block rounded-full border border-slate-700 px-4 py-3 text-center text-sm font-medium text-slate-300 hover:border-slate-500 hover:text-white"
+                    >
+                      {tier.secondaryCtaLabel}
+                    </Link>
+                  )}
                 </div>
               </article>
             ))}

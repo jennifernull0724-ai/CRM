@@ -90,8 +90,8 @@ export function SignupPageClient() {
         <div className="w-full max-w-[420px] space-y-8">
           <header className="space-y-2">
             <p className="text-xs uppercase tracking-[0.4em] text-[#6d768a]">Provisioning</p>
-            <h2 className="text-3xl font-semibold text-[#050d1a]">Authorized account creation</h2>
-            <p className="text-xs text-[#4c566a]">14-day trial · No credit card required</p>
+            <h2 className="text-3xl font-semibold text-[#050d1a]">Create your workspace</h2>
+            <p className="text-xs text-[#4c566a]">Activate trial or purchase a plan after signup</p>
           </header>
           <div className="rounded-sm border border-[#d7dbe2] bg-white p-6 shadow-[0_25px_60px_rgba(5,13,26,0.18)]">
             <form onSubmit={handleSubmit} className="space-y-5">
@@ -172,7 +172,7 @@ export function SignupPageClient() {
                 disabled={loading}
                 className="w-full rounded-sm bg-[#d5530d] py-3 text-sm font-semibold text-white transition hover:bg-[#b6440b] disabled:cursor-not-allowed disabled:opacity-70"
               >
-                {loading ? 'Creating account…' : 'Start 14-day trial'}
+                {loading ? 'Creating account…' : 'Create workspace'}
               </button>
 
               <p className="text-xs text-[#4c566a] text-center">

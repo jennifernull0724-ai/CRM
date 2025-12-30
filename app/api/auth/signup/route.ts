@@ -33,19 +33,15 @@ export async function POST(req: NextRequest) {
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 10)
 
-    const now = new Date()
-    const starterDurationDays = PLAN_TIERS.starter.durationDays ?? 14
-    const starterExpiresAt = new Date(now)
-    starterExpiresAt.setDate(starterExpiresAt.getDate() + starterDurationDays)
-
+    // DO NOT auto-assign trial — trial must be explicitly opted into
     const company = await prisma.company.create({
       data: {
         name: `${name}'s Workspace`,
         industry: 'Other',
         kind: 'account',
         planKey: 'starter',
-        starterStartedAt: now,
-        starterExpiresAt,
+        starterStartedAt: null,
+        starterExpiresAt: null,
       },
     })
 
@@ -62,7 +58,7 @@ export async function POST(req: NextRequest) {
         name,
         password: hashedPassword,
         role: 'owner',
-        subscriptionStatus: 'trial',
+        subscriptionStatus: 'inactive',
         companyId: company.id,
       },
     })

@@ -96,6 +96,24 @@ async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice, templateVe
     return
   }
 
+  // Clear trial fields on successful paid subscription
+  await prisma.company.update({
+    where: { id: companyId },
+    data: {
+      planKey,
+      starterStartedAt: null,
+      starterExpiresAt: null,
+    },
+  })
+
+  // Update all users in company to active paid status
+  await prisma.user.updateMany({
+    where: { companyId },
+    data: {
+      subscriptionStatus: 'active',
+    },
+  })
+
   const invoiceLogged = await prisma.accessAuditLog.findFirst({
     where: {
       companyId,
