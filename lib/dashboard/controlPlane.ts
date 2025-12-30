@@ -4,6 +4,7 @@ import { getGovernanceState, type GovernanceState } from '@/lib/dashboard/govern
 import { loadStandardSettings, type StandardSettingsData } from '@/lib/dashboard/standardSettings'
 import { getCompliancePolicies, type CompliancePolicies } from '@/lib/system/settings'
 import { listCompliancePresets } from '@/lib/compliance/presets'
+import { ensureCompanyBootstrap } from '@/lib/system/bootstrap'
 import type { CompliancePreset, CompanyComplianceDocumentCategory } from '@prisma/client'
 
 export type ControlPlaneCertification = {
@@ -59,6 +60,9 @@ const COMPANY_DOCUMENT_CATEGORIES: CompanyComplianceDocumentCategory[] = ['INSUR
 const COMPANY_DOCUMENT_EXPIRY_DAYS = 365
 
 export async function loadControlPlaneData(companyId: string): Promise<ControlPlaneData> {
+  // Ensure workspace has minimum required system records
+  await ensureCompanyBootstrap(companyId)
+
   const [
     analytics,
     governance,

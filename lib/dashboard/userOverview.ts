@@ -1,5 +1,6 @@
 import { Prisma, type DispatchRequestStatus, type EstimateStatus, type WorkOrderStatus } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
+import { ensureCompanyBootstrap } from '@/lib/system/bootstrap'
 
 export type UserDashboardContact = {
   id: string
@@ -85,6 +86,9 @@ function buildFullName(firstName: string, lastName: string | null): string {
 }
 
 export async function loadUserDashboardData(userId: string, companyId: string): Promise<UserDashboardData> {
+  // Ensure workspace has minimum required system records
+  await ensureCompanyBootstrap(companyId)
+
   const [metrics, contacts, estimates, dispatchRecords, contactOptions] = await Promise.all([
     collectMetrics(userId, companyId),
     prisma.contact.findMany({

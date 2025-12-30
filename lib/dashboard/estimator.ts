@@ -1,6 +1,7 @@
 import { Prisma, EstimateStatus } from '@prisma/client'
 import type { EstimateStatus as EstimateStatusValue } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
+import { ensureCompanyBootstrap } from '@/lib/system/bootstrap'
 
 const PIPELINE_STATUSES: EstimateStatusValue[] = [
   EstimateStatus.DRAFT,
@@ -61,6 +62,9 @@ export type EstimatorDashboardPayload = {
 }
 
 export async function loadEstimatorDashboard(params: ScopeParams): Promise<EstimatorDashboardPayload> {
+  // Ensure workspace has minimum required system records
+  await ensureCompanyBootstrap(params.companyId)
+
   const baseWhere = buildEstimateScope(params)
 
   const [statusGroups, aggregate, approvalWindows, awaitingApprovals, recentApprovals, recentDispatches] = await Promise.all([

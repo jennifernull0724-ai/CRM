@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { getDownloadUrl } from '@/lib/s3'
+import { ensureCompanyBootstrap } from '@/lib/system/bootstrap'
 import type { EmailProvider, EmailTemplateScope } from '@prisma/client'
 
 const BRANDING_UI_LOGO_KEY = 'branding_ui_logo'
@@ -110,6 +111,9 @@ type BrandingAssetValue = {
 }
 
 export async function loadStandardSettings(companyId: string): Promise<StandardSettingsData> {
+  // Ensure workspace has minimum required system records
+  await ensureCompanyBootstrap(companyId)
+
   const [integrations, templatesRaw, signaturesRaw, recipientPreferences, brandingSettings] = await Promise.all([
     prisma.emailIntegration.findMany({
       where: { companyId },
