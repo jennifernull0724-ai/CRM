@@ -6,6 +6,8 @@ import Link from 'next/link'
 export default function RequestDemoPage() {
   const searchParams = useSearchParams()
   const success = searchParams.get('success')
+  const errorFlag = searchParams.get('error')
+  const supportEmail = process.env.NEXT_PUBLIC_SUPPORT_EMAIL
 
   if (success === 'true') {
     return (
@@ -41,8 +43,15 @@ export default function RequestDemoPage() {
           See the production system. No sandbox, no simulations.
         </p>
 
-        <div className="bg-gray-900 p-8 rounded-lg border border-gray-800">
-          <form action="/api/request-demo" method="POST" className="space-y-6">
+        <div className="bg-gray-900 p-8 rounded-lg border border-gray-800 space-y-6">
+          {errorFlag === 'true' && (
+            <div className="rounded border border-red-500/50 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+              Something went wrong while submitting your request. Please try again shortly
+              {supportEmail ? ` or email ${supportEmail}` : ''}.
+            </div>
+          )}
+
+          <form action="/api/forms/request-demo" method="POST" className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <label htmlFor="name" className="block text-sm font-medium text-gray-300 mb-2">
@@ -85,8 +94,11 @@ export default function RequestDemoPage() {
 
             <div>
               <label htmlFor="industry" className="block text-sm font-medium text-gray-300 mb-2">
-                Industry *
+                Industry focus *
               </label>
+              <p className="text-xs text-gray-500 mb-2">
+                This helps us tailor your demo — it does not limit or change platform functionality.
+              </p>
               <select
                 id="industry"
                 name="industry"
@@ -98,6 +110,7 @@ export default function RequestDemoPage() {
                 <option value="railroad">Railroad</option>
                 <option value="environmental">Environmental</option>
                 <option value="other">Other</option>
+                <option value="multiple">Multiple / Not Sure</option>
               </select>
             </div>
 

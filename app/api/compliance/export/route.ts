@@ -46,7 +46,7 @@ export async function GET(request: Request) {
     },
   })
 
-  const snapshotHashes = new Map<string, string>()
+  const snapshotMetadata: { employeeId: string; snapshotId: string; snapshotHash: string; failureReasons: unknown[] }[] = []
 
   for (const employee of employees) {
     const { snapshot } = await createComplianceSnapshot({
@@ -54,24 +54,28 @@ export async function GET(request: Request) {
       createdById: session.user.id,
       source: 'export',
     })
-    snapshotHashes.set(employee.id, snapshot.snapshotHash)
+    snapshotMetadata.push({
+      employeeId: employee.id,
+      snapshotId: snapshot.id,
+      snapshotHash: snapshot.snapshotHash,
+      failureReasons: Array.isArray(snapshot.failureReasons) ? snapshot.failureReasons : [],
+    })
   }
 
-  await Promise.all(
-    employees.map((employee) =>
-      logComplianceActivity({
-        companyId: session.user.companyId,
-        actorId: session.user.id,
-        employeeId: employee.id,
-        type: 'COMPLIANCE_EXPORTED',
-        metadata: {
-          format,
-          certificationCount: employee.certifications.length,
-          snapshotHash: snapshotHashes.get(employee.id) ?? employee.complianceHash ?? 'UNVERIFIED',
-        },
-      })
-    )
-  )
+  await logComplianceActivity({
+    companyId: session.user.companyId,
+    actorId: session.user.id,
+    type: 'COMPLIANCE_EXPORTED',
+    metadata: {
+      format,
+      snapshotIds: snapshotMetadata.map((item) => item.snapshotId),
+      employeeIds: snapshotMetadata.map((item) => item.employeeId),
+      failureReasons: snapshotMetadata.reduce<Record<string, unknown[]>>((acc, item) => {
+        acc[item.employeeId] = item.failureReasons
+        return acc
+      }, {}),
+    },
+  })
 
   if (format === 'csv') {
     const header = [
@@ -113,5 +117,15 @@ export async function GET(request: Request) {
     })
   }
 
-  return NextResponse.json({ employees })
+  const payload = employees.map((employee) => {
+    const snapshot = snapshotMetadata.find((item) => item.employeeId === employee.id)
+    return {
+      employee,
+      snapshotId: snapshot?.snapshotId ?? null,
+      snapshotHash: snapshot?.snapshotHash ?? null,
+      failureReasons: snapshot?.failureReasons ?? [],
+    }
+  })
+
+  return NextResponse.json({ employees: payload })
 }

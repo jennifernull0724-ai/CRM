@@ -11,7 +11,7 @@ export default function UpgradeSuccessPage() {
           workspace as paid. You can close this tab or return to the app while we finish provisioning.
         </p>
         <Link
-          href="/dashboard/user"
+          href="/app"
           className="inline-flex justify-center rounded-lg bg-blue-600 px-4 py-2 font-medium text-white hover:bg-blue-700"
         >
           Return to dashboard

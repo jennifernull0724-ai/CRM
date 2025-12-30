@@ -12,7 +12,13 @@ import {
   deleteEmailSignatureAction,
   upsertRecipientPreferenceAction,
 } from '@/app/dashboard/actions'
-import { updateProfileAction, uploadPdfLogoAction, removePdfLogoAction } from '@/app/dashboard/settings/actions'
+import {
+  updateProfileAction,
+  uploadPdfLogoAction,
+  removePdfLogoAction,
+  uploadDispatchPdfLogoAction,
+  removeDispatchPdfLogoAction,
+} from '@/app/dashboard/settings/actions'
 
 const emailProvidersList = [
   { key: 'gmail', label: 'Gmail Workspace' },
@@ -48,6 +54,7 @@ export function StandardSettingsPanel({ viewer, settings }: Props) {
   )
 
   const activeSignature = settings.email.signatures.find((signature) => signature.isActive) ?? null
+  const canManageBranding = viewer.role === 'owner' || viewer.role === 'admin'
 
   return (
     <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -349,6 +356,7 @@ export function StandardSettingsPanel({ viewer, settings }: Props) {
                 ) : (
                   <p className="mt-2 text-slate-500">No logo uploaded.</p>
                 )}
+                {!canManageBranding ? <p className="mt-1 text-xs font-semibold text-slate-500">Owner/Admin only</p> : null}
               </div>
               <div>
                 <p className="text-xs uppercase tracking-wide text-slate-500">Estimating PDF logo</p>
@@ -358,28 +366,79 @@ export function StandardSettingsPanel({ viewer, settings }: Props) {
                     <p className="text-xs text-slate-500">{settings.branding.pdfLogoFileName ?? 'Uploaded logo'}</p>
                     <form action={uploadPdfLogoAction} encType="multipart/form-data" className="flex flex-col gap-2 text-xs">
                       <input type="hidden" name="replace" value="true" />
-                      <input name="logo" type="file" accept="image/*" className="text-xs text-slate-600" required />
-                      <button type="submit" className="inline-flex items-center justify-center rounded-lg border border-slate-200 px-3 py-1 font-semibold text-slate-700">
+                      <input name="logo" type="file" accept="image/*" className="text-xs text-slate-600" required disabled={!canManageBranding} />
+                      <button
+                        type="submit"
+                        className="inline-flex items-center justify-center rounded-lg border border-slate-200 px-3 py-1 font-semibold text-slate-700 disabled:opacity-50"
+                        disabled={!canManageBranding}
+                      >
                         Replace logo
                       </button>
                     </form>
                     <form action={removePdfLogoAction}>
-                      <button type="submit" className="text-xs font-semibold text-rose-600">Remove logo</button>
+                      <button type="submit" className="text-xs font-semibold text-rose-600 disabled:opacity-50" disabled={!canManageBranding}>
+                        Remove logo
+                      </button>
                     </form>
                   </div>
                 ) : (
                   <form action={uploadPdfLogoAction} encType="multipart/form-data" className="space-y-2">
-                    <input name="logo" type="file" accept="image/*" required className="text-sm text-slate-600" />
-                    <button type="submit" className="inline-flex items-center justify-center rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white">
+                    <input name="logo" type="file" accept="image/*" required className="text-sm text-slate-600" disabled={!canManageBranding} />
+                    <button
+                      type="submit"
+                      className="inline-flex items-center justify-center rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+                      disabled={!canManageBranding}
+                    >
                       Upload PDF logo
                     </button>
                     <p className="text-xs text-slate-500">PNG or SVG, 600×200 preferred.</p>
                   </form>
                 )}
               </div>
+              <div>
+                <p className="text-xs uppercase tracking-wide text-slate-500">Dispatch PDF logo</p>
+                {settings.branding.dispatchPdfLogoUrl ? (
+                  <div className="space-y-3">
+                    <img
+                      src={settings.branding.dispatchPdfLogoUrl}
+                      alt="Dispatch PDF logo"
+                      className="mt-2 h-16 w-auto rounded-lg border border-slate-200 bg-white object-contain"
+                    />
+                    <p className="text-xs text-slate-500">{settings.branding.dispatchPdfLogoFileName ?? 'Uploaded logo'}</p>
+                    <form action={uploadDispatchPdfLogoAction} encType="multipart/form-data" className="flex flex-col gap-2 text-xs">
+                      <input type="hidden" name="replace" value="true" />
+                      <input name="logo" type="file" accept="image/*" className="text-xs text-slate-600" required disabled={!canManageBranding} />
+                      <button
+                        type="submit"
+                        className="inline-flex items-center justify-center rounded-lg border border-slate-200 px-3 py-1 font-semibold text-slate-700 disabled:opacity-50"
+                        disabled={!canManageBranding}
+                      >
+                        Replace logo
+                      </button>
+                    </form>
+                    <form action={removeDispatchPdfLogoAction}>
+                      <button type="submit" className="text-xs font-semibold text-rose-600 disabled:opacity-50" disabled={!canManageBranding}>
+                        Remove logo
+                      </button>
+                    </form>
+                  </div>
+                ) : (
+                  <form action={uploadDispatchPdfLogoAction} encType="multipart/form-data" className="space-y-2">
+                    <input name="logo" type="file" accept="image/*" required className="text-sm text-slate-600" disabled={!canManageBranding} />
+                    <button
+                      type="submit"
+                      className="inline-flex items-center justify-center rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+                      disabled={!canManageBranding}
+                    >
+                      Upload dispatch logo
+                    </button>
+                    <p className="text-xs text-slate-500">Defaults to the estimating logo when empty.</p>
+                  </form>
+                )}
+              </div>
               <p className="text-xs text-slate-500">
                 Updated {settings.branding.lastUpdatedAt ? formatDistanceToNow(new Date(settings.branding.lastUpdatedAt), { addSuffix: true }) : 'never'}
-                {settings.branding.lastUpdatedByName ? ` by ${settings.branding.lastUpdatedByName}` : ''}. PDF logos apply only to estimating + quote PDFs.
+                {settings.branding.lastUpdatedByName ? ` by ${settings.branding.lastUpdatedByName}` : ''}. Dispatch PDFs use this slot when available; otherwise they inherit the estimating logo.
               </p>
             </div>
           </div>

@@ -1,6 +1,4 @@
 "use server"
-
-import { revalidatePath } from 'next/cache'
 import { getServerSession } from 'next-auth'
 import { z } from 'zod'
 import {
@@ -12,10 +10,11 @@ import {
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { createContactRecord, updateContactRecord } from '@/lib/contacts/mutations'
+import { revalidateContactSurfaces } from '@/lib/contacts/cache'
 import { sendMentionNotification } from '@/lib/email'
 import { sanitizeNoteBody } from '@/lib/contacts/noteRichText'
 import { sendContactEmail } from '@/lib/email/service'
-import type { EmailRecipientInput } from '@/lib/email/service'
+import { normalizeRecipientList } from '@/lib/email/recipients'
 
 const MAX_ATTACHMENT_BYTES = 15 * 1024 * 1024
 const MAX_TOTAL_ATTACHMENT_BYTES = 25 * 1024 * 1024
@@ -109,12 +108,6 @@ async function logAuditEvent(params: {
 			metadata: params.metadata ?? null,
 		},
 	})
-}
-
-function revalidateContactSurfaces(contactId: string) {
-	revalidatePath('/contacts')
-	revalidatePath(`/contacts/${contactId}`)
-	revalidatePath('/dashboard/user')
 }
 
 function resolveFormData(stateOrFormData: ActionState | FormData, maybeFormData?: FormData) {
@@ -776,22 +769,6 @@ const emailComposerSchema = z.object({
 	bodyText: z.string().optional(),
 })
 
-function normalizeRecipients(raw?: string | null): EmailRecipientInput[] {
-	if (!raw) return []
-	const emails = raw
-		.split(/[\n,;]+/)
-		.map((part) => part.trim())
-		.filter(Boolean)
-	const unique = Array.from(new Set(emails.map((value) => value.toLowerCase())))
-	return unique.map((email) => {
-		const parsed = z.string().email().safeParse(email)
-		if (!parsed.success) {
-			throw new Error(`Invalid email: ${email}`)
-		}
-		return { email: parsed.data }
-	})
-}
-
 function stripHtml(input: string): string {
 	return input.replace(/<style[\s\S]*?<\/style>/gi, '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim()
 }
@@ -823,13 +800,13 @@ export async function sendContactEmailAction(
 			throw new Error('Email account is not available in this workspace')
 		}
 
-		const toRecipients = normalizeRecipients(data.to)
+		const toRecipients = normalizeRecipientList(data.to)
 		if (toRecipients.length === 0) {
 			throw new Error('At least one primary recipient is required')
 		}
 
-		const ccRecipients = normalizeRecipients(data.cc)
-		const bccRecipients = normalizeRecipients(data.bcc)
+		const ccRecipients = normalizeRecipientList(data.cc)
+		const bccRecipients = normalizeRecipientList(data.bcc)
 		const everyone = [...toRecipients, ...ccRecipients, ...bccRecipients]
 		const contactEmail = contact.email.toLowerCase()
 		const includesContact = everyone.some((recipient) => recipient.email === contactEmail)

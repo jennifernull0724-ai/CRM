@@ -48,7 +48,7 @@ export function PipelineBoard({ pipelines, selectedEstimateId }: Props) {
                   {rows.map((row) => (
                     <tr key={row.id} className={row.id === selectedEstimateId ? 'bg-amber-50/50' : undefined}>
                       <td className="py-3 pr-4 font-semibold text-slate-800">
-                        <Link href={`/dashboard/estimator?estimateId=${row.id}`} className="hover:underline">
+                        <Link href={`/estimating?estimateId=${row.id}`} className="hover:underline">
                           {row.quoteNumber}
                         </Link>
                       </td>

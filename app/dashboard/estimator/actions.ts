@@ -1,5 +1,6 @@
 'use server'
 
+import { randomUUID } from 'crypto'
 import { revalidatePath } from 'next/cache'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
@@ -7,11 +8,13 @@ import { prisma } from '@/lib/prisma'
 import { enforceCanEstimate } from '@/lib/billing/enforcement'
 import { generateEstimatePdf, type GenerateEstimatePdfParams } from '@/lib/estimating/pdf'
 import { getDownloadUrl, getFileBuffer, uploadEstimatePdf } from '@/lib/s3'
-import { sendEmail } from '@/lib/email'
+import { sendContactEmail } from '@/lib/email/service'
+import { normalizeRecipientList } from '@/lib/email/recipients'
+import { deriveCompanyNameFromEmail } from '@/lib/contacts/deriveCompany'
 import type { AccessAuditAction, EstimateDocumentKind, EstimateIndustry, EstimateStatus } from '@prisma/client'
 import { Prisma } from '@prisma/client'
 
-const DASHBOARD_PATH = '/dashboard/estimator'
+const ESTIMATING_PATHS = ['/estimating']
 const BRANDING_PDF_LOGO_KEY = 'branding_pdf_logo'
 
 type ActionResponse<T = unknown> = { success: true; data?: T } | { success: false; error: string }
@@ -20,6 +23,15 @@ type EstimatingContext = {
   userId: string
   companyId: string
   role: string
+}
+
+function revalidateEstimatingPaths(estimateId?: string) {
+  for (const path of ESTIMATING_PATHS) {
+    revalidatePath(path)
+  }
+  if (estimateId) {
+    revalidatePath(`/estimating/${estimateId}`)
+  }
 }
 
 type QuoteVariant = 'estimate' | 'quote'
@@ -92,7 +104,16 @@ async function ensureEstimateWithRevision(estimateId: string, companyId: string)
   const estimate = await prisma.estimate.findFirst({
     where: { id: estimateId, companyId },
     include: {
-      contact: { select: { id: true, firstName: true, lastName: true, email: true } },
+      contact: {
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          email: true,
+          derivedCompanyName: true,
+          companyOverrideName: true,
+        },
+      },
       currentRevision: {
         include: {
           lineItems: true,
@@ -175,16 +196,6 @@ function sanitizeRichText(value: string | null | undefined): string {
   return (value ?? '').trim()
 }
 
-function parseRecipients(value: string | null): string[] {
-  if (!value) {
-    return []
-  }
-  return value
-    .split(/[,\n]/)
-    .map((entry) => entry.trim())
-    .filter(Boolean)
-}
-
 async function ensureRecipientsAllowed(companyId: string, recipients: string[]) {
   if (!recipients.length) {
     throw new Error('Recipient list is empty')
@@ -196,6 +207,139 @@ async function ensureRecipientsAllowed(companyId: string, recipients: string[]) 
 
   if (suppressed.length) {
     throw new Error(`Email blocked for ${suppressed.map((pref) => pref.email).join(', ')}`)
+  }
+}
+
+function deriveContactCompany(contact: { companyOverrideName?: string | null; derivedCompanyName?: string; email: string }) {
+  return (
+    contact.companyOverrideName?.trim() ||
+    contact.derivedCompanyName?.trim() ||
+    deriveCompanyNameFromEmail(contact.email) ||
+    null
+  )
+}
+
+async function allocateEstimatePdfVersion(estimateId: string, revisionId: string): Promise<number> {
+  const count = await prisma.estimateDocument.count({ where: { estimateId, revisionId } })
+  return count + 1
+}
+
+async function createEstimatePdfVersion(params: {
+  estimateId: string
+  companyId: string
+  actorId: string
+  variant: QuoteVariant
+}) {
+  const estimate = await prisma.estimate.findFirst({
+    where: { id: params.estimateId, companyId: params.companyId },
+    include: {
+      company: { select: { name: true } },
+      contact: {
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          email: true,
+          derivedCompanyName: true,
+          companyOverrideName: true,
+        },
+      },
+      currentRevision: { include: { lineItems: true } },
+    },
+  })
+
+  if (!estimate || !estimate.currentRevision) {
+    throw new Error('Estimate not found')
+  }
+
+  const generatedAt = new Date()
+  const logoBuffer = await getPdfLogo(params.companyId)
+  const pdfVersion = await allocateEstimatePdfVersion(estimate.id, estimate.currentRevision.id)
+  const pdfVersionId = randomUUID()
+  const contactCompany = deriveContactCompany(estimate.contact)
+
+  const pdfPayload: GenerateEstimatePdfParams = {
+    variant: params.variant,
+    quoteNumber: estimate.quoteNumber,
+    revisionNumber: estimate.currentRevision.revisionNumber,
+    companyName: estimate.company.name,
+    projectName: estimate.currentRevision.projectName,
+    projectLocation: estimate.currentRevision.projectLocation,
+    industry: estimate.currentRevision.industry,
+    contactName: `${estimate.contact.firstName} ${estimate.contact.lastName}`.trim(),
+    contactEmail: estimate.contact.email,
+    contactCompany,
+    createdDate: estimate.createdAt,
+    generatedAt,
+    scopeOfWork: estimate.currentRevision.scopeOfWork,
+    assumptions: estimate.currentRevision.assumptions,
+    exclusions: estimate.currentRevision.exclusions,
+    lineItems: estimate.currentRevision.lineItems.map((item) => ({
+      presetLabel: item.presetLabel,
+      description: item.description,
+      quantity: Number(item.quantity),
+      unit: item.unit,
+      unitCost: Number(item.unitCost),
+      lineTotal: Number(item.lineTotal),
+      notes: item.notes,
+    })),
+    subtotal: Number(estimate.currentRevision.subtotal),
+    markupPercent: estimate.currentRevision.markupPercent ? Number(estimate.currentRevision.markupPercent) : null,
+    markupAmount: estimate.currentRevision.markupAmount ? Number(estimate.currentRevision.markupAmount) : null,
+    overheadPercent: estimate.currentRevision.overheadPercent ? Number(estimate.currentRevision.overheadPercent) : null,
+    overheadAmount: estimate.currentRevision.overheadAmount ? Number(estimate.currentRevision.overheadAmount) : null,
+    grandTotal: Number(estimate.currentRevision.grandTotal),
+    manualOverrideTotal: estimate.currentRevision.manualOverrideTotal
+      ? Number(estimate.currentRevision.manualOverrideTotal)
+      : null,
+    overrideReason: estimate.currentRevision.overrideReason,
+    logo: logoBuffer,
+  }
+
+  const pdfBuffer = await generateEstimatePdf(pdfPayload)
+  const uploadResult = await uploadEstimatePdf({
+    file: pdfBuffer,
+    companyId: params.companyId,
+    estimateId: estimate.id,
+    revisionNumber: estimate.currentRevision.revisionNumber,
+    variant: params.variant,
+    pdfVersion,
+    pdfVersionId,
+  })
+
+  const document = await prisma.estimateDocument.create({
+    data: {
+      id: pdfVersionId,
+      companyId: params.companyId,
+      estimateId: estimate.id,
+      revisionId: estimate.currentRevision.id,
+      contactId: estimate.contact.id,
+      kind: params.variant === 'quote' ? ('QUOTE' as EstimateDocumentKind) : ('ESTIMATE' as EstimateDocumentKind),
+      storageKey: uploadResult.key,
+      fileName: `${estimate.quoteNumber}-rev${estimate.currentRevision.revisionNumber}-v${pdfVersion}-${params.variant}.pdf`,
+      fileSize: uploadResult.size,
+      hash: uploadResult.hash,
+      generatedById: params.actorId,
+    },
+  })
+
+  await logEstimateEvent(params.companyId, params.actorId, 'PDF_GENERATED', estimate.id, {
+    pdfDocumentId: document.id,
+    pdfVersion,
+    revisionNumber: estimate.currentRevision.revisionNumber,
+    variant: params.variant,
+    storageKey: uploadResult.key,
+    timestamp: generatedAt.toISOString(),
+  })
+
+  return {
+    pdfBuffer,
+    document,
+    pdfVersion,
+    revisionNumber: estimate.currentRevision.revisionNumber,
+    variant: params.variant,
+    generatedAt,
+    storageKey: uploadResult.key,
   }
 }
 
@@ -274,7 +418,7 @@ export async function createEstimateAction(formData: FormData) {
   })
 
   await logEstimateEvent(companyId, userId, 'ESTIMATE_CREATED', revision.estimateId, { quoteNumber })
-  revalidatePath(DASHBOARD_PATH)
+  revalidateEstimatingPaths(revision.estimateId)
 }
 
 export async function startEstimateRevisionAction(formData: FormData) {
@@ -362,7 +506,7 @@ export async function startEstimateRevisionAction(formData: FormData) {
   })
 
   await logEstimateEvent(companyId, userId, 'ESTIMATE_UPDATED', estimate.id, { revisionNumber: newRevisionNumber })
-  revalidatePath(DASHBOARD_PATH)
+  revalidateEstimatingPaths(estimate.id)
 }
 
 export async function updateEstimateHeaderAction(formData: FormData) {
@@ -417,7 +561,7 @@ export async function updateEstimateHeaderAction(formData: FormData) {
   })
 
   await logEstimateEvent(companyId, userId, 'ESTIMATE_UPDATED', estimate.id, { field: 'header' })
-  revalidatePath(DASHBOARD_PATH)
+  revalidateEstimatingPaths(estimate.id)
 }
 
 export async function saveEstimateLineItemAction(formData: FormData) {
@@ -496,7 +640,7 @@ export async function saveEstimateLineItemAction(formData: FormData) {
 
   await recomputeRevisionTotals(revision.id)
   await logEstimateEvent(companyId, userId, 'ESTIMATE_UPDATED', estimate.id, { field: 'line_items' })
-  revalidatePath(DASHBOARD_PATH)
+  revalidateEstimatingPaths(estimate.id)
 }
 
 export async function deleteEstimateLineItemAction(formData: FormData) {
@@ -517,7 +661,7 @@ export async function deleteEstimateLineItemAction(formData: FormData) {
     field: 'line_items',
     action: 'delete',
   })
-  revalidatePath(DASHBOARD_PATH)
+  revalidateEstimatingPaths(lineItem.estimateId)
 }
 
 export async function reorderEstimateLineItemsAction(formData: FormData) {
@@ -540,7 +684,7 @@ export async function reorderEstimateLineItemsAction(formData: FormData) {
       })
     )
   )
-  revalidatePath(DASHBOARD_PATH)
+  revalidateEstimatingPaths(estimateId)
 }
 
 export async function setEstimatePricingAction(formData: FormData) {
@@ -577,7 +721,7 @@ export async function setEstimatePricingAction(formData: FormData) {
 
   await recomputeRevisionTotals(revision.id)
   await logEstimateEvent(companyId, userId, 'ESTIMATE_UPDATED', estimate.id, { field: 'pricing' })
-  revalidatePath(DASHBOARD_PATH)
+  revalidateEstimatingPaths(estimate.id)
 }
 
 export async function submitEstimateAction(formData: FormData) {
@@ -610,8 +754,8 @@ export async function submitEstimateAction(formData: FormData) {
   ])
 
   await logEstimateEvent(companyId, userId, 'ESTIMATE_UPDATED', estimate.id, { status: 'AWAITING_APPROVAL' })
-  await logEstimateEvent(companyId, userId, 'ESTIMATE_REQUESTED', estimate.id, { revision: revision.revisionNumber })
-  revalidatePath(DASHBOARD_PATH)
+  await logEstimateEvent(companyId, userId, 'ESTIMATE_SUBMITTED', estimate.id, { revision: revision.revisionNumber })
+  revalidateEstimatingPaths(estimate.id)
 }
 
 export async function approveEstimateAction(formData: FormData) {
@@ -643,7 +787,7 @@ export async function approveEstimateAction(formData: FormData) {
   ])
 
   await logEstimateEvent(companyId, userId, 'ESTIMATE_APPROVED', estimate.id, { revision: revision.revisionNumber })
-  revalidatePath(DASHBOARD_PATH)
+  revalidateEstimatingPaths(estimate.id)
 }
 
 export async function returnEstimateAction(formData: FormData) {
@@ -664,7 +808,7 @@ export async function returnEstimateAction(formData: FormData) {
   ])
 
   await logEstimateEvent(companyId, userId, 'ESTIMATE_RETURNED_TO_USER', estimate.id, { reason })
-  revalidatePath(DASHBOARD_PATH)
+  revalidateEstimatingPaths(estimate.id)
 }
 
 export async function sendEstimateToDispatchAction(formData: FormData) {
@@ -687,9 +831,12 @@ export async function sendEstimateToDispatchAction(formData: FormData) {
     await prisma.dispatchRequest.create({ data: { companyId, estimateId: estimate.id, status: 'QUEUED', queuedAt } })
   }
 
-  await prisma.estimate.update({ where: { id: estimate.id }, data: { status: 'SENT_TO_DISPATCH', sentToDispatchAt: queuedAt } })
+  await prisma.estimate.update({
+    where: { id: estimate.id },
+    data: { status: 'SENT_TO_DISPATCH', sentToDispatchAt: queuedAt, sentToDispatchById: userId },
+  })
   await logEstimateEvent(companyId, userId, 'ESTIMATE_SENT_TO_DISPATCH', estimate.id)
-  revalidatePath(DASHBOARD_PATH)
+  revalidateEstimatingPaths(estimate.id)
 }
 
 export async function generateEstimatePdfAction(formData: FormData): Promise<ActionResponse<{ url: string }>> {
@@ -698,182 +845,98 @@ export async function generateEstimatePdfAction(formData: FormData): Promise<Act
   const variant = (formData.get('variant')?.toString() ?? 'estimate') as QuoteVariant
   if (!estimateId) return { success: false, error: 'Estimate id required' }
 
-  const estimate = await prisma.estimate.findFirst({
-    where: { id: estimateId, companyId },
-    include: {
-      company: { select: { name: true } },
-      contact: { select: { firstName: true, lastName: true, email: true } },
-      currentRevision: { include: { lineItems: true } },
-    },
-  })
-
-  if (!estimate || !estimate.currentRevision) {
-    return { success: false, error: 'Estimate not found' }
-  }
-
-  const logoBuffer = await getPdfLogo(companyId)
-
-  const pdfPayload: GenerateEstimatePdfParams = {
-    variant,
-    quoteNumber: estimate.quoteNumber,
-    revisionNumber: estimate.currentRevision.revisionNumber,
-    companyName: estimate.company.name,
-    projectName: estimate.currentRevision.projectName,
-    projectLocation: estimate.currentRevision.projectLocation,
-    industry: estimate.currentRevision.industry,
-    contactName: `${estimate.contact.firstName} ${estimate.contact.lastName}`.trim(),
-    contactEmail: estimate.contact.email,
-    createdDate: estimate.createdAt,
-    scopeOfWork: estimate.currentRevision.scopeOfWork,
-    assumptions: estimate.currentRevision.assumptions,
-    exclusions: estimate.currentRevision.exclusions,
-    lineItems: estimate.currentRevision.lineItems.map((item) => ({
-      presetLabel: item.presetLabel,
-      description: item.description,
-      quantity: Number(item.quantity),
-      unit: item.unit,
-      unitCost: Number(item.unitCost),
-      lineTotal: Number(item.lineTotal),
-      notes: item.notes,
-    })),
-    subtotal: Number(estimate.currentRevision.subtotal),
-    markupPercent: estimate.currentRevision.markupPercent ? Number(estimate.currentRevision.markupPercent) : null,
-    markupAmount: estimate.currentRevision.markupAmount ? Number(estimate.currentRevision.markupAmount) : null,
-    overheadPercent: estimate.currentRevision.overheadPercent ? Number(estimate.currentRevision.overheadPercent) : null,
-    overheadAmount: estimate.currentRevision.overheadAmount ? Number(estimate.currentRevision.overheadAmount) : null,
-    grandTotal: Number(estimate.currentRevision.grandTotal),
-    manualOverrideTotal: estimate.currentRevision.manualOverrideTotal
-      ? Number(estimate.currentRevision.manualOverrideTotal)
-      : null,
-    overrideReason: estimate.currentRevision.overrideReason,
-    logo: logoBuffer,
-  }
-
-  const pdfBuffer = await generateEstimatePdf(pdfPayload)
-  const uploadResult = await uploadEstimatePdf(
-    pdfBuffer,
+  const pdfVersion = await createEstimatePdfVersion({
+    estimateId,
     companyId,
-    estimate.id,
-    estimate.currentRevision.revisionNumber,
-    variant
-  )
-
-  const kind: EstimateDocumentKind = variant === 'quote' ? 'QUOTE' : 'ESTIMATE'
-
-  const document = await prisma.estimateDocument.create({
-    data: {
-      companyId,
-      estimateId: estimate.id,
-      revisionId: estimate.currentRevision.id,
-      kind,
-      storageKey: uploadResult.key,
-      fileName: `${estimate.quoteNumber}-${variant}.pdf`,
-      fileSize: uploadResult.size,
-      hash: uploadResult.hash,
-      generatedById: userId,
-    },
+    actorId: userId,
+    variant,
   })
 
-  await logEstimateEvent(companyId, userId, 'PDF_GENERATED', estimate.id, { documentId: document.id, variant })
-  revalidatePath(DASHBOARD_PATH)
+  revalidateEstimatingPaths(estimateId)
 
-  const url = await getDownloadUrl(uploadResult.key, 900)
+  const url = await getDownloadUrl(pdfVersion.storageKey, 900)
   return { success: true, data: { url } }
 }
 
 export async function emailEstimateAction(formData: FormData): Promise<ActionResponse> {
   const { userId, companyId } = await requireEstimatingContext()
   const estimateId = formData.get('estimateId')?.toString()
-  if (!estimateId) return { success: false, error: 'Estimate id required' }
+  const accountId = formData.get('accountId')?.toString()
+  const variant = (formData.get('variant')?.toString() ?? 'quote') as QuoteVariant
 
-  const toRecipients = parseRecipients(formData.get('to')?.toString() ?? '')
-  const ccRecipients = parseRecipients(formData.get('cc')?.toString() ?? '')
-  const bccRecipients = parseRecipients(formData.get('bcc')?.toString() ?? '')
+  if (!estimateId) return { success: false, error: 'Estimate id required' }
+  if (!accountId) return { success: false, error: 'Email account is required' }
+
+  const toRecipients = normalizeRecipientList(formData.get('to')?.toString())
+  const ccRecipients = normalizeRecipientList(formData.get('cc')?.toString())
+  const bccRecipients = normalizeRecipientList(formData.get('bcc')?.toString())
+  const subject = formData.get('subject')?.toString().trim()
+  const bodyHtml = formData.get('bodyHtml')?.toString().trim() ?? formData.get('body')?.toString().trim() ?? ''
+  const bodyTextInput = formData.get('bodyText')?.toString().trim() ?? ''
   const templateId = formData.get('templateId')?.toString() || null
   const signatureId = formData.get('signatureId')?.toString() || null
-  const subject = formData.get('subject')?.toString().trim()
-  const body = formData.get('body')?.toString().trim()
 
-  if (!subject || !body) {
+  if (!subject || !bodyHtml) {
     return { success: false, error: 'Subject and body are required' }
   }
 
-  await ensureRecipientsAllowed(companyId, [...toRecipients, ...ccRecipients, ...bccRecipients])
-
-  const [template, signature, estimate, logoBuffer] = await Promise.all([
-    templateId
-      ? prisma.emailTemplate.findFirst({ where: { id: templateId, companyId } })
-      : Promise.resolve(null),
-    signatureId
-      ? prisma.emailSignature.findFirst({ where: { id: signatureId, companyId } })
-      : Promise.resolve(null),
-    prisma.estimate.findFirst({
-      where: { id: estimateId, companyId },
-      include: {
-        contact: { select: { firstName: true, lastName: true } },
-        company: { select: { name: true } },
-        currentRevision: { include: { lineItems: true } },
-      },
-    }),
-    getPdfLogo(companyId),
-  ])
-
-  if (!estimate || !estimate.currentRevision) {
-    return { success: false, error: 'Estimate not found' }
+  if (!toRecipients.length) {
+    return { success: false, error: 'At least one primary recipient is required' }
   }
 
-  if (template && template.scope !== 'estimating' && template.scope !== 'global') {
-    return { success: false, error: 'Template scope must be estimating or global' }
+  const allRecipientEmails = [...toRecipients, ...ccRecipients, ...bccRecipients].map((recipient) => recipient.email)
+  await ensureRecipientsAllowed(companyId, allRecipientEmails)
+
+  const estimate = await ensureEstimateWithRevision(estimateId, companyId)
+  const contactEmail = estimate.contact.email.toLowerCase()
+  const includesContact = allRecipientEmails.some((email) => email.toLowerCase() === contactEmail)
+  if (!includesContact) {
+    return { success: false, error: 'Contact email must be included' }
   }
 
-  const pdfBuffer = await generateEstimatePdf({
-    variant: 'quote',
-    quoteNumber: estimate.quoteNumber,
-    revisionNumber: estimate.currentRevision.revisionNumber,
-    companyName: estimate.company.name,
-    projectName: estimate.currentRevision.projectName,
-    projectLocation: estimate.currentRevision.projectLocation,
-    industry: estimate.currentRevision.industry,
-    contactName: `${estimate.contact.firstName} ${estimate.contact.lastName}`.trim(),
-    contactEmail: null,
-    createdDate: estimate.createdAt,
-    scopeOfWork: estimate.currentRevision.scopeOfWork,
-    assumptions: estimate.currentRevision.assumptions,
-    exclusions: estimate.currentRevision.exclusions,
-    lineItems: estimate.currentRevision.lineItems.map((item) => ({
-      presetLabel: item.presetLabel,
-      description: item.description,
-      quantity: Number(item.quantity),
-      unit: item.unit,
-      unitCost: Number(item.unitCost),
-      lineTotal: Number(item.lineTotal),
-      notes: item.notes,
-    })),
-    subtotal: Number(estimate.currentRevision.subtotal),
-    markupPercent: estimate.currentRevision.markupPercent ? Number(estimate.currentRevision.markupPercent) : null,
-    markupAmount: estimate.currentRevision.markupAmount ? Number(estimate.currentRevision.markupAmount) : null,
-    overheadPercent: estimate.currentRevision.overheadPercent ? Number(estimate.currentRevision.overheadPercent) : null,
-    overheadAmount: estimate.currentRevision.overheadAmount ? Number(estimate.currentRevision.overheadAmount) : null,
-    grandTotal: Number(estimate.currentRevision.grandTotal),
-    manualOverrideTotal: estimate.currentRevision.manualOverrideTotal
-      ? Number(estimate.currentRevision.manualOverrideTotal)
-      : null,
-    overrideReason: estimate.currentRevision.overrideReason,
-    logo: logoBuffer,
+  const template = templateId
+    ? await prisma.emailTemplate.findFirst({ where: { id: templateId, companyId, scope: { in: ['estimating', 'global'] } } })
+    : null
+  if (templateId && !template) {
+    return { success: false, error: 'Template not found or not authorized' }
+  }
+
+  const selectedSignature = signatureId
+    ? await prisma.emailSignature.findFirst({ where: { id: signatureId, companyId } })
+    : await prisma.emailSignature.findFirst({ where: { companyId, isActive: true }, orderBy: { updatedAt: 'desc' } })
+
+  if (signatureId && !selectedSignature) {
+    return { success: false, error: 'Signature not found' }
+  }
+
+  const finalHtml = selectedSignature ? `${bodyHtml}\n\n${selectedSignature.content}` : bodyHtml
+  const textBody = bodyTextInput || finalHtml.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
+
+  const pdfVersion = await createEstimatePdfVersion({
+    estimateId,
+    companyId,
+    actorId: userId,
+    variant,
   })
 
-  const finalBody = signature ? `${body}\n\n${signature.content}` : body
+  const attachmentName = `${estimate.quoteNumber}-rev${pdfVersion.revisionNumber}-v${pdfVersion.pdfVersion}-${variant}.pdf`
 
-  await sendEmail({
+  const emailRecord = await sendContactEmail({
+    accountId,
+    companyId,
+    contactId: estimate.contact.id,
+    authorId: userId,
     to: toRecipients,
-    cc: ccRecipients,
-    bcc: bccRecipients,
+    cc: ccRecipients.length ? ccRecipients : undefined,
+    bcc: bccRecipients.length ? bccRecipients : undefined,
     subject,
-    html: finalBody,
+    html: finalHtml,
+    text: textBody,
     attachments: [
       {
-        filename: `${estimate.quoteNumber}-quote.pdf`,
-        content: pdfBuffer,
+        filename: attachmentName,
+        contentType: 'application/pdf',
+        buffer: pdfVersion.pdfBuffer,
       },
     ],
   })
@@ -883,20 +946,39 @@ export async function emailEstimateAction(formData: FormData): Promise<ActionRes
       companyId,
       estimateId: estimate.id,
       revisionId: estimate.currentRevision.id,
-      templateId,
-      signatureId,
-      toRecipients,
-      ccRecipients,
-      bccRecipients,
+      contactId: estimate.contact.id,
+      templateId: template?.id ?? null,
+      signatureId: selectedSignature?.id ?? null,
+      pdfDocumentId: pdfVersion.document.id,
+      toRecipients: toRecipients.map((recipient) => recipient.email),
+      ccRecipients: ccRecipients.map((recipient) => recipient.email),
+      bccRecipients: bccRecipients.map((recipient) => recipient.email),
       subject,
-      body: finalBody,
+      body: finalHtml,
       sentById: userId,
     },
   })
 
-  await logEstimateEvent(companyId, userId, 'EMAIL_SENT', estimate.id, { subject })
-  await logEstimateEvent(companyId, userId, 'ESTIMATE_EMAILED', estimate.id)
-  revalidatePath(DASHBOARD_PATH)
+  const timestamp = new Date().toISOString()
+  await logEstimateEvent(companyId, userId, 'EMAIL_SENT', estimateId, {
+    contactId: estimate.contact.id,
+    recipients: {
+      to: toRecipients.map((recipient) => recipient.email),
+      cc: ccRecipients.map((recipient) => recipient.email),
+      bcc: bccRecipients.map((recipient) => recipient.email),
+    },
+    subject,
+    pdfDocumentId: pdfVersion.document.id,
+    pdfVersion: pdfVersion.pdfVersion,
+    variant,
+    timestamp,
+    accountId,
+    templateId: template?.id ?? null,
+    signatureId: selectedSignature?.id ?? null,
+    emailId: emailRecord.id,
+  })
+  await logEstimateEvent(companyId, userId, 'ESTIMATE_EMAILED', estimateId)
+  revalidateEstimatingPaths(estimateId)
   return { success: true }
 }
 
@@ -924,7 +1006,7 @@ export async function updatePresetDetailsAction(formData: FormData) {
     },
   })
 
-  revalidatePath(DASHBOARD_PATH)
+  revalidateEstimatingPaths()
 }
 
 export async function togglePresetAction(formData: FormData) {
@@ -940,7 +1022,7 @@ export async function togglePresetAction(formData: FormData) {
   }
 
   await prisma.estimatingPreset.update({ where: { id: presetId }, data: { enabled } })
-  revalidatePath(DASHBOARD_PATH)
+  revalidateEstimatingPaths()
 }
 
 export async function reorderPresetAction(formData: FormData) {
@@ -969,5 +1051,5 @@ export async function reorderPresetAction(formData: FormData) {
     prisma.estimatingPreset.update({ where: { id: target.id }, data: { sortOrder: preset.sortOrder } }),
   ])
 
-  revalidatePath(DASHBOARD_PATH)
+  revalidateEstimatingPaths()
 }

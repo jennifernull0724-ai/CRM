@@ -2,6 +2,7 @@ import type { Prisma, WorkOrderDiscipline, WorkOrderStatus } from '@prisma/clien
 import { prisma } from '@/lib/prisma'
 
 const OPEN_WORK_STATUSES: WorkOrderStatus[] = ['SCHEDULED', 'IN_PROGRESS']
+const CLOSED_WORK_STATUSES: WorkOrderStatus[] = ['COMPLETED', 'CANCELLED']
 
 export type DispatchAnalyticsFilters = {
   companyId: string
@@ -15,6 +16,15 @@ export type DispatchAnalyticsFilters = {
 export type DispatchAnalyticsResult = {
   count: number
   ids: string[]
+}
+
+export type DispatchRoleMetrics = {
+  openWorkOrders: number
+  pendingDispatchRequests: number
+  recentlyClosed: {
+    last7: number
+    last30: number
+  }
 }
 
 export type WorkOrderListItem = {
@@ -188,4 +198,40 @@ export async function getWorkOrdersForView(
     scheduledAt: item.scheduledAt,
     closedAt: item.closedAt,
   }))
+}
+
+export async function loadDispatchRoleMetrics(companyId: string): Promise<DispatchRoleMetrics> {
+  const subtractDays = (days: number) => {
+    const copy = new Date()
+    copy.setDate(copy.getDate() - days)
+    return copy
+  }
+
+  const [openWorkOrders, pendingDispatchRequests, last7, last30] = await Promise.all([
+    prisma.workOrder.count({ where: { companyId, status: { in: OPEN_WORK_STATUSES } } }),
+    prisma.dispatchRequest.count({ where: { companyId, status: 'QUEUED' } }),
+    prisma.workOrder.count({
+      where: {
+        companyId,
+        status: { in: CLOSED_WORK_STATUSES },
+        closedAt: { gte: subtractDays(7) },
+      },
+    }),
+    prisma.workOrder.count({
+      where: {
+        companyId,
+        status: { in: CLOSED_WORK_STATUSES },
+        closedAt: { gte: subtractDays(30) },
+      },
+    }),
+  ])
+
+  return {
+    openWorkOrders,
+    pendingDispatchRequests,
+    recentlyClosed: {
+      last7,
+      last30,
+    },
+  }
 }

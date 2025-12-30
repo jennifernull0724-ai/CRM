@@ -1,6 +1,7 @@
 import type { Prisma, WorkOrder, WorkOrderStatus } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { recordWorkOrderActivity } from '@/lib/dispatch/workOrderActivity'
+import { sendAutoWorkOrderEmails } from '@/lib/dispatch/autoEmail'
 
 export const TERMINAL_WORK_ORDER_STATUSES: WorkOrderStatus[] = ['COMPLETED', 'CANCELLED']
 
@@ -105,4 +106,17 @@ export async function transitionWorkOrderStatus(params: {
       newStatus: nextStatus,
     }),
   ])
+
+  if (nextStatus === 'SCHEDULED' || nextStatus === 'IN_PROGRESS') {
+    try {
+      await sendAutoWorkOrderEmails({
+        workOrderId: workOrder.id,
+        companyId: workOrder.companyId,
+        actorId,
+        trigger: 'status-change',
+      })
+    } catch (error) {
+      console.error('Auto work order email (status change) failed', error)
+    }
+  }
 }

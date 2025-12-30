@@ -39,15 +39,12 @@ export async function GET(_request: Request, { params }: { params: { employeeId:
     return NextResponse.json({ error: 'Employee not found' }, { status: 404 })
   }
 
-  let snapshotHash = employee.complianceHash
-  if (!snapshotHash) {
-    const snapshotRecord = await createComplianceSnapshot({
-      employeeId: employee.id,
-      createdById: session.user.id,
-      source: 'print',
-    })
-    snapshotHash = snapshotRecord.snapshot.snapshotHash
-  }
+  const snapshotRecord = await createComplianceSnapshot({
+    employeeId: employee.id,
+    createdById: session.user.id,
+    source: 'print',
+  })
+  const snapshotHash = snapshotRecord.snapshot.snapshotHash
 
   const pdfBuffer = await generateEmployeeCompliancePdf({
     employee,

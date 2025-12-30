@@ -42,6 +42,8 @@ export type EstimatingAnalytics = {
   returnedQueue: PipelineEstimateRow[]
 }
 
+type AnalyticsScope = { kind: 'company' } | { kind: 'user'; userId: string }
+
 export type EstimateWorkspaceData = {
   estimate: Pick<Estimate, 'id' | 'status' | 'quoteNumber' | 'createdAt' | 'sentToDispatchAt' | 'approvedAt'> & {
     contact: { id: string; name: string; email: string | null }
@@ -110,7 +112,7 @@ const PIPELINE_STATUSES: EstimateStatus[] = [
   'DRAFT',
   'AWAITING_APPROVAL',
   'APPROVED',
-  'REVISION_REQUIRED',
+  'RETURNED_TO_USER',
   'SENT_TO_DISPATCH',
 ]
 
@@ -150,15 +152,19 @@ function mapPipelineRow(estimate: Awaited<ReturnType<typeof fetchPipelineEstimat
   }
 }
 
-async function fetchPipelineEstimates(companyId: string) {
+async function fetchPipelineEstimates(companyId: string, scope: AnalyticsScope) {
   return prisma.estimate.findMany({
-    where: { companyId },
+    where: {
+      companyId,
+      ...(scope.kind === 'user' ? { createdById: scope.userId } : {}),
+    },
     orderBy: { updatedAt: 'desc' },
     select: {
       id: true,
       status: true,
       quoteNumber: true,
       revisionCount: true,
+      createdById: true,
       contact: { select: { id: true, firstName: true, lastName: true, email: true } },
       currentRevision: {
         select: {
@@ -300,7 +306,8 @@ async function fetchSelectedEstimate(companyId: string, estimateId: string): Pro
 
 async function buildAnalytics(
   companyId: string,
-  pipelineRows: PipelineEstimateRow[]
+  pipelineRows: PipelineEstimateRow[],
+  scope: AnalyticsScope
 ): Promise<EstimatingAnalytics> {
   const totalsByStatus = pipelineRows.reduce<Record<EstimateStatus, number>>((acc, row) => {
     acc[row.status] = (acc[row.status] ?? 0) + 1
@@ -309,13 +316,16 @@ async function buildAnalytics(
 
   const totalEstimates = pipelineRows.length
   const approvedEstimates = totalsByStatus.APPROVED ?? 0
-  const returnedEstimates = totalsByStatus.REVISION_REQUIRED ?? 0
+  const returnedEstimates = totalsByStatus.RETURNED_TO_USER ?? 0
   const sentToDispatch = totalsByStatus.SENT_TO_DISPATCH ?? 0
   const revisionFrequency = totalEstimates ? pipelineRows.reduce((acc, row) => acc + row.revisionNumber, 0) / totalEstimates : 0
 
   const approvedRevisions = await prisma.estimateRevision.findMany({
     where: {
-      estimate: { companyId },
+      estimate: {
+        companyId,
+        ...(scope.kind === 'user' ? { createdById: scope.userId } : {}),
+      },
       status: 'APPROVED',
       submittedAt: { not: null },
       approvedAt: { not: null },
@@ -345,7 +355,7 @@ async function buildAnalytics(
   const conversionRate = approvedEstimates ? sentToDispatch / approvedEstimates : 0
 
   const awaitingApprovals = pipelineRows.filter((row) => row.status === 'AWAITING_APPROVAL')
-  const returnedQueue = pipelineRows.filter((row) => row.status === 'REVISION_REQUIRED')
+  const returnedQueue = pipelineRows.filter((row) => row.status === 'RETURNED_TO_USER')
 
   return {
     totalsByStatus,
@@ -369,14 +379,17 @@ async function buildAnalytics(
 
 export async function loadEstimatingDashboard(params: {
   companyId: string
+  viewer: { role: 'user' | 'estimator' | 'admin' | 'owner'; userId: string }
   selectedEstimateId?: string | null
 }): Promise<EstimatingDashboardPayload> {
-  const { companyId, selectedEstimateId } = params
+  const { companyId, selectedEstimateId, viewer } = params
+  const scope: AnalyticsScope = viewer.role === 'user' ? { kind: 'user', userId: viewer.userId } : { kind: 'company' }
+
   const [presets, contacts, deals, pipelineEstimates, settings] = await Promise.all([
     listEstimatingPresets(companyId),
     fetchContacts(companyId),
     fetchDeals(companyId),
-    fetchPipelineEstimates(companyId),
+    fetchPipelineEstimates(companyId, scope),
     loadStandardSettings(companyId),
   ])
 
@@ -389,7 +402,7 @@ export async function loadEstimatingDashboard(params: {
     return acc
   }, Object.fromEntries(PIPELINE_STATUSES.map((status) => [status, []])) as Record<EstimateStatus, PipelineEstimateRow[]>)
 
-  const analytics = await buildAnalytics(companyId, pipelineRows)
+  const analytics = await buildAnalytics(companyId, pipelineRows, scope)
 
   const selectedEstimate = selectedEstimateId ? await fetchSelectedEstimate(companyId, selectedEstimateId) : null
 

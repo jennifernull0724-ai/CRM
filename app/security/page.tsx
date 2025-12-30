@@ -1,109 +1,113 @@
+import type { Metadata } from 'next'
 import Link from 'next/link'
+import { MarketingFooter } from '@/components/public/marketing-footer'
+import { MarketingHeader } from '@/components/public/marketing-header'
+
+export const metadata: Metadata = {
+  title: 'Security & Governance | T-REX AI OS',
+  description:
+    'Role-based access control, immutable audit logs, signed PDFs, and compliance snapshots built for regulated operations.',
+  alternates: {
+    canonical: 'https://trexaios.com/security',
+  },
+  robots: {
+    index: true,
+    follow: true,
+  },
+}
+
+const sections = [
+  {
+    title: 'Governance Model',
+    body: 'Authority is separated by design: Governance (Owner/Admin), Pricing (Estimator), Execution (Dispatch), Operations (Users). No role can exceed its mandate.'
+  },
+  {
+    title: 'Access Enforcement',
+    list: [
+      'Server-side role validation on every request',
+      'No reliance on client-side controls',
+      'Company-scoped data isolation',
+    ],
+  },
+  {
+    title: 'Audit & Non-Repudiation',
+    list: [
+      'Append-only audit logs',
+      'Immutable records for approvals and compliance',
+      'Cryptographic verification of critical artifacts',
+    ],
+  },
+  {
+    title: 'Document Security',
+    list: [
+      'Encrypted storage',
+      'Signed, time-limited access',
+      'Versioned PDFs',
+      'No public file exposure',
+    ],
+  },
+  {
+    title: 'Compliance Integrity',
+    list: [
+      'Compliance records are Owner/Admin controlled',
+      'Snapshot-based and QR-verifiable',
+      'Immutable after issuance',
+    ],
+  },
+  {
+    title: 'Operational Reality',
+    body: 'The system supports real-world workflows: Email attachments allowed, field uploads supported, bid documents and operational files preserved. Execution never blocks without visibility.'
+  },
+]
 
 export default function SecurityPage() {
   return (
-    <div className="min-h-screen bg-gray-950">
-      <nav className="border-b border-gray-800 bg-gray-900/50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <Link href="/" className="text-2xl font-bold text-white">
-            T-REX AI OS
+    <div className="min-h-screen bg-[#f5f6f9]">
+      <MarketingHeader />
+      <main className="mx-auto max-w-4xl px-4 py-16 space-y-10">
+        <header className="space-y-4">
+          <p className="text-xs uppercase tracking-[0.4em] text-[#6d768a]">Security</p>
+          <h1 className="text-4xl font-semibold text-[#050d1a]">Security & Governance</h1>
+          <p className="text-sm text-[#4c566a]">
+            T-REX AI OS is built for regulated operational environments where accountability, auditability, and access control are mandatory—not optional. Security is enforced at the system architecture level.
+          </p>
+        </header>
+
+        <section className="border border-[#c9ceda] bg-white p-6 text-sm text-[#0b1220]">
+          <h2 className="text-2xl font-semibold text-[#050d1a]">Security & Governance (Final Public Version)</h2>
+          <p className="mt-3">Security is not marketing copy. It is a design constraint for every workflow inside the platform.</p>
+        </section>
+
+        {sections.map((section) => (
+          <section key={section.title} className="border border-[#c9ceda] bg-white p-6 text-sm text-[#0b1220]">
+            <h3 className="text-2xl font-semibold text-[#050d1a]">{section.title}</h3>
+            {section.body ? <p className="mt-3 text-[#4c566a]">{section.body}</p> : null}
+            {section.list ? (
+              <ul className="mt-4 list-disc list-inside text-[#0b1220] space-y-1">
+                {section.list.map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            ) : null}
+          </section>
+        ))}
+
+        <section className="border border-[#c9ceda] bg-white p-6 text-sm text-[#0b1220] space-y-3">
+          <h3 className="text-2xl font-semibold text-[#050d1a]">Audit-Ready by Default</h3>
+          <p>
+            The system withstands audits, disputes, and inspections by default. Field uploads, bid documents, and operational files are preserved, and every action is attributable.
+          </p>
+        </section>
+
+        <div className="border border-[#c9ceda] bg-white p-6 text-sm text-[#0b1220]">
+          <p className="font-semibold text-[#050d1a]">Next steps</p>
+          <p className="mt-2 text-[#4c566a]">Need deeper evidence? Request full security documentation via support.</p>
+          <Link href="/support" className="mt-3 inline-flex text-sm font-semibold text-[#d5530d]">
+            Contact Support
           </Link>
         </div>
-      </nav>
-
-      <div className="max-w-4xl mx-auto px-4 py-16">
-        <h1 className="text-4xl font-bold text-white mb-8">Security & Governance</h1>
-
-        <div className="space-y-12">
-          <section>
-            <h2 className="text-2xl font-bold text-white mb-4">Access Control</h2>
-            <div className="space-y-4 text-gray-400">
-              <p>Role-based access control enforced at the server level. Every API call validates permissions before executing.</p>
-              <ul className="list-disc list-inside space-y-2 ml-4">
-                <li>Owner: Full system access including billing and compliance</li>
-                <li>Admin: Full operational access including user management and compliance</li>
-                <li>Estimator: Can create and approve estimates, manage deals</li>
-                <li>User: Can create contacts and deals, cannot edit pricing or approve</li>
-                <li>Field: Limited access to assigned projects only</li>
-              </ul>
-            </div>
-          </section>
-
-          <section>
-            <h2 className="text-2xl font-bold text-white mb-4">Audit Logs</h2>
-            <div className="space-y-4 text-gray-400">
-              <p>Every action is logged to an append-only activity table. No edits, no deletions.</p>
-              <ul className="list-disc list-inside space-y-2 ml-4">
-                <li>Contact creation, updates, archiving</li>
-                <li>Deal creation, stage changes, approvals</li>
-                <li>Estimate modifications and approvals</li>
-                <li>PDF generation and distribution</li>
-                <li>Compliance record changes</li>
-                <li>User actions and role changes</li>
-              </ul>
-            </div>
-          </section>
-
-          <section>
-            <h2 className="text-2xl font-bold text-white mb-4">Document Versioning</h2>
-            <div className="space-y-4 text-gray-400">
-              <p>All estimates are versioned. PDFs are generated on approval and stored immutably.</p>
-              <ul className="list-disc list-inside space-y-2 ml-4">
-                <li>Each estimate revision creates a new version</li>
-                <li>Approved PDFs cannot be modified or deleted</li>
-                <li>SHA-256 hashing verifies file integrity</li>
-                <li>Complete version history preserved</li>
-              </ul>
-            </div>
-          </section>
-
-          <section>
-            <h2 className="text-2xl font-bold text-white mb-4">Data Storage</h2>
-            <div className="space-y-4 text-gray-400">
-              <p>All files stored in AWS S3 with server-side encryption. No public access.</p>
-              <ul className="list-disc list-inside space-y-2 ml-4">
-                <li>Server-side uploads only</li>
-                <li>Signed download URLs with expiration</li>
-                <li>Compliance documents segregated by company</li>
-                <li>Automatic backup and replication</li>
-              </ul>
-            </div>
-          </section>
-
-          <section>
-            <h2 className="text-2xl font-bold text-white mb-4">Retention Controls</h2>
-            <div className="space-y-4 text-gray-400">
-              <p>Data retention policies enforced at the system level.</p>
-              <ul className="list-disc list-inside space-y-2 ml-4">
-                <li>Activity logs retained indefinitely</li>
-                <li>Approved PDFs retained per compliance requirements</li>
-                <li>Archived contacts retain full history</li>
-                <li>Deleted users preserve attribution in logs</li>
-              </ul>
-            </div>
-          </section>
-
-          <section>
-            <h2 className="text-2xl font-bold text-white mb-4">Compliance Module</h2>
-            <div className="space-y-4 text-gray-400">
-              <p>Owner and Admin only. Complete employee certification tracking with QR verification.</p>
-              <ul className="list-disc list-inside space-y-2 ml-4">
-                <li>Mandatory proof files for all certifications</li>
-                <li>Expiration tracking and alerts</li>
-                <li>Public QR verification pages (read-only)</li>
-                <li>QR scan logging for audit trail</li>
-                <li>Deterministic compliance snapshots</li>
-              </ul>
-            </div>
-          </section>
-        </div>
-
-        <div className="mt-12 pt-8 border-t border-gray-800">
-          <Link href="/" className="text-orange-500 hover:text-orange-400">
-            ← Back to home
-          </Link>
-        </div>
-      </div>
+      </main>
+      <MarketingFooter />
     </div>
   )
 }

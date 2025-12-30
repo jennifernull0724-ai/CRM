@@ -98,6 +98,15 @@ export async function POST(req: NextRequest) {
       allow_promotion_codes: true,
       customer: stripeCustomerId,
       billing_address_collection: 'required',
+      subscription_data: {
+        metadata: {
+          companyId: company.id,
+          planKey: requestedPlan,
+          requestedBy: session.user.id,
+          companyName: company.name,
+          billingEmail: company.email || session.user.email || '',
+        },
+      },
       line_items: [
         {
           price: priceId,

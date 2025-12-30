@@ -1,8 +1,18 @@
 'use client'
 
+import type { Metadata } from 'next'
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { AuthorityPanel } from '@/components/auth/authority-panel'
+
+export const metadata: Metadata = {
+  title: 'Create Account | T-REX AI OS',
+  robots: {
+    index: false,
+    follow: false,
+  },
+}
 
 export default function SignupPage() {
   const router = useRouter()
@@ -67,124 +77,125 @@ export default function SignupPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-900 flex items-center justify-center px-4 py-12">
-      <div className="max-w-md w-full">
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-white mb-2">T-REX AI OS</h1>
-          <p className="text-gray-400">Create your account</p>
-          <p className="text-sm text-gray-500 mt-2">14-day trial • No credit card required</p>
-        </div>
-
-        <div className="bg-gray-800 rounded-lg p-8 border border-gray-700">
-          <form onSubmit={handleSubmit} className="space-y-5">
-            {error && (
-              <div className="bg-red-900/50 border border-red-700 text-red-200 px-4 py-3 rounded text-sm">
-                {error}
-              </div>
-            )}
-
-            <div>
-              <label htmlFor="name" className="block text-sm font-medium text-gray-300 mb-2">
-                Full Name
-              </label>
-              <input
-                id="name"
-                name="name"
-                type="text"
-                value={formData.name}
-                onChange={handleChange}
-                required
-                className="w-full px-4 py-3 bg-gray-900 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="John Doe"
-              />
-            </div>
-
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-300 mb-2">
-                Email
-              </label>
-              <input
-                id="email"
-                name="email"
-                type="email"
-                value={formData.email}
-                onChange={handleChange}
-                required
-                className="w-full px-4 py-3 bg-gray-900 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="you@company.com"
-              />
-            </div>
-
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-300 mb-2">
-                Password
-              </label>
-              <input
-                id="password"
-                name="password"
-                type="password"
-                value={formData.password}
-                onChange={handleChange}
-                required
-                minLength={8}
-                className="w-full px-4 py-3 bg-gray-900 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="••••••••"
-              />
-              <p className="mt-1 text-xs text-gray-500">Minimum 8 characters</p>
-            </div>
-
-            <div>
-              <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-300 mb-2">
-                Confirm Password
-              </label>
-              <input
-                id="confirmPassword"
-                name="confirmPassword"
-                type="password"
-                value={formData.confirmPassword}
-                onChange={handleChange}
-                required
-                className="w-full px-4 py-3 bg-gray-900 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="••••••••"
-              />
-            </div>
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              {loading ? 'Creating account...' : 'Start 14-day trial'}
-            </button>
-
-            <p className="text-xs text-gray-500 text-center">
-              By creating an account, you agree to our{' '}
-              <Link href="/legal/terms" className="text-blue-400 hover:text-blue-300">
-                Terms of Service
-              </Link>{' '}
-              and{' '}
-              <Link href="/legal/privacy" className="text-blue-400 hover:text-blue-300">
-                Privacy Policy
-              </Link>
-            </p>
-          </form>
-
-          <div className="mt-6 text-center">
-            <p className="text-gray-400 text-sm">
-              Already have an account?{' '}
-              <Link href="/login" className="text-blue-400 hover:text-blue-300 font-medium">
-                Sign in
-              </Link>
-            </p>
-          </div>
-        </div>
-
-        <div className="mt-8 text-center">
-          <Link href="/" className="text-gray-500 hover:text-gray-400 text-sm">
-            ← Back to home
-          </Link>
-        </div>
+    <div className="min-h-screen flex flex-col lg:flex-row">
+      <div className="w-full lg:w-2/5">
+        <AuthorityPanel className="h-full" />
       </div>
+      <section className="flex w-full flex-1 items-center justify-center bg-white px-6 py-12">
+        <div className="w-full max-w-[420px] space-y-8">
+          <header className="space-y-2">
+            <p className="text-xs uppercase tracking-[0.4em] text-[#6d768a]">Provisioning</p>
+            <h2 className="text-3xl font-semibold text-[#050d1a]">Authorized account creation</h2>
+            <p className="text-xs text-[#4c566a]">14-day trial · No credit card required</p>
+          </header>
+          <div className="rounded-sm border border-[#d7dbe2] bg-white p-6 shadow-[0_25px_60px_rgba(5,13,26,0.18)]">
+            <form onSubmit={handleSubmit} className="space-y-5">
+              {error && (
+                <div className="rounded-sm border border-[#d5530d] bg-[#2b0d04] px-4 py-3 text-sm text-white/90">
+                  {error}
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <label htmlFor="name" className="text-sm font-semibold text-[#0b1220]">
+                  Full Name
+                </label>
+                <input
+                  id="name"
+                  name="name"
+                  type="text"
+                  value={formData.name}
+                  onChange={handleChange}
+                  required
+                  className="w-full border border-[#c9ceda] bg-white px-4 py-3 text-sm text-[#0b1220] outline-none transition focus:border-[#0b1220] focus:ring-2 focus:ring-[#0b1220]"
+                  placeholder="John Doe"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label htmlFor="email" className="text-sm font-semibold text-[#0b1220]">
+                  Email
+                </label>
+                <input
+                  id="email"
+                  name="email"
+                  type="email"
+                  value={formData.email}
+                  onChange={handleChange}
+                  required
+                  className="w-full border border-[#c9ceda] bg-white px-4 py-3 text-sm text-[#0b1220] outline-none transition focus:border-[#0b1220] focus:ring-2 focus:ring-[#0b1220]"
+                  placeholder="you@company.com"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label htmlFor="password" className="text-sm font-semibold text-[#0b1220]">
+                  Password
+                </label>
+                <input
+                  id="password"
+                  name="password"
+                  type="password"
+                  value={formData.password}
+                  onChange={handleChange}
+                  required
+                  minLength={8}
+                  className="w-full border border-[#c9ceda] bg-white px-4 py-3 text-sm text-[#0b1220] outline-none transition focus:border-[#0b1220] focus:ring-2 focus:ring-[#0b1220]"
+                  placeholder="••••••••"
+                />
+                <p className="text-xs text-[#4c566a]">Minimum 8 characters</p>
+              </div>
+
+              <div className="space-y-2">
+                <label htmlFor="confirmPassword" className="text-sm font-semibold text-[#0b1220]">
+                  Confirm Password
+                </label>
+                <input
+                  id="confirmPassword"
+                  name="confirmPassword"
+                  type="password"
+                  value={formData.confirmPassword}
+                  onChange={handleChange}
+                  required
+                  className="w-full border border-[#c9ceda] bg-white px-4 py-3 text-sm text-[#0b1220] outline-none transition focus:border-[#0b1220] focus:ring-2 focus:ring-[#0b1220]"
+                  placeholder="••••••••"
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full rounded-sm bg-[#d5530d] py-3 text-sm font-semibold text-white transition hover:bg-[#b6440b] disabled:cursor-not-allowed disabled:opacity-70"
+              >
+                {loading ? 'Creating account…' : 'Start 14-day trial'}
+              </button>
+
+              <p className="text-xs text-[#4c566a] text-center">
+                By creating an account, you agree to our{' '}
+                <Link href="/terms" className="font-semibold text-[#0b1220] underline">
+                  Terms of Service
+                </Link>{' '}
+                and{' '}
+                <Link href="/privacy" className="font-semibold text-[#0b1220] underline">
+                  Privacy Policy
+                </Link>
+              </p>
+            </form>
+          </div>
+          <div className="space-y-3">
+            <Link
+              href="/login"
+              className="inline-flex w-full items-center justify-center rounded-sm border border-[#0b1220] px-4 py-3 text-sm font-semibold text-[#0b1220]"
+            >
+              Back to login
+            </Link>
+            <Link href="/" className="text-sm font-medium text-[#0b1220]/60">
+              Return to home
+            </Link>
+          </div>
+          <p className="text-xs text-[#4c566a]">Access is logged. Activity is audited.</p>
+        </div>
+      </section>
     </div>
   )
 }

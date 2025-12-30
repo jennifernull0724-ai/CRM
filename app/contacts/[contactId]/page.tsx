@@ -2,19 +2,20 @@ import type { ReactNode } from 'react'
 import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import { getServerSession } from 'next-auth'
-import { formatDistanceToNow } from 'date-fns'
+import { formatDistanceToNow, formatRelative } from 'date-fns'
 import { authOptions } from '@/lib/auth'
 import { getContactWorkspace } from '@/lib/contacts/workspace'
 import {
   completeContactTaskAction,
   createContactNoteAction,
   createContactTaskAction,
-  sendContactEmailAction,
   logContactCallAction,
   logContactCustomActivityAction,
   logContactMeetingAction,
   logContactSocialAction,
+  sendContactEmailAction,
   updateContactTaskAction,
+  type ActionState,
 } from '@/app/contacts/actions'
 import { NoteComposer } from '@/app/contacts/[contactId]/_components/note-composer'
 import { ContactEmailComposer } from '@/app/contacts/[contactId]/_components/contact-email-composer'
@@ -34,60 +35,137 @@ const TIMELINE_FILTERS = [
   { label: 'Social', value: 'SOCIAL_LOGGED' },
   { label: 'Custom', value: 'CUSTOM_ACTIVITY_LOGGED' },
   { label: 'Deal', value: 'DEAL_CREATED' },
-                      const mentionIds = parseMentionIds(note.mentions)
-                      const mentionedUsers = mentionIds
-                        .map((id) => mentionLookup.get(id))
-                        .filter(Boolean)
+]
 
-                      return (
-                        <article key={note.id} className="rounded-2xl border border-slate-800 bg-slate-950/40 p-4">
-                          <div
-                            className="prose prose-invert max-w-none text-sm"
-                            dangerouslySetInnerHTML={{ __html: sanitizeNoteBody(note.content) }}
-                          />
-                          <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-slate-500">
-                            <span>{note.createdBy?.name ?? 'Unknown actor'}</span>
-                            <span>·</span>
-                            <span>{formatRelative(note.createdAt)}</span>
-                            {mentionedUsers.length > 0 && (
-                              <span className="inline-flex flex-wrap gap-2">
-                                {mentionedUsers.map((user) => (
-                                  <span key={user!.id} className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-emerald-200">
-                                    @{user!.name}
-                                  </span>
-                                ))}
-                              </span>
-                            )}
-                          </div>
-                        </article>
-                      )
-                    })
-                  )}
-                </div>
+const DEFAULT_TIMELINE_TYPES = TIMELINE_FILTERS.map((filter) => filter.value)
+
+type SearchParams = Record<string, string | string[] | undefined>
+
+type PageProps = {
+  params: { contactId: string }
+  searchParams?: SearchParams
+}
+
+export default async function ContactDetailPage({ params, searchParams }: PageProps) {
+  const session = await getServerSession(authOptions)
+  if (!session?.user?.companyId) {
+    redirect(`/login?from=/contacts/${params.contactId}`)
+  }
+
+  const timelineTypes = normalizeTimelineFilters(searchParams?.timelineType)
+  const workspace = await getContactWorkspace(
+    params.contactId,
+    session.user.companyId,
+    {
+      types: timelineTypes,
+      limit: 75,
+    },
+    {
+      userId: session.user.id,
+      role: session.user.role ?? 'user',
+    }
+  )
+
+  if (!workspace) {
+    notFound()
+  }
+
+  const { contact } = workspace
+  const openTasks = workspace.tasks.filter((task) => !task.completed)
+  const completedTasks = workspace.tasks.filter((task) => task.completed).slice(0, 5)
+  const overdueTasks = openTasks.filter((task) => task.dueDate && task.dueDate < new Date()).length
+  const mentionableUsers = workspace.workspaceUsers.map((user) => ({
+    id: user.id,
+    name: user.name ?? 'Workspace user',
+    role: user.role ?? 'user',
+    email: user.email,
+  }))
+  const mentionLookup = new Map(workspace.workspaceUsers.map((user) => [user.id, user]))
+
+  const noteComposerAction = (state: ActionState, formData: FormData) => createContactNoteAction(contact.id, state, formData)
+  const createTask = (state: ActionState | FormData, formData?: FormData) => createContactTaskAction(contact.id, state, formData)
+  const updateTask = (taskId: string) => (state: ActionState | FormData, formData?: FormData) => updateContactTaskAction(contact.id, taskId, state, formData)
+  const completeTask = (taskId: string) => (state: ActionState | FormData, formData?: FormData) => completeContactTaskAction(contact.id, taskId, state, formData)
+  const logCall = (state: ActionState | FormData, formData?: FormData) => logContactCallAction(contact.id, state, formData)
+  const logMeeting = (state: ActionState | FormData, formData?: FormData) => logContactMeetingAction(contact.id, state, formData)
+  const logSocial = (state: ActionState | FormData, formData?: FormData) => logContactSocialAction(contact.id, state, formData)
+  const logCustom = (state: ActionState | FormData, formData?: FormData) => logContactCustomActivityAction(contact.id, state, formData)
+  const sendEmail = (state: ActionState, formData: FormData) => sendContactEmailAction(contact.id, state, formData)
+
+  const ownerName = contact.owner?.name ?? 'Unassigned'
+  const companyLabel = contact.companyOverrideName ?? contact.derivedCompanyName
+  const lastActivityLabel = contact.lastActivityAt
+    ? formatDistanceToNow(new Date(contact.lastActivityAt), { addSuffix: true })
+    : 'Never'
+
+  return (
+    <div className="min-h-screen bg-slate-950 text-slate-50">
+      <div className="mx-auto max-w-7xl space-y-8 px-4 py-10">
+        <section className="rounded-3xl border border-slate-800 bg-gradient-to-br from-slate-900/90 via-slate-900 to-slate-950 p-8 shadow-2xl">
+          <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+            <div className="space-y-3">
+              <p className="text-xs uppercase tracking-[0.4em] text-slate-500">Contact</p>
+              <h1 className="text-3xl font-semibold text-white">
+                {contact.firstName} {contact.lastName}
+              </h1>
+              <p className="text-sm text-slate-400">
+                {contact.jobTitle ?? 'No title'} · {companyLabel || 'Unknown company'}
+              </p>
+              <div className="flex flex-wrap gap-4 text-sm text-slate-300">
+                {contact.email && (
+                  <a href={`mailto:${contact.email}`} className="hover:text-emerald-300">
+                    {contact.email}
+                  </a>
+                )}
+                {contact.phone && (
+                  <a href={`tel:${contact.phone}`} className="hover:text-emerald-300">
+                    {contact.phone}
+                  </a>
+                )}
+                <span>Owner · {ownerName}</span>
+                <span>Status · {contact.activityState}</span>
               </div>
-            </section>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-3">
+              <Metric label="Open tasks" value={workspace.stats.openTasks} helper="Assigned to this contact" tone="emerald" />
+              <Metric label="Overdue" value={workspace.stats.overdueTasks} helper="Tasks past due" tone="amber" />
+              <Metric label="Last activity" value={lastActivityLabel} helper="Timeline touch" tone="violet" />
+            </div>
+          </div>
+        </section>
 
-            <ManualActivityPanel
-              logCall={logCall}
-              logMeeting={logMeeting}
-              logSocial={logSocial}
-              logCustom={logCustom}
+        <div className="grid gap-6 lg:grid-cols-[2fr,1fr]">
+          <div className="space-y-6">
+            <TasksPanel
+              tasks={openTasks}
+              completedTasks={completedTasks}
+              overdueTasks={overdueTasks}
+              users={workspace.workspaceUsers.map((user) => ({ id: user.id, name: user.name ?? 'Workspace user' }))}
+              createAction={createTask}
+              updateAction={updateTask}
+              completeAction={completeTask}
             />
 
-            <TimelinePanel
-              contactId={contact.id}
-              timeline={workspace.timeline}
-              timelineTypes={timelineTypes}
+            <NotesPanel
+              notes={workspace.notes}
+              mentionLookup={mentionLookup}
+              mentionableUsers={mentionableUsers}
+              action={noteComposerAction}
             />
+
+            <ManualActivityPanel logCall={logCall} logMeeting={logMeeting} logSocial={logSocial} logCustom={logCustom} />
+
+            <TimelinePanel contactId={contact.id} timeline={workspace.timeline} timelineTypes={timelineTypes} />
           </div>
 
           <div className="space-y-6">
-            <EmailShell integration={workspace.emailIntegration} contact={contact} />
-            <RelatedObjectsPanel
-              deals={workspace.deals}
-              estimates={workspace.estimates}
-              workOrders={workspace.workOrders}
+            <EmailShell
+              integration={workspace.emailIntegration}
+              contact={{ id: contact.id, firstName: contact.firstName, lastName: contact.lastName, email: contact.email }}
+              userContext={{ companyId: session.user.companyId, userId: session.user.id }}
+              action={sendEmail}
             />
+            <RelatedObjectsPanel deals={workspace.deals} estimates={workspace.estimates} workOrders={workspace.workOrders} />
           </div>
         </div>
       </div>
@@ -95,33 +173,83 @@ const TIMELINE_FILTERS = [
   )
 }
 
-function Metric({
-  label,
-  value,
-  helper,
-  tone,
-}: {
-  label: string
-  value: number
-  helper: string
-  tone: 'emerald' | 'amber' | 'violet'
-}) {
-  const toneClass =
-    tone === 'emerald'
-      ? 'text-emerald-300'
-      : tone === 'amber'
-        ? 'text-amber-300'
-        : 'text-indigo-300'
+function Metric({ label, value, helper, tone }: { label: string; value: string | number; helper: string; tone: 'emerald' | 'amber' | 'violet' }) {
+  const toneClass = tone === 'emerald' ? 'text-emerald-300' : tone === 'amber' ? 'text-amber-300' : 'text-indigo-300'
   return (
-    <div className="rounded-2xl border border-slate-800 bg-slate-900/40 px-3 py-4">
+    <div className="rounded-2xl border border-slate-800 bg-slate-900/40 px-4 py-4">
       <p className="text-xs uppercase tracking-[0.4em] text-slate-500">{label}</p>
-      <p className={`text-3xl font-semibold ${toneClass}`}>{value}</p>
+      <p className={`mt-1 text-2xl font-semibold ${toneClass}`}>{value}</p>
       <p className="text-xs text-slate-500">{helper}</p>
     </div>
   )
 }
 
-type ActionState = import('@/app/contacts/actions').ActionState
+type NotesPanelProps = {
+  notes: Array<{
+    id: string
+    content: string
+    mentions: string | null
+    createdAt: Date
+    createdBy: { name: string | null } | null
+  }>
+  mentionableUsers: Array<{ id: string; name: string; role: string; email?: string | null }>
+  mentionLookup: Map<string, { id: string; name: string | null }>
+  action: (state: ActionState, formData: FormData) => Promise<ActionState>
+}
+
+function NotesPanel({ notes, mentionableUsers, mentionLookup, action }: NotesPanelProps) {
+  return (
+    <section className="rounded-3xl border border-slate-800 bg-slate-900/80 p-5">
+      <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+        <div>
+          <p className="text-xs uppercase tracking-[0.4em] text-slate-500">Notes</p>
+          <h2 className="text-2xl font-semibold text-white">Shared context</h2>
+        </div>
+      </div>
+      <div className="mt-6 grid gap-6 lg:grid-cols-[1.1fr,1fr]">
+        <div className="space-y-4">
+          {notes.length === 0 ? (
+            <p className="rounded-2xl border border-dashed border-slate-800 p-4 text-sm text-slate-500">No notes yet.</p>
+          ) : (
+            notes.map((note) => {
+              const mentionIds = parseMentionIds(note.mentions)
+              const mentionedUsers = mentionIds.map((id) => mentionLookup.get(id)).filter(Boolean)
+
+              return (
+                <article key={note.id} className="rounded-2xl border border-slate-800 bg-slate-950/40 p-4">
+                  <div
+                    className="prose prose-invert max-w-none text-sm"
+                    dangerouslySetInnerHTML={{ __html: sanitizeNoteBody(note.content) }}
+                  />
+                  <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-slate-500">
+                    <span>{note.createdBy?.name ?? 'Unknown actor'}</span>
+                    <span>·</span>
+                    <span>{formatRelativeSafe(note.createdAt)}</span>
+                    {mentionedUsers.length > 0 && (
+                      <span className="inline-flex flex-wrap gap-2">
+                        {mentionedUsers.map((user) => (
+                          <span key={user!.id} className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-emerald-200">
+                            @{user!.name}
+                          </span>
+                        ))}
+                      </span>
+                    )}
+                  </div>
+                </article>
+              )
+            })
+          )}
+        </div>
+        <div className="rounded-2xl border border-slate-800 bg-slate-950/40 p-4">
+          <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-500">Compose</p>
+          <div className="mt-3">
+            <NoteComposer action={action} mentionableUsers={mentionableUsers} />
+          </div>
+        </div>
+      </div>
+    </section>
+  )
+}
 
 type TaskPanelProps = {
   tasks: Array<{
@@ -137,12 +265,8 @@ type TaskPanelProps = {
   overdueTasks: number
   users: Array<{ id: string; name: string }>
   createAction: (stateOrFormData: ActionState | FormData, formData?: FormData) => Promise<ActionState>
-  updateAction: (
-    taskId: string
-  ) => (stateOrFormData: ActionState | FormData, formData?: FormData) => Promise<ActionState>
-  completeAction: (
-    taskId: string
-  ) => (stateOrFormData: ActionState | FormData, formData?: FormData) => Promise<ActionState>
+  updateAction: (taskId: string) => (stateOrFormData: ActionState | FormData, formData?: FormData) => Promise<ActionState>
+  completeAction: (taskId: string) => (stateOrFormData: ActionState | FormData, formData?: FormData) => Promise<ActionState>
 }
 
 function TasksPanel({ tasks, completedTasks, overdueTasks, users, createAction, updateAction, completeAction }: TaskPanelProps) {
@@ -202,9 +326,7 @@ function TasksPanel({ tasks, completedTasks, overdueTasks, users, createAction, 
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-base font-semibold text-white">{task.title}</p>
-                    <p className="text-xs text-slate-500">
-                      Due {task.dueDate ? formatRelative(task.dueDate) : 'No due date'} · {task.priority}
-                    </p>
+                    <p className="text-xs text-slate-500">Due {task.dueDate ? formatRelativeSafe(task.dueDate) : 'No due date'} · {task.priority}</p>
                   </div>
                   <form action={completeAction(task.id)}>
                     <button className="rounded-full border border-emerald-300/50 px-3 py-1 text-xs text-emerald-200 hover:bg-emerald-400/10">
@@ -258,17 +380,9 @@ function TasksPanel({ tasks, completedTasks, overdueTasks, users, createAction, 
   )
 }
 
-function ManualActivityPanel({
-  logCall,
-  logMeeting,
-  logSocial,
-  logCustom,
-}: {
-  logCall: (stateOrFormData: ActionState | FormData, formData?: FormData) => Promise<ActionState>
-  logMeeting: (stateOrFormData: ActionState | FormData, formData?: FormData) => Promise<ActionState>
-  logSocial: (stateOrFormData: ActionState | FormData, formData?: FormData) => Promise<ActionState>
-  logCustom: (stateOrFormData: ActionState | FormData, formData?: FormData) => Promise<ActionState>
-}) {
+type ManualPanelAction = (stateOrFormData: ActionState | FormData, formData?: FormData) => Promise<ActionState>
+
+function ManualActivityPanel({ logCall, logMeeting, logSocial, logCustom }: { logCall: ManualPanelAction; logMeeting: ManualPanelAction; logSocial: ManualPanelAction; logCustom: ManualPanelAction }) {
   return (
     <section className="rounded-3xl border border-slate-800 bg-slate-900/80 p-5">
       <p className="text-xs uppercase tracking-[0.4em] text-slate-500">Manual activities</p>
@@ -332,22 +446,16 @@ function ManualActivityPanel({
   )
 }
 
-function TimelinePanel({
-  contactId,
-  timeline,
-  timelineTypes,
-}: {
-  contactId: string
-  timeline: Array<{
-    id: string
-    type: string
-    subject: string
-    description: string | null
-    createdAt: Date
-    user?: { name: string | null } | null
-  }>
-  timelineTypes: string[]
-}) {
+type TimelineItem = {
+  id: string
+  type: string
+  subject: string
+  description: string | null
+  createdAt: Date
+  user?: { name: string | null } | null
+}
+
+function TimelinePanel({ contactId, timeline, timelineTypes }: { contactId: string; timeline: TimelineItem[]; timelineTypes: string[] }) {
   return (
     <section className="rounded-3xl border border-slate-800 bg-slate-900/80 p-5">
       <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
@@ -386,7 +494,7 @@ function TimelinePanel({
                 <div className="flex flex-wrap items-center gap-2 text-xs text-slate-400">
                   <span className="rounded-full bg-slate-900/80 px-2 py-0.5 text-[10px] uppercase tracking-wide text-slate-300">{activity.type}</span>
                   <span>·</span>
-                  <span>{formatRelative(activity.createdAt)}</span>
+                  <span>{formatRelativeSafe(activity.createdAt)}</span>
                   {activity.user?.name && (
                     <>
                       <span>·</span>
@@ -405,18 +513,7 @@ function TimelinePanel({
   )
 }
 
-async function EmailShell({
-  integration,
-  contact,
-}: {
-  integration: { provider: string; status: string } | null
-  contact: {
-    id: string
-    firstName: string
-    lastName: string
-    email: string
-  }
-}) {
+async function EmailShell({ integration, contact, userContext, action }: { integration: { provider: string; status: string } | null; contact: { id: string; firstName: string; lastName: string; email: string }; userContext: { companyId: string; userId: string }; action: (state: ActionState, formData: FormData) => Promise<ActionState> }) {
   if (!integration) {
     return (
       <section className="rounded-3xl border border-slate-800 bg-slate-900/80 p-5">
@@ -442,14 +539,9 @@ async function EmailShell({
     )
   }
 
-  const session = await getServerSession(authOptions)
-  if (!session?.user?.companyId) {
-    return null
-  }
-
   const composerData = await loadContactEmailComposerData({
-    companyId: session.user.companyId,
-    userId: session.user.id,
+    companyId: userContext.companyId,
+    userId: userContext.userId,
     contactEmail: contact.email,
   })
 
@@ -489,18 +581,19 @@ async function EmailShell({
 
   const contactName = [contact.firstName, contact.lastName].filter(Boolean).join(' ').trim() || contact.email
   const defaultTemplateId = composerData.templates.find((template) => template.isDefault)?.id ?? null
-  const sendEmail = (state: ActionState, formData: FormData) => sendContactEmailAction(contact.id, state, formData)
 
   return (
     <section className="rounded-3xl border border-slate-800 bg-slate-900/80 p-5">
       <div className="flex flex-col gap-1">
         <p className="text-xs uppercase tracking-[0.4em] text-slate-500">Email</p>
         <h2 className="text-2xl font-semibold text-white">Workspace inbox</h2>
-        <p className="text-xs text-slate-500">{integration.provider} · {integration.status}</p>
+        <p className="text-xs text-slate-500">
+          {integration.provider} · {integration.status}
+        </p>
       </div>
       <div className="mt-4">
         <ContactEmailComposer
-          action={sendEmail}
+          action={action}
           initialTo={contact.email}
           contactName={contactName}
           accountOptions={composerData.accounts}
@@ -513,15 +606,7 @@ async function EmailShell({
   )
 }
 
-function RelatedObjectsPanel({
-  deals,
-  estimates,
-  workOrders,
-}: {
-  deals: Array<{ id: string; name: string; stage: string; value: number | null }>
-  estimates: Array<{ id: string; quoteNumber: string; status: string }>
-  workOrders: Array<{ id: string; title: string; status: string }>
-}) {
+function RelatedObjectsPanel({ deals, estimates, workOrders }: { deals: Array<{ id: string; name: string; stage: string; value: number | null }>; estimates: Array<{ id: string; quoteNumber: string; status: string }>; workOrders: Array<{ id: string; title: string; status: string }> }) {
   return (
     <section className="space-y-4">
       <RelatedCard
@@ -563,254 +648,36 @@ function RelatedObjectsPanel({
   )
 }
 
-function RelatedCard({
-  title,
-  empty,
-  items,
-}: {
-  title: string
-  empty: string
-  items: ReactNode[]
-}) {
+function RelatedCard({ title, empty, items }: { title: string; empty: string; items: ReactNode[] }) {
   return (
     <section className="rounded-3xl border border-slate-800 bg-slate-900/80 p-5">
       <p className="text-xs uppercase tracking-[0.4em] text-slate-500">{title}</p>
-      <div className="mt-3 space-y-3">
-        {items.length > 0 ? items : <p className="text-sm text-slate-500">{empty}</p>}
-      </div>
+      <div className="mt-3 space-y-3">{items.length > 0 ? items : <p className="text-sm text-slate-500">{empty}</p>}</div>
     </section>
   )
 }
-import Link from 'next/link'
-              {contact.company && (
-                <p className="text-lg text-gray-600 mb-2">{contact.company.name}</p>
-              )}
-              <div className="flex gap-4 text-sm text-gray-500">
-                {contact.email && (
-                  <a href={`mailto:${contact.email}`} className="hover:text-blue-600">
-                    {contact.email}
-                  </a>
-                )}
-                {contact.phone && (
-                  <a href={`tel:${contact.phone}`} className="hover:text-blue-600">
-                    {contact.phone}
-                  </a>
-                )}
-              </div>
-              {contact.owner && (
-                <p className="text-sm text-gray-500 mt-2">
-                  Owner: <span className="font-medium">{contact.owner.name}</span>
-                </p>
-              )}
-            </div>
-            <div className="flex gap-2">
-              <Link
-                href={`/contacts/${contact.id}/edit`}
-                className="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 font-medium"
-              >
-                Edit Contact
-              </Link>
-              <Link
-                href={`/deals/new?contactId=${contact.id}`}
-                className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 font-medium"
-              >
-                + New Deal
-              </Link>
-            </div>
-          </div>
-        </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Main Column */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* Tasks */}
-            <div className="bg-white rounded-lg shadow">
-              <div className="p-6 border-b border-gray-200">
-                <div className="flex justify-between items-center">
-                  <h2 className="text-xl font-semibold text-gray-900">
-                    Tasks
-                    {overdueTasks.length > 0 && (
-                      <span className="ml-2 text-sm font-normal text-red-600">
-                        ({overdueTasks.length} overdue)
-                      </span>
-                    )}
-                  </h2>
-                  <Link
-                    href={`/contacts/${contact.id}/tasks/new`}
-                    className="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700"
-                  >
-                    + Add Task
-                  </Link>
-                </div>
-              </div>
-              <div className="p-6">
-                {contact.tasks.length === 0 ? (
-                  <p className="text-gray-500 text-center py-4">No open tasks</p>
-                ) : (
-                  <div className="space-y-3">
-                    {contact.tasks.map((task) => (
-                      <div
-                        key={task.id}
-                        className={`p-3 rounded border ${
-                          task.dueDate && task.dueDate < new Date()
-                            ? 'border-red-300 bg-red-50'
-                            : 'border-gray-200'
-                        }`}
-                      >
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <h3 className="font-medium text-gray-900">{task.title}</h3>
-                            {task.description && (
-                              <p className="text-sm text-gray-600 mt-1">{task.description}</p>
-                            )}
-                            {task.dueDate && (
-                              <p className="text-sm text-gray-500 mt-1">
-                                Due: {new Date(task.dueDate).toLocaleDateString()}
-                              </p>
-                            )}
-                          </div>
-                          <span
-                            className={`text-xs px-2 py-1 rounded ${
-                              task.priority === 'high'
-                                ? 'bg-red-100 text-red-800'
-                                : task.priority === 'medium'
-                                ? 'bg-yellow-100 text-yellow-800'
-                                : 'bg-gray-100 text-gray-800'
-                            }`}
-                          >
-                            {task.priority}
-                          </span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
+function normalizeTimelineFilters(raw: string | string[] | undefined): string[] {
+  if (!raw) {
+    return DEFAULT_TIMELINE_TYPES
+  }
+  const values = Array.isArray(raw) ? raw : [raw]
+  const allowed = new Set(DEFAULT_TIMELINE_TYPES)
+  const selected = values.map((value) => value.toString()).filter((value) => allowed.has(value))
+  return selected.length ? selected : DEFAULT_TIMELINE_TYPES
+}
 
-            {/* Notes */}
-            <div className="bg-white rounded-lg shadow">
-              <div className="p-6 border-b border-gray-200">
-                <div className="flex justify-between items-center">
-                  <h2 className="text-xl font-semibold text-gray-900">Notes</h2>
-                  <Link
-                    href={`/contacts/${contact.id}/notes/new`}
-                    className="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700"
-                  >
-                    + Add Note
-                  </Link>
-                </div>
-              </div>
-              <div className="p-6">
-                {contact.notes.length === 0 ? (
-                  <p className="text-gray-500 text-center py-4">No notes yet</p>
-                ) : (
-                  <div className="space-y-4">
-                    {contact.notes.map((note) => (
-                      <div key={note.id} className="border-b border-gray-200 pb-4 last:border-0">
-                        <p className="text-gray-900 whitespace-pre-wrap">{note.content}</p>
-                        <p className="text-sm text-gray-500 mt-2">
-                          {note.createdBy?.name} •{' '}
-                          {new Date(note.createdAt).toLocaleString()}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
+function parseMentionIds(value: string | null): string[] {
+  if (!value) return []
+  try {
+    const parsed = JSON.parse(value)
+    return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === 'string') : []
+  } catch {
+    return []
+  }
+}
 
-            {/* Activity Timeline */}
-            <div className="bg-white rounded-lg shadow">
-              <div className="p-6 border-b border-gray-200">
-                <h2 className="text-xl font-semibold text-gray-900">Activity Timeline</h2>
-              </div>
-              <div className="p-6">
-                {contact.activities.length === 0 ? (
-                  <p className="text-gray-500 text-center py-4">No activity yet</p>
-                ) : (
-                  <div className="space-y-4">
-                    {contact.activities.map((activity) => (
-                      <div key={activity.id} className="flex gap-3">
-                        <div className="flex-shrink-0">
-                          <div className="w-2 h-2 bg-blue-600 rounded-full mt-2"></div>
-                        </div>
-                        <div className="flex-1">
-                          <p className="text-gray-900 font-medium">{activity.subject}</p>
-                          {activity.description && (
-                            <p className="text-gray-600 text-sm mt-1">{activity.description}</p>
-                          )}
-                          <p className="text-gray-500 text-xs mt-1">
-                            {activity.user?.name} • {new Date(activity.createdAt).toLocaleString()}
-                          </p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Sidebar */}
-          <div className="space-y-6">
-            {/* Deals */}
-            <div className="bg-white rounded-lg shadow">
-              <div className="p-6 border-b border-gray-200">
-                <h2 className="text-xl font-semibold text-gray-900">Deals</h2>
-              </div>
-              <div className="p-6">
-                {contact.deals.length === 0 ? (
-                  <p className="text-gray-500 text-center py-4">No deals yet</p>
-                ) : (
-                  <div className="space-y-3">
-                    {contact.deals.map((deal) => (
-                      <Link
-                        key={deal.id}
-                        href={`/deals/${deal.id}`}
-                        className="block p-3 border border-gray-200 rounded hover:bg-gray-50"
-                      >
-                        <h3 className="font-medium text-gray-900">{deal.name}</h3>
-                        <p className="text-sm text-gray-600 mt-1">Stage: {deal.stage}</p>
-                        {deal.value && (
-                          <p className="text-sm text-gray-600">
-                            ${deal.value.toLocaleString()}
-                          </p>
-                        )}
-                      </Link>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Quick Actions */}
-            <div className="bg-white rounded-lg shadow p-6">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">Quick Actions</h2>
-              <div className="space-y-2">
-                <Link
-                  href={`/contacts/${contact.id}/activity/call`}
-                  className="block w-full bg-blue-600 text-white px-4 py-2 rounded text-center hover:bg-blue-700"
-                >
-                  Log Call
-                </Link>
-                <Link
-                  href={`/contacts/${contact.id}/activity/meeting`}
-                  className="block w-full bg-green-600 text-white px-4 py-2 rounded text-center hover:bg-green-700"
-                >
-                  Log Meeting
-                </Link>
-                <Link
-                  href={`/contacts/${contact.id}/email`}
-                  className="block w-full bg-purple-600 text-white px-4 py-2 rounded text-center hover:bg-purple-700"
-                >
-                  Send Email
-                </Link>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
+function formatRelativeSafe(date: Date | string): string {
+  const target = typeof date === 'string' ? new Date(date) : date
+  return formatRelative(target, new Date())
 }

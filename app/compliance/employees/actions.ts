@@ -92,6 +92,8 @@ export async function createEmployeeAction(formData: FormData) {
       companyId,
       qrToken,
       email,
+      createdById: userId,
+      updatedById: userId,
     },
   })
 
@@ -368,7 +370,7 @@ export async function setEmployeeActiveStateAction(formData: FormData) {
     throw new Error('Employee not found')
   }
 
-  await prisma.complianceEmployee.update({ where: { id: employeeId }, data: { active } })
+  await prisma.complianceEmployee.update({ where: { id: employeeId }, data: { active, updatedById: userId } })
 
   await logComplianceActivity({
     companyId,
@@ -383,4 +385,16 @@ export async function setEmployeeActiveStateAction(formData: FormData) {
   revalidatePath('/dashboard/admin')
   revalidatePath('/dashboard/owner')
   revalidatePath('/compliance/employees')
+}
+
+export async function updateCertificationAction() {
+  throw new Error('Certification records are immutable. Create a new certification version instead.')
+}
+
+export async function deleteCertificationAction() {
+  throw new Error('Certification records are immutable and cannot be deleted.')
+}
+
+export async function updateSnapshotAction() {
+  throw new Error('Compliance snapshots are immutable. Generate a new snapshot instead.')
 }

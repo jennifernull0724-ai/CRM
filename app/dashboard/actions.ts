@@ -309,7 +309,7 @@ export async function transitionWorkOrderStatusAction(formData: FormData) {
   })
 
   revalidateDashboards()
-  revalidatePath('/dashboard/dispatch')
+  revalidatePath('/dispatch')
 }
 
 export async function approveComplianceOverrideAction(formData: FormData) {
@@ -348,7 +348,7 @@ export async function approveComplianceOverrideAction(formData: FormData) {
     metadata: { overrideApproved: true },
   })
   revalidateDashboards()
-  revalidatePath('/dashboard/dispatch')
+  revalidatePath('/dispatch')
 }
 
 function parseNumber(value: FormDataEntryValue | null, fallback: number): number {

@@ -85,7 +85,7 @@ Employee
 - `/contacts/[id]` - Command center ✅
 - `/deals` - Pipeline view ✅
 - `/deals/new` - Create deal (ready)
-- `/dashboard/user` - User metrics ✅
+- `/crm` - User metrics ✅
 - `/compliance/*` - Owner/Admin only (ready)
 - `/settings/*` - Configuration (ready)
 

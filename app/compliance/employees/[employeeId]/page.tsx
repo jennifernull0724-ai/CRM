@@ -162,7 +162,7 @@ export default async function ComplianceEmployeeDetailPage({ params }: { params:
             <label className="text-xs uppercase text-slate-500">Proof files (PDF or images)</label>
             <input type="file" name="proofFiles" accept="image/*,application/pdf" multiple required />
             <p className="text-xs text-slate-500">All proofs upload atomically and become immutable.</p>
-            <button type="submit" className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white">Save certification</button>
+            <button type="submit" className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white">Record certification</button>
           </form>
         </div>
         <div className="mt-6 space-y-6">

@@ -67,7 +67,7 @@ export default async function ComplianceDashboardPage() {
   const planKey = (session.user.planKey as PlanKey) ?? 'starter'
   const isAdvanced = planAllowsFeature(planKey, 'advanced_compliance')
 
-  const [employees, snapshots, presets, lastSnapshot, lastExport, recentSnapshots] = await Promise.all([
+  const [employees, snapshots, presets, lastSnapshot, lastExport, recentSnapshots, latestSnapshots, companyDocs] = await Promise.all([
     prisma.complianceEmployee.findMany({
       where: { companyId: session.user.companyId },
       include: {
@@ -107,9 +107,50 @@ export default async function ComplianceDashboardPage() {
         qrToken: true,
       },
     }),
+    prisma.complianceSnapshot.findMany({
+      where: { employee: { companyId: session.user.companyId } },
+      orderBy: { createdAt: 'desc' },
+      include: {
+        employee: { select: { id: true, employeeId: true, firstName: true, lastName: true, complianceStatus: true } },
+      },
+      take: 500,
+    }),
+    prisma.companyComplianceDocument.findMany({
+      where: { companyId: session.user.companyId },
+      select: { id: true, category: true },
+    }),
   ])
 
   const totals = summarizeEmployees(employees)
+
+  const latestSnapshotMap = latestSnapshots.reduce<Record<string, (typeof latestSnapshots)[number]>>((acc, snap) => {
+    if (!acc[snap.employeeId]) {
+      acc[snap.employeeId] = snap
+    }
+    return acc
+  }, {})
+
+  const staleCutoff = Date.now() - 1000 * 60 * 60 * 24 * 30
+  const snapshotStaleCount = Object.values(latestSnapshotMap).filter((snap) => snap.createdAt.getTime() < staleCutoff).length
+
+  const blockingDispatch = Object.values(latestSnapshotMap).filter((snap) => {
+    const reasons = Array.isArray((snap as any).failureReasons) ? (snap as any).failureReasons : snap.payload?.failureReasons ?? []
+    return (reasons?.length ?? 0) > 0 || snap.employee.complianceStatus !== 'PASS'
+  }).length
+
+  const failureReasonBreakdown = Object.values(latestSnapshotMap).reduce<Record<string, number>>((acc, snap) => {
+    const reasons = Array.isArray((snap as any).failureReasons) ? (snap as any).failureReasons : snap.payload?.failureReasons ?? []
+    reasons.forEach((reason: any) => {
+      const key = reason?.type ?? 'UNKNOWN'
+      acc[key] = (acc[key] ?? 0) + 1
+    })
+    return acc
+  }, {})
+
+  const categories = ['INSURANCE', 'POLICIES', 'PROGRAMS', 'RAILROAD'] as const
+  const missingCompanyCategories = categories.filter(
+    (category) => !companyDocs.some((doc) => doc.category === category)
+  )
 
   const groupedPresets = groupPresets(presets)
 
@@ -148,6 +189,14 @@ export default async function ComplianceDashboardPage() {
               <span>Snapshots</span>
               <span className="font-semibold text-slate-900">{snapshots}</span>
             </div>
+            <div className="flex items-center justify-between text-sm">
+              <span>Blocking dispatch</span>
+              <span className="font-semibold text-rose-600">{blockingDispatch}</span>
+            </div>
+            <div className="flex items-center justify-between text-sm">
+              <span>Stale snapshots (&gt;30d)</span>
+              <span className="font-semibold text-amber-600">{snapshotStaleCount}</span>
+            </div>
           </div>
         </div>
 
@@ -177,6 +226,37 @@ export default async function ComplianceDashboardPage() {
               <li className="text-slate-400">Exports unlock on Enterprise</li>
             )}
           </ul>
+        </div>
+      </section>
+
+      <section className="grid gap-4 md:grid-cols-2">
+        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <p className="text-sm font-semibold text-slate-600">Failure reasons (latest snapshots)</p>
+          {Object.keys(failureReasonBreakdown).length === 0 ? (
+            <p className="mt-3 text-sm text-emerald-700">No recorded failures.</p>
+          ) : (
+            <ul className="mt-3 space-y-2 text-sm text-slate-700">
+              {Object.entries(failureReasonBreakdown).map(([reason, count]) => (
+                <li key={reason} className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2">
+                  <span className="font-semibold">{reason}</span>
+                  <span className="text-slate-900">{count}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <p className="text-sm font-semibold text-slate-600">Company documents</p>
+          {missingCompanyCategories.length === 0 ? (
+            <p className="mt-3 text-sm text-emerald-700">All categories have at least one document.</p>
+          ) : (
+            <ul className="mt-3 space-y-2 text-sm text-amber-700">
+              {missingCompanyCategories.map((category) => (
+                <li key={category} className="rounded-lg bg-amber-50 px-3 py-2">Missing: {category}</li>
+              ))}
+            </ul>
+          )}
         </div>
       </section>
 

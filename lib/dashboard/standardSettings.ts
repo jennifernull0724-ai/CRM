@@ -4,6 +4,7 @@ import type { EmailProvider, EmailTemplateScope } from '@prisma/client'
 
 const BRANDING_UI_LOGO_KEY = 'branding_ui_logo'
 const BRANDING_PDF_LOGO_KEY = 'branding_pdf_logo'
+const BRANDING_DISPATCH_PDF_LOGO_KEY = 'branding_dispatch_pdf_logo'
 
 export type StandardEmailIntegration = {
   id: string
@@ -55,6 +56,8 @@ export type StandardBrandingInfo = {
   uiLogoUrl: string | null
   pdfLogoUrl: string | null
   pdfLogoFileName: string | null
+  dispatchPdfLogoUrl: string | null
+  dispatchPdfLogoFileName: string | null
   lastUpdatedAt: Date | null
   lastUpdatedByName: string | null
 }
@@ -62,6 +65,41 @@ export type StandardBrandingInfo = {
 export type StandardSettingsData = {
   email: StandardEmailSettings
   branding: StandardBrandingInfo
+}
+
+export type StandardSettingsSnapshot = {
+  email: {
+    gmail: {
+      connected: boolean
+      active: boolean
+    }
+    outlook: {
+      connected: boolean
+      active: boolean
+    }
+    templates: Array<{
+      id: string
+      name: string
+      scope: EmailTemplateScope
+      updatedAt: string
+      isDefault: boolean
+    }>
+    templateLimit: number
+    signatures: Array<{
+      id: string
+      name: string
+      isActive: boolean
+    }>
+    activeSignatureName: string | null
+    recipientExclusionCount: number
+  }
+  branding: {
+    uiLogoUrl: string | null
+    pdfLogoUrl: string | null
+    dispatchPdfLogoUrl: string | null
+    lastUpdatedAt: string | null
+    lastUpdatedByName: string | null
+  }
 }
 
 type BrandingAssetValue = {
@@ -99,7 +137,7 @@ export async function loadStandardSettings(companyId: string): Promise<StandardS
     prisma.systemSetting.findMany({
       where: {
         companyId,
-        key: { in: [BRANDING_UI_LOGO_KEY, BRANDING_PDF_LOGO_KEY] },
+        key: { in: [BRANDING_UI_LOGO_KEY, BRANDING_PDF_LOGO_KEY, BRANDING_DISPATCH_PDF_LOGO_KEY] },
       },
       include: {
         updatedBy: { select: { name: true } },
@@ -119,13 +157,40 @@ export async function loadStandardSettings(companyId: string): Promise<StandardS
   }, {})
 
   const pdfLogoSetting = brandingMap[BRANDING_PDF_LOGO_KEY]?.value as BrandingAssetValue | string | null
+  const uiLogoSetting = brandingMap[BRANDING_UI_LOGO_KEY]?.value as BrandingAssetValue | string | null
   let pdfLogoUrl: string | null = null
   let pdfLogoFileName: string | null = null
+  let uiLogoUrl: string | null = null
+  let dispatchPdfLogoUrl: string | null = null
+  let dispatchPdfLogoFileName: string | null = null
+
+  if (uiLogoSetting && typeof uiLogoSetting === 'object' && 'key' in uiLogoSetting && uiLogoSetting.key) {
+    uiLogoUrl = await getDownloadUrl(uiLogoSetting.key, 600)
+  }
 
   if (pdfLogoSetting && typeof pdfLogoSetting === 'object' && 'key' in pdfLogoSetting && pdfLogoSetting.key) {
     pdfLogoUrl = await getDownloadUrl(pdfLogoSetting.key, 600)
     pdfLogoFileName = pdfLogoSetting.fileName ?? null
   }
+
+  const dispatchLogoSetting = brandingMap[BRANDING_DISPATCH_PDF_LOGO_KEY]?.value as BrandingAssetValue | string | null
+  if (dispatchLogoSetting && typeof dispatchLogoSetting === 'object' && 'key' in dispatchLogoSetting && dispatchLogoSetting.key) {
+    dispatchPdfLogoUrl = await getDownloadUrl(dispatchLogoSetting.key, 600)
+    dispatchPdfLogoFileName = dispatchLogoSetting.fileName ?? null
+  }
+
+  const brandingTimestamps = [
+    brandingMap[BRANDING_UI_LOGO_KEY]?.updatedAt ?? null,
+    brandingMap[BRANDING_PDF_LOGO_KEY]?.updatedAt ?? null,
+    brandingMap[BRANDING_DISPATCH_PDF_LOGO_KEY]?.updatedAt ?? null,
+  ].filter((value): value is Date => Boolean(value))
+
+  const lastUpdatedAt = brandingTimestamps.sort((a, b) => b.getTime() - a.getTime())[0] ?? null
+  const lastUpdatedByName = lastUpdatedAt
+    ? ([BRANDING_UI_LOGO_KEY, BRANDING_PDF_LOGO_KEY, BRANDING_DISPATCH_PDF_LOGO_KEY]
+        .map((key) => brandingMap[key])
+        .find((entry) => entry?.updatedAt?.getTime() === lastUpdatedAt.getTime())?.updatedByName ?? null)
+    : null
 
   const activeSignature = signaturesRaw.find((signature) => signature.isActive) ?? null
 
@@ -168,12 +233,60 @@ export async function loadStandardSettings(companyId: string): Promise<StandardS
       activeSignatureId: activeSignature?.id ?? null,
     },
     branding: {
-      uiLogoUrl: (brandingMap[BRANDING_UI_LOGO_KEY]?.value as string | null) ?? null,
+      uiLogoUrl,
       pdfLogoUrl,
       pdfLogoFileName,
-      lastUpdatedAt: brandingMap[BRANDING_UI_LOGO_KEY]?.updatedAt ?? brandingMap[BRANDING_PDF_LOGO_KEY]?.updatedAt ?? null,
-      lastUpdatedByName:
-        brandingMap[BRANDING_UI_LOGO_KEY]?.updatedByName ?? brandingMap[BRANDING_PDF_LOGO_KEY]?.updatedByName ?? null,
+      dispatchPdfLogoUrl,
+      dispatchPdfLogoFileName,
+      lastUpdatedAt,
+      lastUpdatedByName,
+    },
+  }
+}
+
+export function mapStandardSettingsToSnapshot(
+  data: StandardSettingsData,
+  templateLimit = 5,
+): StandardSettingsSnapshot {
+  const gmailIntegration = data.email.integrations.find((integration) => integration.provider === 'gmail')
+  const outlookIntegration = data.email.integrations.find((integration) => integration.provider === 'outlook')
+  const templateSlice = data.email.templates.slice(0, templateLimit)
+  const signatures = data.email.signatures.map((signature) => ({
+    id: signature.id,
+    name: signature.name,
+    isActive: signature.isActive,
+  }))
+  const activeSignatureName = data.email.signatures.find((signature) => signature.isActive)?.name ?? null
+  const recipientExclusionCount = data.email.recipientPreferences.filter((preference) => !preference.sendEnabled).length
+
+  return {
+    email: {
+      gmail: {
+        connected: gmailIntegration?.status === 'connected',
+        active: Boolean(gmailIntegration?.isActive),
+      },
+      outlook: {
+        connected: outlookIntegration?.status === 'connected',
+        active: Boolean(outlookIntegration?.isActive),
+      },
+      templates: templateSlice.map((template) => ({
+        id: template.id,
+        name: template.name,
+        scope: template.scope,
+        updatedAt: template.updatedAt.toISOString(),
+        isDefault: template.isDefault,
+      })),
+      templateLimit,
+      signatures,
+      activeSignatureName,
+      recipientExclusionCount,
+    },
+    branding: {
+      uiLogoUrl: data.branding.uiLogoUrl,
+      pdfLogoUrl: data.branding.pdfLogoUrl,
+      dispatchPdfLogoUrl: data.branding.dispatchPdfLogoUrl,
+      lastUpdatedAt: data.branding.lastUpdatedAt?.toISOString() ?? null,
+      lastUpdatedByName: data.branding.lastUpdatedByName,
     },
   }
 }

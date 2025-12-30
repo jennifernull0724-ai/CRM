@@ -2,7 +2,8 @@ import Link from 'next/link'
 
 const SETTINGS_GROUPS = [
   { title: 'Profile', href: '/settings/profile', description: 'Personal info, email integration, signature block.' },
-  { title: 'Estimating', href: '/settings/estimating', description: 'Templates, presets, logo uploads, defaults.' },
+  { title: 'Branding', href: '/settings/branding', description: 'Owner/Admin logo management for the shell and PDFs.' },
+  { title: 'Estimating', href: '/estimating/settings', description: 'Templates, presets, and branding for estimating.' },
   { title: 'Billing', href: '/settings/billing', description: 'Plan, seats, upgrade, Stripe customer portal.' },
 ]
 

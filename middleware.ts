@@ -7,9 +7,9 @@ import {
   type PlanKey,
   type PlanRestrictionKey,
 } from '@/lib/billing/planTiers'
+import { resolveRoleDestination, isUserRole, isOwnerOrAdmin } from '@/lib/auth/roleDestinations'
 
-const PUBLIC_PATHS = ['/', '/login', '/signup', '/pricing', '/request-demo', '/security', '/verify']
-const AUTH_PATHS = ['/login', '/signup']
+const PUBLIC_PATHS = ['/', '/login', '/signup', '/pricing', '/request-demo', '/security', '/privacy', '/verify']
 const PLAN_BYPASS_PATHS = ['/upgrade', '/upgrade/success', '/upgrade/cancel']
 const API_BYPASS_PATTERNS = [/^\/api\/auth\//, /^\/api\/stripe\//]
 const STRIPE_RETURN_PATHS = ['/checkout/success', '/checkout/cancel']
@@ -29,10 +29,6 @@ const WRITE_METHODS = ['POST', 'PUT', 'PATCH', 'DELETE']
 
 function isPublicPath(pathname: string): boolean {
   return PUBLIC_PATHS.some((path) => pathname === path || pathname.startsWith(`${path}/`))
-}
-
-function isAuthPath(pathname: string): boolean {
-  return AUTH_PATHS.some((path) => pathname === path || pathname.startsWith(`${path}/`))
 }
 
 function shouldBypassPlan(pathname: string): boolean {
@@ -69,11 +65,9 @@ export async function middleware(request: NextRequest) {
   const isWrite = WRITE_METHODS.includes(method)
 
   if (isPublicPath(pathname)) {
-    if (isAuthPath(pathname)) {
-      const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET })
-      if (token) {
-        return NextResponse.redirect(new URL('/dashboard/user', request.url))
-      }
+    const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET })
+    if (token) {
+      return NextResponse.redirect(new URL('/app', request.url))
     }
     return NextResponse.next()
   }
@@ -87,6 +81,32 @@ export async function middleware(request: NextRequest) {
     const loginUrl = new URL('/login', request.url)
     loginUrl.searchParams.set('from', pathname)
     return NextResponse.redirect(loginUrl)
+  }
+
+  const userRole = (token.role as string | undefined) ?? undefined
+
+  if (pathname === '/dashboard') {
+    return NextResponse.redirect(new URL('/app', request.url))
+  }
+
+  if (pathname.startsWith('/dashboard/user')) {
+    return NextResponse.redirect(new URL('/crm', request.url))
+  }
+
+  if (pathname.startsWith('/dashboard/estimator')) {
+    return NextResponse.redirect(new URL('/estimating', request.url))
+  }
+
+  if (pathname.startsWith('/crm')) {
+    if (!isUserRole(userRole)) {
+      return NextResponse.redirect(new URL(resolveRoleDestination(userRole), request.url))
+    }
+  }
+
+  if (pathname.startsWith('/dashboard')) {
+    if (!isOwnerOrAdmin(userRole)) {
+      return NextResponse.redirect(new URL(resolveRoleDestination(userRole), request.url))
+    }
   }
 
   if (matchesApiBypass(pathname) || shouldBypassPlan(pathname)) {

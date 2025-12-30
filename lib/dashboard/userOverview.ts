@@ -1,5 +1,5 @@
+import { Prisma, type DispatchRequestStatus, type EstimateStatus, type WorkOrderStatus } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
-import type { DispatchRequestStatus, EstimateStatus, WorkOrderStatus } from '@prisma/client'
 
 export type UserDashboardContact = {
   id: string
@@ -52,12 +52,32 @@ export type UserDashboardMetrics = {
   openWorkOrders: number
 }
 
+export type UserPersonalAnalytics = {
+  dealsCreated: number
+  estimatesApproved: number
+  estimatesSentToDispatch: number
+  conversionRate: number
+  avgApprovalHours: number
+  workOrdersFromMyDispatches: number
+}
+
 export type UserDashboardData = {
   metrics: UserDashboardMetrics
   contacts: UserDashboardContact[]
   estimates: UserDashboardEstimate[]
   dispatchRecords: UserDashboardDispatchRecord[]
   contactOptions: { id: string; name: string; email: string }[]
+}
+
+export type UserActivityTimelineEntry = {
+  id: string
+  type: string
+  subject: string
+  createdAt: string
+  contactId: string | null
+  contactName: string | null
+  dealId: string | null
+  dealName: string | null
 }
 
 function buildFullName(firstName: string, lastName: string | null): string {
@@ -112,7 +132,7 @@ export async function loadUserDashboardData(userId: string, companyId: string): 
       },
     }),
     prisma.dispatchRequest.findMany({
-      where: { companyId, estimate: { deal: { createdById: userId } } },
+      where: { companyId, estimate: { sentToDispatchById: userId } },
       orderBy: { queuedAt: 'desc' },
       take: 10,
       include: {
@@ -191,6 +211,88 @@ export async function loadUserDashboardData(userId: string, companyId: string): 
   }
 }
 
+export async function loadUserPersonalAnalytics(userId: string, companyId: string): Promise<UserPersonalAnalytics> {
+  const [dealsCreated, estimatesApproved, estimatesSentToDispatch, workOrdersFromMyDispatches, approvalRows] =
+    await Promise.all([
+      prisma.deal.count({ where: { createdById: userId, companyId } }),
+      prisma.estimate.count({ where: { createdById: userId, companyId, status: 'APPROVED' } }),
+      prisma.estimate.count({ where: { companyId, sentToDispatchById: userId, status: 'SENT_TO_DISPATCH' } }),
+      prisma.workOrder.count({
+        where: {
+          companyId,
+          dispatchRequest: {
+            estimate: { sentToDispatchById: userId },
+          },
+        },
+      }),
+      prisma.$queryRaw<{ hours: number | null }[]>(
+        Prisma.sql`
+          SELECT AVG(EXTRACT(EPOCH FROM (e."approvedAt" - e."submittedAt")) / 3600) AS hours
+          FROM "Estimate" e
+          WHERE e."companyId" = ${companyId}
+            AND e."createdById" = ${userId}
+            AND e."approvedAt" IS NOT NULL
+            AND e."submittedAt" IS NOT NULL
+        `,
+      ),
+    ])
+
+  const conversionRate = estimatesApproved === 0 ? 0 : Math.round((estimatesSentToDispatch / estimatesApproved) * 100)
+  const avgApprovalHours = approvalRows[0]?.hours ? Number(approvalRows[0].hours) : 0
+
+  return {
+    dealsCreated,
+    estimatesApproved,
+    estimatesSentToDispatch,
+    conversionRate,
+    avgApprovalHours,
+    workOrdersFromMyDispatches,
+  }
+}
+
+const TIMELINE_WINDOW_LIMIT = 25
+
+export async function loadUserActivityTimeline(
+  userId: string,
+  companyId: string,
+): Promise<UserActivityTimelineEntry[]> {
+  const startOfToday = new Date()
+  startOfToday.setHours(0, 0, 0, 0)
+
+  const activities = await prisma.activity.findMany({
+    where: {
+      companyId,
+      userId,
+      createdAt: { gte: startOfToday },
+    },
+    orderBy: { createdAt: 'desc' },
+    take: TIMELINE_WINDOW_LIMIT,
+    select: {
+      id: true,
+      type: true,
+      subject: true,
+      createdAt: true,
+      contact: {
+        select: { id: true, firstName: true, lastName: true },
+      },
+      deal: {
+        select: { id: true, name: true },
+      },
+    },
+  })
+
+  return activities.map((activity) => ({
+    id: activity.id,
+    type: activity.type,
+    subject: activity.subject,
+    createdAt: activity.createdAt.toISOString(),
+    contactId: activity.contact?.id ?? null,
+    contactName: activity.contact ? buildFullName(activity.contact.firstName, activity.contact.lastName) : null,
+    dealId: activity.deal?.id ?? null,
+    dealName: activity.deal?.name ?? null,
+  }))
+}
+
 async function collectMetrics(userId: string, companyId: string): Promise<UserDashboardMetrics> {
   const [activeQuotes, awaitingApproval, sentToDispatch, openWorkOrders] = await Promise.all([
     prisma.estimate.count({
@@ -210,7 +312,7 @@ async function collectMetrics(userId: string, companyId: string): Promise<UserDa
     prisma.estimate.count({
       where: {
         companyId,
-        deal: { createdById: userId },
+        sentToDispatchById: userId,
         status: 'SENT_TO_DISPATCH',
       },
     }),
@@ -219,7 +321,7 @@ async function collectMetrics(userId: string, companyId: string): Promise<UserDa
         companyId,
         status: { in: ['DRAFT', 'SCHEDULED', 'IN_PROGRESS'] },
         dispatchRequest: {
-          estimate: { deal: { createdById: userId } },
+          estimate: { sentToDispatchById: userId },
         },
       },
     }),

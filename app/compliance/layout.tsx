@@ -1,20 +1,10 @@
 import { ReactNode } from 'react'
 import { getServerSession } from 'next-auth'
 import { redirect } from 'next/navigation'
-import AppShell from '@/components/app-shell'
+import { DashboardShell } from '@/components/shells/dashboard-shell'
 import { authOptions } from '@/lib/auth'
 import { planAllowsFeature, type PlanKey } from '@/lib/billing/planTiers'
-
-type ShellRole = 'user' | 'estimator' | 'admin' | 'owner'
-
-const allowedShellRoles: ShellRole[] = ['user', 'estimator', 'admin', 'owner']
-
-function resolveShellRole(role?: string | null): ShellRole {
-  if (role && allowedShellRoles.includes(role as ShellRole)) {
-    return role as ShellRole
-  }
-  return 'user'
-}
+import { loadStandardSettings } from '@/lib/dashboard/standardSettings'
 
 export default async function ComplianceLayout({ children }: { children: ReactNode }) {
   const session = await getServerSession(authOptions)
@@ -23,8 +13,14 @@ export default async function ComplianceLayout({ children }: { children: ReactNo
     redirect('/login')
   }
 
-  if (!['admin', 'owner'].includes(session.user.role as string)) {
-    redirect('/dashboard/user')
+  if (!session.user.companyId) {
+    redirect('/signup')
+  }
+
+  const normalizedRole = (session.user.role as string).toLowerCase()
+
+  if (!['admin', 'owner'].includes(normalizedRole)) {
+    redirect('/app')
   }
 
   const planKey = (session.user.planKey as PlanKey) ?? 'starter'
@@ -35,13 +31,15 @@ export default async function ComplianceLayout({ children }: { children: ReactNo
     redirect('/upgrade?feature=compliance')
   }
 
-  const resolvedRole = resolveShellRole(session.user.role as string | undefined)
+  const standardSettings = await loadStandardSettings(session.user.companyId)
 
   return (
-    <AppShell userRole={resolvedRole} userName={session.user.name ?? undefined}>
-      <div className="min-h-screen bg-slate-50 p-6">
-        {children}
-      </div>
-    </AppShell>
+    <DashboardShell
+      role={normalizedRole as 'owner' | 'admin'}
+      userName={session.user.name ?? undefined}
+      companyLogoUrl={standardSettings.branding.uiLogoUrl}
+    >
+      <div className="min-h-screen bg-slate-50 p-6">{children}</div>
+    </DashboardShell>
   )
 }

@@ -62,7 +62,7 @@ export function BulkImportPanel() {
         <div>
           <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Bulk import</p>
           <h3 className="text-xl font-semibold">HubSpot-grade contact ingestion</h3>
-          <p className="text-sm text-slate-400">Headers required: Company, First Name, Last Name, Email, Phone, Job Title.</p>
+          <p className="text-sm text-slate-400">Headers required: Company, First Name, Last Name, Email, Phone. Job Title is optional.</p>
         </div>
         <form onSubmit={handleUpload} className="flex flex-col gap-3 md:flex-row md:items-center">
           <label className="flex cursor-pointer flex-col text-xs text-slate-400">

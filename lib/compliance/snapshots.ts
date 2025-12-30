@@ -1,6 +1,24 @@
 import { prisma } from '@/lib/prisma'
 import { logComplianceActivity } from './activity'
 import { hashPayload } from '@/lib/utils/hash'
+import { CertificationStatus, ComplianceStatus } from '@prisma/client'
+
+const COMPLIANCE_SNAPSHOT_MAX_AGE_DAYS = 30
+const SNAPSHOT_STALE_THRESHOLD_MS = COMPLIANCE_SNAPSHOT_MAX_AGE_DAYS * 24 * 60 * 60 * 1000
+
+export type FailureReasonType =
+  | 'MISSING_CERTIFICATION'
+  | 'EXPIRED_CERTIFICATION'
+  | 'MISSING_PROOF'
+  | 'EMPLOYEE_INACTIVE'
+  | 'MISSING_COMPANY_DOCUMENT'
+  | 'SNAPSHOT_STALE'
+
+export type FailureReason = {
+  type: FailureReasonType
+  entityId?: string | null
+  label: string
+}
 
 export async function createComplianceSnapshot({
   employeeId,
@@ -33,6 +51,92 @@ export async function createComplianceSnapshot({
     throw new Error('Employee missing QR token')
   }
 
+  const [companyDocs, latestSnapshot] = await Promise.all([
+    prisma.companyComplianceDocument.findMany({
+      where: { companyId: employee.companyId },
+      select: { category: true },
+    }),
+    prisma.complianceSnapshot.findFirst({
+      where: { employeeId },
+      orderBy: { createdAt: 'desc' },
+      select: { createdAt: true },
+    }),
+  ])
+
+  const failureReasons: FailureReason[] = []
+
+  const now = Date.now()
+  const deriveStatus = (cert: typeof employee.certifications[number]): CertificationStatus => {
+    if (cert.expiresAt.getTime() < now) {
+      return CertificationStatus.EXPIRED
+    }
+    if (!cert.images.length) {
+      return CertificationStatus.INCOMPLETE
+    }
+    return CertificationStatus.PASS
+  }
+
+  const certificationsWithStatus = employee.certifications.map((cert) => ({
+    ...cert,
+    status: deriveStatus(cert),
+  }))
+
+  certificationsWithStatus.forEach((cert) => {
+    if (cert.required && cert.status !== CertificationStatus.PASS) {
+      failureReasons.push({
+        type: cert.status === CertificationStatus.EXPIRED ? 'EXPIRED_CERTIFICATION' : 'MISSING_CERTIFICATION',
+        entityId: cert.id,
+        label: `${cert.customName ?? cert.presetKey ?? 'Certification'} (${cert.status})`,
+      })
+    }
+
+    if (!cert.images.length) {
+      failureReasons.push({
+        type: 'MISSING_PROOF',
+        entityId: cert.id,
+        label: `${cert.customName ?? cert.presetKey ?? 'Certification'} has no proof`,
+      })
+    }
+  })
+
+  if (!employee.active) {
+    failureReasons.push({ type: 'EMPLOYEE_INACTIVE', label: 'Employee marked inactive', entityId: employee.id })
+  }
+
+  const requiredCategories = ['INSURANCE', 'POLICIES', 'PROGRAMS', 'RAILROAD'] as const
+  const missingCompanyCategories = requiredCategories.filter(
+    (category) => !companyDocs.some((doc) => doc.category === category)
+  )
+
+  if (missingCompanyCategories.length) {
+    missingCompanyCategories.forEach((category) => {
+      failureReasons.push({ type: 'MISSING_COMPANY_DOCUMENT', label: `Missing company document: ${category}` })
+    })
+  }
+
+  const latestSnapshotIsStale = latestSnapshot
+    ? now - latestSnapshot.createdAt.getTime() > SNAPSHOT_STALE_THRESHOLD_MS
+    : false
+
+  if (latestSnapshotIsStale) {
+    failureReasons.push({
+      type: 'SNAPSHOT_STALE',
+      label: `Latest compliance snapshot older than ${COMPLIANCE_SNAPSHOT_MAX_AGE_DAYS} days`,
+    })
+  }
+
+  const hasFailures = failureReasons.length > 0
+  const hasNonStaleFailures = failureReasons.some((reason) => reason.type !== 'SNAPSHOT_STALE')
+
+  let derivedComplianceStatus: ComplianceStatus
+  if (!hasFailures) {
+    derivedComplianceStatus = ComplianceStatus.PASS
+  } else if (!hasNonStaleFailures) {
+    derivedComplianceStatus = ComplianceStatus.INCOMPLETE
+  } else {
+    derivedComplianceStatus = ComplianceStatus.FAIL
+  }
+
   const payload = {
     generatedAt: new Date().toISOString(),
     employee: {
@@ -43,7 +147,7 @@ export async function createComplianceSnapshot({
       title: employee.title,
       role: employee.role,
       companyName: employee.company.name,
-      complianceStatus: employee.complianceStatus,
+      complianceStatus: derivedComplianceStatus,
     },
     certifications: employee.certifications.map((cert) => ({
       id: cert.id,
@@ -53,7 +157,7 @@ export async function createComplianceSnapshot({
       required: cert.required,
       issueDate: cert.issueDate.toISOString(),
       expiresAt: cert.expiresAt.toISOString(),
-      status: cert.status,
+      status: certificationsWithStatus.find((c) => c.id === cert.id)?.status ?? cert.status,
       images: cert.images.map((image) => ({
         id: image.id,
         version: image.version,
@@ -63,6 +167,7 @@ export async function createComplianceSnapshot({
         filename: image.filename,
       })),
     })),
+    failureReasons,
   }
 
   const snapshotHash = hashPayload(payload)
@@ -73,6 +178,7 @@ export async function createComplianceSnapshot({
       createdById,
       snapshotHash,
       payload,
+      failureReasons,
     },
   })
 
@@ -96,6 +202,8 @@ export async function createComplianceSnapshot({
     data: {
       complianceHash: snapshotHash,
       lastVerifiedAt: new Date(),
+      updatedById: createdById,
+      complianceStatus: derivedComplianceStatus,
     },
   })
 
@@ -104,7 +212,7 @@ export async function createComplianceSnapshot({
     actorId: createdById,
     employeeId,
     type: 'SNAPSHOT_CREATED',
-    metadata: { snapshotId: snapshot.id, hash: snapshotHash, source },
+    metadata: { snapshotId: snapshot.id, hash: snapshotHash, source, failureReasons },
   })
 
   return { snapshot, token }

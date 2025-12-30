@@ -1,51 +1,16 @@
 import Link from 'next/link'
 import { formatDistanceToNow } from 'date-fns'
-import { fetchContactAnalytics } from '@/lib/analytics/apiClient'
-import type {
-  MySummaryMetrics,
-  MyTaskSnapshot,
-  MyMentionEntry,
-  MyStaleContact,
-} from '@/lib/analytics/contactAnalytics'
+import type { MyContactRadarSnapshot } from '@/lib/dashboard/contactSnapshots'
+import type { MyMentionEntry, MyStaleContact } from '@/lib/analytics/contactAnalytics'
 
 const mentionTimestamp = new Intl.DateTimeFormat('en-US', {
   dateStyle: 'medium',
   timeStyle: 'short',
 })
 
-type MentionResponse = Omit<MyMentionEntry, 'createdAt'> & { createdAt: string }
-type StaleContactResponse = Omit<MyStaleContact, 'lastActivityAt'> & { lastActivityAt: string | null }
-
 type Props = {
   variant: 'user' | 'estimator'
-}
-
-type DashboardData = {
-  summary: MySummaryMetrics
-  tasks: MyTaskSnapshot
-  mentions: MyMentionEntry[]
-  stale: MyStaleContact[]
-}
-
-async function loadDashboardData(): Promise<DashboardData> {
-  const [summary, tasks, mentionResponse, staleResponse] = await Promise.all([
-    fetchContactAnalytics<MySummaryMetrics>('/api/analytics/contacts/my-summary'),
-    fetchContactAnalytics<MyTaskSnapshot>('/api/analytics/contacts/my-tasks'),
-    fetchContactAnalytics<MentionResponse[]>('/api/analytics/contacts/my-mentions'),
-    fetchContactAnalytics<StaleContactResponse[]>('/api/analytics/contacts/my-stale?days=14'),
-  ])
-
-  const mentions: MyMentionEntry[] = mentionResponse.map((mention) => ({
-    ...mention,
-    createdAt: new Date(mention.createdAt),
-  }))
-
-  const stale: MyStaleContact[] = staleResponse.map((contact) => ({
-    ...contact,
-    lastActivityAt: contact.lastActivityAt ? new Date(contact.lastActivityAt) : null,
-  }))
-
-  return { summary, tasks, mentions, stale }
+  analytics: MyContactRadarSnapshot
 }
 
 function formatRelative(input: Date | null): string {
@@ -53,38 +18,23 @@ function formatRelative(input: Date | null): string {
   return formatDistanceToNow(input, { addSuffix: true })
 }
 
-export async function MyContactDashboard({ variant }: Props) {
-  let data: DashboardData | null = null
-  let error: string | null = null
-
-  try {
-    data = await loadDashboardData()
-  } catch (err) {
-    error = err instanceof Error ? err.message : 'Unable to load analytics'
-  }
-
+export function MyContactDashboard({ variant, analytics }: Props) {
   const title = variant === 'estimator' ? 'Estimator Contact Radar' : 'My Contact Radar'
   const subtitle =
     variant === 'estimator'
       ? 'Every metric is scoped to the contacts you own. No pipeline guessing, no placeholders.'
       : 'Live task pressure, untouched contacts, and @mentions from the contacts you own.'
 
-  if (error) {
-    return (
-      <div className="mx-auto max-w-5xl px-4 py-10">
-        <div className="rounded-2xl border border-rose-200 bg-rose-50 p-6 text-rose-900">
-          <h1 className="text-xl font-semibold">Dashboard unavailable</h1>
-          <p className="mt-2 text-sm">{error}</p>
-        </div>
-      </div>
-    )
-  }
-
-  if (!data) {
-    return null
-  }
-
-  const { summary, tasks, mentions, stale } = data
+  const summary = analytics.summary
+  const tasks = analytics.tasks
+  const mentions: MyMentionEntry[] = analytics.mentions.map((mention) => ({
+    ...mention,
+    createdAt: new Date(mention.createdAt),
+  }))
+  const stale: MyStaleContact[] = analytics.stale.map((contact) => ({
+    ...contact,
+    lastActivityAt: contact.lastActivityAt ? new Date(contact.lastActivityAt) : null,
+  }))
   const attentionIsClear =
     summary.myContactsWithNoActivity === 0 &&
     summary.myContactsWithOpenTasks === 0 &&

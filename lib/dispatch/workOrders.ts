@@ -17,6 +17,8 @@ const DISPATCH_WORK_ORDER_INCLUDE = {
       lastName: true,
       email: true,
       jobTitle: true,
+      companyOverrideName: true,
+      derivedCompanyName: true,
     },
   },
   dispatchRequest: {
@@ -73,6 +75,30 @@ const DISPATCH_WORK_ORDER_INCLUDE = {
       addedBy: { select: { name: true } },
     },
   },
+  documents: {
+    orderBy: { createdAt: 'desc' },
+    take: 10,
+    select: {
+      id: true,
+      fileName: true,
+      fileType: true,
+      mimeType: true,
+      fileSize: true,
+      storageKey: true,
+      createdAt: true,
+    },
+  },
+  pdfs: {
+    orderBy: { version: 'desc' },
+    take: 5,
+    select: {
+      id: true,
+      version: true,
+      fileSize: true,
+      storageKey: true,
+      createdAt: true,
+    },
+  },
 } as const
 
 type DispatchWorkOrderRecord = Prisma.WorkOrderGetPayload<{ include: typeof DISPATCH_WORK_ORDER_INCLUDE }>
@@ -109,6 +135,7 @@ export type DispatchAssetAssignment = {
 }
 
 export type DispatchWorkOrder = {
+  companyId: string
   id: string
   title: string
   status: WorkOrderStatus
@@ -118,16 +145,42 @@ export type DispatchWorkOrder = {
   createdAt: Date
   dispatchStatus: string | null
   dispatchPriority: string | null
+  operationsNotes: string | null
+  gateAccessCode: string | null
+  onsitePocName: string | null
+  onsitePocPhone: string | null
+  specialInstructions: string | null
   contact: {
     id: string
     name: string
     email: string
     jobTitle: string | null
+    company: string | null
   }
   assignments: DispatchAssignment[]
   assets: DispatchAssetAssignment[]
   activities: DispatchWorkOrderActivity[]
   presets: DispatchWorkOrderPreset[]
+  documents: DispatchWorkOrderDocument[]
+  pdfs: DispatchWorkOrderPdf[]
+}
+
+export type DispatchWorkOrderDocument = {
+  id: string
+  fileName: string
+  fileType: string
+  mimeType: string
+  storageKey: string
+  fileSize: number
+  createdAt: Date
+}
+
+export type DispatchWorkOrderPdf = {
+  id: string
+  version: number
+  storageKey: string
+  fileSize: number
+  createdAt: Date
 }
 
 export type DispatchWorkOrderPreset = {
@@ -191,6 +244,7 @@ async function loadDispatchBoardForIds(companyId: string, ids: string[]): Promis
 
 function mapWorkOrder(record: DispatchWorkOrderRecord): DispatchWorkOrder {
   return {
+    companyId: record.companyId,
     id: record.id,
     title: record.title,
     status: record.status,
@@ -200,11 +254,17 @@ function mapWorkOrder(record: DispatchWorkOrderRecord): DispatchWorkOrder {
     createdAt: record.createdAt,
     dispatchStatus: record.dispatchRequest?.status ?? null,
     dispatchPriority: record.dispatchRequest?.priority ?? null,
+    operationsNotes: record.operationsNotes ?? null,
+    gateAccessCode: record.gateAccessCode ?? null,
+    onsitePocName: record.onsitePocName ?? null,
+    onsitePocPhone: record.onsitePocPhone ?? null,
+    specialInstructions: record.specialInstructions ?? null,
     contact: {
       id: record.contactId,
       name: `${record.contact.firstName} ${record.contact.lastName}`.trim(),
       email: record.contact.email,
       jobTitle: record.contact.jobTitle ?? null,
+      company: record.contact.companyOverrideName ?? record.contact.derivedCompanyName ?? null,
     },
     assignments: record.assignments.map((assignment) => ({
       id: assignment.id,
@@ -257,6 +317,22 @@ function mapWorkOrder(record: DispatchWorkOrderRecord): DispatchWorkOrder {
       enabled: entry.preset.enabled,
       addedAt: entry.addedAt,
       addedByName: entry.addedBy?.name ?? null,
+    })),
+    documents: (record.documents ?? []).map((doc) => ({
+      id: doc.id,
+      fileName: doc.fileName,
+      fileType: doc.fileType,
+      mimeType: doc.mimeType,
+      storageKey: doc.storageKey,
+      fileSize: doc.fileSize,
+      createdAt: doc.createdAt,
+    })),
+    pdfs: (record.pdfs ?? []).map((pdf) => ({
+      id: pdf.id,
+      version: pdf.version,
+      storageKey: pdf.storageKey,
+      fileSize: pdf.fileSize,
+      createdAt: pdf.createdAt,
     })),
   }
 }

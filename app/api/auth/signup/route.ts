@@ -67,16 +67,6 @@ export async function POST(req: NextRequest) {
       },
     })
 
-    // Log activity
-    await prisma.activity.create({
-      data: {
-        type: 'USER_CREATED',
-        subject: `User account created: ${name}`,
-        description: `New user registered with email ${email}`,
-        userId: user.id,
-      }
-    })
-
     return NextResponse.json({
       user: {
         id: user.id,

@@ -117,10 +117,20 @@ export async function refreshEmployeeComplianceState(
   const complianceStatus = deriveEmployeeStatus(employee.certifications)
 
   if (employee.complianceStatus !== complianceStatus) {
+    activities.push({
+      employeeId,
+      companyId: context.companyId,
+      actorId: context.actorId,
+      type: 'EMPLOYEE_UPDATED',
+      metadata: {
+        previousStatus: employee.complianceStatus,
+        nextStatus: complianceStatus,
+      },
+    })
     updates.push(
       prisma.complianceEmployee.update({
         where: { id: employeeId },
-        data: { complianceStatus },
+        data: { complianceStatus, updatedById: context.actorId },
       })
     )
     employee.complianceStatus = complianceStatus

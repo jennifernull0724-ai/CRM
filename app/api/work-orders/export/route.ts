@@ -28,7 +28,17 @@ export async function GET(request: Request) {
     where: { workOrder: { companyId: session.user.companyId } },
     orderBy: { assignedAt: 'desc' },
     include: {
-      workOrder: { select: { id: true, title: true } },
+      workOrder: {
+        select: {
+          id: true,
+          title: true,
+          operationsNotes: true,
+          gateAccessCode: true,
+          onsitePocName: true,
+          onsitePocPhone: true,
+          specialInstructions: true,
+        },
+      },
       employee: { select: { firstName: true, lastName: true, role: true } },
     },
   })
@@ -36,6 +46,11 @@ export async function GET(request: Request) {
   const header = [
     'workOrderId',
     'workOrderTitle',
+    'operationsNotes',
+    'gateAccessCode',
+    'onsitePocName',
+    'onsitePocPhone',
+    'specialInstructions',
     'employeeName',
     'employeeRole',
     'complianceStatus',
@@ -57,6 +72,11 @@ export async function GET(request: Request) {
     return [
       assignment.workOrder.id,
       assignment.workOrder.title,
+      assignment.workOrder.operationsNotes ?? '',
+      assignment.workOrder.gateAccessCode ?? '',
+      assignment.workOrder.onsitePocName ?? '',
+      assignment.workOrder.onsitePocPhone ?? '',
+      assignment.workOrder.specialInstructions ?? '',
       `${assignment.employee.firstName} ${assignment.employee.lastName}`.trim(),
       assignment.employee.role,
       assignment.complianceStatus ?? 'UNSET',

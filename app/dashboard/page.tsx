@@ -1,24 +1,28 @@
-import { redirect } from 'next/navigation'
 import { getServerSession } from 'next-auth'
+import { redirect } from 'next/navigation'
 import { authOptions } from '@/lib/auth'
+import { resolveRoleDestination } from '@/lib/auth/roleDestinations'
 
-const ROLE_DESTINATION: Record<string, string> = {
-  user: '/dashboard/user',
-  estimator: '/dashboard/estimator',
-  dispatch: '/dashboard/dispatch',
-  admin: '/dashboard/admin',
-  owner: '/dashboard/owner',
-}
-
-export default async function DashboardRouterPage() {
+export default async function DashboardEntryPoint() {
   const session = await getServerSession(authOptions)
 
-  if (!session) {
-    redirect('/login?from=/dashboard')
+  if (!session?.user) {
+    redirect('/login')
   }
 
-  const role = session.user.role?.toLowerCase() ?? 'user'
-  const destination = ROLE_DESTINATION[role] ?? ROLE_DESTINATION.user
+  if (!session.user.companyId) {
+    redirect('/signup')
+  }
 
-  redirect(destination)
+  const role = (session.user.role as string | undefined)?.toLowerCase()
+
+  if (role === 'user') {
+    redirect('/dashboard/user')
+  }
+
+  if (role === 'estimator') {
+    redirect('/dashboard/estimator')
+  }
+
+  redirect(resolveRoleDestination(role))
 }

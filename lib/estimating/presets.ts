@@ -1,6 +1,5 @@
-import { Prisma } from '@prisma/client'
+import { Prisma, type AccessAuditAction, type EstimatePresetIndustry, type EstimatingPreset } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
-import type { EstimatePresetIndustry, EstimatingPreset } from '@prisma/client'
 
 export type PresetSeed = {
   baseKey: string
@@ -537,6 +536,15 @@ export async function ensureEstimatingPresets(companyId: string): Promise<void> 
 
   if (toCreate.length) {
     await prisma.estimatingPreset.createMany({ data: toCreate })
+
+    await prisma.accessAuditLog.createMany({
+      data: toCreate.map((seed) => ({
+        companyId,
+        actorId: null,
+        action: 'ESTIMATING_PRESET_CREATED' as AccessAuditAction,
+        metadata: { baseKey: seed.baseKey, label: seed.label },
+      })),
+    })
   }
 
   await Promise.all(

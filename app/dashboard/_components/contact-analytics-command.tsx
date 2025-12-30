@@ -1,29 +1,14 @@
 import Link from 'next/link'
 import { formatDistanceToNow } from 'date-fns'
-import { fetchContactAnalytics } from '@/lib/analytics/apiClient'
-import type {
-  ContactOverviewMetrics,
-  ActivityByUserRow,
-  ContactTaskPerformance,
-  UntouchedContact,
-  EmailActivityMetrics,
-  AttachmentUsageMetrics,
-} from '@/lib/analytics/contactAnalytics'
+import type { ContactCommandSnapshot } from '@/lib/dashboard/contactSnapshots'
+import type { UntouchedContact } from '@/lib/analytics/contactAnalytics'
 
 type Props = {
   variant: 'admin' | 'owner'
+  data: ContactCommandSnapshot
 }
 
-type UntouchedResponse = Omit<UntouchedContact, 'lastActivityAt'> & { lastActivityAt: string | null }
-
-type DashboardData = {
-  overview: ContactOverviewMetrics
-  activityByUser: ActivityByUserRow[]
-  taskPerformance: ContactTaskPerformance
-  untouched: UntouchedContact[]
-  emailActivity: EmailActivityMetrics
-  attachments: AttachmentUsageMetrics
-}
+type UntouchedWithDate = Omit<UntouchedContact, 'lastActivityAt'> & { lastActivityAt: Date | null }
 
 const numberFormatter = new Intl.NumberFormat('en-US')
 const percentFormatter = new Intl.NumberFormat('en-US', {
@@ -31,61 +16,26 @@ const percentFormatter = new Intl.NumberFormat('en-US', {
   maximumFractionDigits: 1,
 })
 
-async function loadDashboardData(): Promise<DashboardData> {
-  const [overview, activityByUser, taskPerformance, untouchedResponse, emailActivity, attachments] = await Promise.all([
-    fetchContactAnalytics<ContactOverviewMetrics>('/api/analytics/contacts/overview'),
-    fetchContactAnalytics<ActivityByUserRow[]>('/api/analytics/contacts/activity-by-user'),
-    fetchContactAnalytics<ContactTaskPerformance>('/api/analytics/contacts/task-performance'),
-    fetchContactAnalytics<UntouchedResponse[]>('/api/analytics/contacts/untouched?days=30'),
-    fetchContactAnalytics<EmailActivityMetrics>('/api/analytics/contacts/email-activity'),
-    fetchContactAnalytics<AttachmentUsageMetrics>('/api/analytics/contacts/attachment-usage'),
-  ])
-
-  const untouched: UntouchedContact[] = untouchedResponse.map((contact) => ({
-    ...contact,
-    lastActivityAt: contact.lastActivityAt ? new Date(contact.lastActivityAt) : null,
-  }))
-
-  return { overview, activityByUser, taskPerformance, untouched, emailActivity, attachments }
-}
-
 function formatRelative(date: Date | null): string {
   if (!date) return 'No recorded activity'
   return formatDistanceToNow(date, { addSuffix: true })
 }
 
-export async function ContactAnalyticsCommand({ variant }: Props) {
-  let data: DashboardData | null = null
-  let error: string | null = null
-
-  try {
-    data = await loadDashboardData()
-  } catch (err) {
-    error = err instanceof Error ? err.message : 'Unable to load analytics'
-  }
-
+export function ContactAnalyticsCommand({ variant, data }: Props) {
   const title = variant === 'owner' ? 'Owner Contact Health' : 'Admin Contact Health'
   const subtitle =
     variant === 'owner'
       ? 'Company-wide contact accountability sourced directly from the analytics APIs.'
       : 'Monitor contact load, activities, and communication from a single read-only board.'
-
-  if (error) {
-    return (
-      <div className="mx-auto max-w-6xl px-4 py-10">
-        <div className="rounded-2xl border border-rose-200 bg-rose-50 p-6 text-rose-900">
-          <h1 className="text-xl font-semibold">Dashboard unavailable</h1>
-          <p className="mt-2 text-sm">{error}</p>
-        </div>
-      </div>
-    )
-  }
-
-  if (!data) {
-    return null
-  }
-
-  const { overview, activityByUser, taskPerformance, untouched, emailActivity, attachments } = data
+  const untouched: UntouchedWithDate[] = data.untouched.map((entry) => ({
+    ...entry,
+    lastActivityAt: entry.lastActivityAt ? new Date(entry.lastActivityAt) : null,
+  }))
+  const overview = data.overview
+  const activityByUser = data.activityByUser
+  const taskPerformance = data.taskPerformance
+  const emailActivity = data.emailActivity
+  const attachments = data.attachments
 
   const overviewTiles = [
     { label: 'Total contacts', value: overview.totalContacts },

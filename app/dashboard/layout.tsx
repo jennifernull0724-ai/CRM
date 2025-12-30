@@ -1,16 +1,5 @@
-import Navigation from '@/components/navigation'
+import type { ReactNode } from 'react'
 
-export default function DashboardLayout({
-  children,
-}: {
-  children: React.ReactNode
-}) {
-  return (
-    <>
-      <Navigation />
-      <main className="min-h-screen bg-gray-50">
-        {children}
-      </main>
-    </>
-  )
+export default function DashboardRootLayout({ children }: { children: ReactNode }) {
+  return <>{children}</>
 }

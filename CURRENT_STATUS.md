@@ -38,7 +38,7 @@
 - `/deals` - Pipeline view
 
 ### ✅ Dashboard
-- `/dashboard/user` - Basic metrics and tasks
+- `/crm` - Basic metrics and tasks
 
 ### ✅ Utilities
 - S3 file upload/download with signed URLs

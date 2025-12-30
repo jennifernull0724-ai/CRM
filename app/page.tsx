@@ -1,414 +1,246 @@
+import type { Metadata } from 'next'
 import Link from 'next/link'
+import { MarketingFooter } from '@/components/public/marketing-footer'
+import { MarketingHeader } from '@/components/public/marketing-header'
+
+const trustSignals = [
+  'Built for regulated industries',
+  'Audit-defensible by design',
+  'Used by operators, not marketers',
+  'Contacts → Dispatch continuity',
+  'Zero speculative features',
+]
+
+const industrySections = [
+  {
+    title: 'Construction',
+    challenge: 'Fragmented workflows, lost documentation, poor visibility.',
+    response: 'T-REX ties CRM, estimating, and dispatch to the same record so every handoff is documented and auditable.',
+  },
+  {
+    title: 'Railroad',
+    challenge: 'Authority coordination, compliance pressure, and operational handoffs.',
+    response: 'Subdivision context, QR verification, and immutable logs keep inspectors, contractors, and owners aligned.',
+  },
+  {
+    title: 'Environmental',
+    challenge: 'Documentation overload, audit exposure, and reporting burden.',
+    response: 'Permit-driven workflows and preserved evidence make regulators see one version of the truth.',
+  },
+]
+
+const operationalCoverage = [
+  {
+    name: 'CRM',
+    lines: [
+      'Contacts, companies, and deals stay on one record.',
+      'Ownership, notes, and documents remain accountable.',
+    ],
+  },
+  {
+    name: 'Estimating',
+    lines: [
+      'Controlled presets and revisions document every change.',
+      'Approvals, signatures, and PDFs stay versioned.',
+    ],
+  },
+  {
+    name: 'Dispatch',
+    lines: [
+      'Work orders inherit context from CRM and estimating.',
+      'Crews, equipment, and execution logs stay traceable.',
+    ],
+  },
+  {
+    name: 'Compliance',
+    lines: [
+      'Certifications, QR verification, and snapshots are immutable.',
+      'Audit history mirrors the field reality in one place.',
+    ],
+  },
+]
+
+const flowSteps = ['Contact', 'Deal', 'Estimate', 'Approval', 'Dispatch', 'Compliance Proof']
+
+export const metadata: Metadata = {
+  title: 'T-REX AI OS | Operational CRM, Estimating, Dispatch & Compliance',
+  description:
+    'T-REX AI OS is an operational system for construction, railroad, and environmental teams. CRM, estimating, dispatch, and compliance with server-enforced workflows and audit-ready records.',
+  alternates: {
+    canonical: 'https://trexaios.com',
+  },
+  openGraph: {
+    title: 'T-REX AI OS — Operational Control System',
+    description: 'CRM, estimating, dispatch, and compliance built for regulated field operations.',
+    type: 'website',
+    url: 'https://trexaios.com',
+    images: [
+      {
+        url: '/android-icon-192x192.png',
+        width: 192,
+        height: 192,
+        alt: 'T-REX AI OS system favicon',
+      },
+    ],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'T-REX AI OS',
+    description: 'Operational control for construction, railroad, and environmental teams.',
+    images: ['/android-icon-192x192.png'],
+  },
+  robots: {
+    index: true,
+    follow: true,
+  },
+}
 
 export default function LandingPage() {
   return (
-    <div className="min-h-screen bg-gray-950">
-      {/* Top Navigation */}
-      <nav className="border-b border-gray-800 bg-gray-900/50 backdrop-blur sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center gap-12">
-              <Link href="/" className="text-2xl font-bold text-white">
-                T-REX AI OS
-              </Link>
-              <div className="hidden md:flex items-center gap-6">
-                <Link href="/pricing" className="text-gray-400 hover:text-white text-sm">
-                  Pricing
+    <div className="min-h-screen bg-[#f5f6f9]">
+      <MarketingHeader />
+      <main className="space-y-0">
+        <section className="relative isolate overflow-hidden bg-[#050d1a] text-white">
+          <div className="absolute inset-0 bg-[url('/useforhero.png')] bg-cover bg-center" aria-hidden />
+          <div className="absolute inset-0 bg-[#050d1a]/85" />
+          <div className="relative mx-auto flex max-w-6xl flex-col gap-10 px-4 py-24">
+            <div className="max-w-3xl space-y-6">
+              <p className="text-xs uppercase tracking-[0.5em] text-white/70">Operational System</p>
+              <h1 className="text-4xl font-semibold leading-tight md:text-5xl">
+                Operational control for construction, railroad, and environmental teams.
+              </h1>
+              <p className="text-lg text-white/80">
+                CRM, estimating, dispatch, and compliance—built for regulated work and real execution. Every workflow is enforced server-side; every action is logged.
+              </p>
+              <div className="flex flex-col gap-3 sm:flex-row">
+                <Link
+                  href="/signup"
+                  className="rounded-md bg-[#d5530d] px-6 py-3 text-center text-sm font-semibold text-white transition hover:bg-[#b6440b]"
+                >
+                  Start Free Trial
                 </Link>
-                <Link href="/security" className="text-gray-400 hover:text-white text-sm">
-                  Security
+                <Link
+                  href="/pricing"
+                  className="rounded-md border border-white/60 px-6 py-3 text-center text-sm font-semibold text-white transition hover:border-white"
+                >
+                  View Pricing
                 </Link>
-                <a href={`mailto:${process.env.NEXT_PUBLIC_SUPPORT_EMAIL || 'jennnull4@gmail.com'}`} className="text-gray-400 hover:text-white text-sm">
-                  Contact Support
-                </a>
               </div>
             </div>
-            <div className="flex items-center gap-4">
-              <Link href="/login" className="text-gray-400 hover:text-white text-sm font-medium">
-                Login
-              </Link>
-              <Link
-                href="/request-demo"
-                className="bg-orange-600 text-white px-5 py-2 rounded-lg hover:bg-orange-700 font-medium text-sm"
-              >
-                Request Demo
-              </Link>
+            <div className="grid gap-6 text-sm text-white/80 md:grid-cols-3">
+              <div>
+                <p className="text-xs uppercase tracking-[0.3em] text-white/60">Mandate</p>
+                <p className="mt-2 font-semibold">One operating record from contact through compliance.</p>
+              </div>
+              <div>
+                <p className="text-xs uppercase tracking-[0.3em] text-white/60">Enforcement</p>
+                <p className="mt-2 font-semibold">Role-based controls and immutable audit logs by default.</p>
+              </div>
+              <div>
+                <p className="text-xs uppercase tracking-[0.3em] text-white/60">Audience</p>
+                <p className="mt-2 font-semibold">Operators, estimators, dispatch leaders, compliance owners.</p>
+              </div>
             </div>
           </div>
-        </div>
-      </nav>
+        </section>
 
-      {/* Hero Section */}
-      <section className="pt-20 pb-16">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center max-w-4xl mx-auto">
-            <h1 className="text-5xl md:text-6xl font-bold text-white mb-6 leading-tight">
-              The Operating System for Regulated Field Operations.
-            </h1>
-            <p className="text-xl md:text-2xl text-gray-400 mb-12 leading-relaxed">
-              CRM, estimating, and compliance — built for construction, rail, and environmental teams that cannot afford mistakes.
-            </p>
-            
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-6">
-              <Link
-                href="/request-demo"
-                className="w-full sm:w-auto bg-orange-600 text-white px-8 py-4 rounded-lg hover:bg-orange-700 font-semibold text-lg"
-              >
-                Request Demo
-              </Link>
-              <Link
-                href="/pricing"
-                className="w-full sm:w-auto bg-gray-800 text-white px-8 py-4 rounded-lg hover:bg-gray-700 font-semibold text-lg border border-gray-700"
-              >
-                View Pricing
-              </Link>
-            </div>
-            
-            <p className="text-sm text-gray-500">
-              <Link href="/login" className="hover:text-gray-400">
-                Login to existing account
-              </Link>
-            </p>
-          </div>
-        </div>
-      </section>
-
-      {/* Trust Strip */}
-      <section className="border-y border-gray-800 bg-gray-900/30 py-8">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-6 text-center">
-            <div>
-              <div className="text-gray-400 text-sm">Production data model</div>
-            </div>
-            <div>
-              <div className="text-gray-400 text-sm">Real workflows only</div>
-            </div>
-            <div>
-              <div className="text-gray-400 text-sm">Explicit enforcement</div>
-            </div>
-            <div>
-              <div className="text-gray-400 text-sm">Zero data loss</div>
-            </div>
-            <div>
-              <div className="text-gray-400 text-sm">Every action logged</div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Built for Regulated Operations */}
-      <section className="py-20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold text-white mb-4">
-              Built for teams where errors cost time, money, and credibility.
-            </h2>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div className="bg-gray-900 p-8 rounded-lg border border-gray-800">
-              <div className="text-4xl mb-4">🏗</div>
-              <h3 className="text-2xl font-bold text-white mb-4">Construction</h3>
-              <ul className="space-y-3 text-gray-400">
-                <li>Pipeline tied to execution</li>
-                <li>Estimating approvals with audit logs</li>
-                <li>Crew & certification visibility</li>
-                <li className="text-gray-500 italic">Purpose-built. No customization required.</li>
-              </ul>
-            </div>
-
-            <div className="bg-gray-900 p-8 rounded-lg border border-gray-800">
-              <div className="text-4xl mb-4">🚆</div>
-              <h3 className="text-2xl font-bold text-white mb-4">Railroad</h3>
-              <ul className="space-y-3 text-gray-400">
-                <li>Subdivision + milepost context on every record</li>
-                <li>QR verification for inspectors</li>
-                <li>Deterministic compliance snapshots</li>
-                <li className="text-gray-500 italic">Purpose-built. No customization required.</li>
-              </ul>
-            </div>
-
-            <div className="bg-gray-900 p-8 rounded-lg border border-gray-800">
-              <div className="text-4xl mb-4">🌎</div>
-              <h3 className="text-2xl font-bold text-white mb-4">Environmental</h3>
-              <ul className="space-y-3 text-gray-400">
-                <li>Permit-driven workflows</li>
-                <li>Equipment + monitoring roles baked in</li>
-                <li>Regulators see one cohesive record</li>
-                <li className="text-gray-500 italic">Purpose-built. No customization required.</li>
-              </ul>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Why Not Generic CRM */}
-      <section className="py-20 bg-gray-900/30">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl font-bold text-white mb-4">
-              Why T-REX is not a generic CRM
-            </h2>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="flex items-start gap-3">
-              <span className="text-orange-500 mt-1">✓</span>
-              <div className="text-gray-300">Production data model</div>
-            </div>
-            <div className="flex items-start gap-3">
-              <span className="text-orange-500 mt-1">✓</span>
-              <div className="text-gray-300">Real workflows enforced</div>
-            </div>
-            <div className="flex items-start gap-3">
-              <span className="text-orange-500 mt-1">✓</span>
-              <div className="text-gray-300">Explicit controls</div>
-            </div>
-            <div className="flex items-start gap-3">
-              <span className="text-orange-500 mt-1">✓</span>
-              <div className="text-gray-300">Clear feature boundaries</div>
-            </div>
-            <div className="flex items-start gap-3">
-              <span className="text-orange-500 mt-1">✓</span>
-              <div className="text-gray-300">Structured estimating</div>
-            </div>
-            <div className="flex items-start gap-3">
-              <span className="text-orange-500 mt-1">✓</span>
-              <div className="text-gray-300">Operational compliance</div>
-            </div>
-            <div className="flex items-start gap-3">
-              <span className="text-orange-500 mt-1">✓</span>
-              <div className="text-gray-300">Zero data loss on upgrade</div>
-            </div>
-            <div className="flex items-start gap-3">
-              <span className="text-orange-500 mt-1">✓</span>
-              <div className="text-gray-300">Role clarity enforced</div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Product Capabilities */}
-      <section className="py-20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <Link href="/system/crm" className="bg-gray-900 p-8 rounded-lg border border-gray-800 hover:border-orange-600 transition-colors">
-              <h3 className="text-xl font-bold text-white mb-3">CRM Core</h3>
-              <p className="text-gray-400 text-sm">
-                Contacts, companies, deals, tasks, notes, email — anchored to real humans.
+        <section className="border-b border-[#d7dbe2] bg-white">
+          <div className="mx-auto grid max-w-6xl gap-6 px-4 py-8 md:grid-cols-5">
+            {trustSignals.map((item) => (
+              <p key={item} className="text-sm font-medium text-[#0a1528]">
+                {item}
               </p>
-            </Link>
+            ))}
+          </div>
+        </section>
 
-            <Link href="/system/estimating" className="bg-gray-900 p-8 rounded-lg border border-gray-800 hover:border-orange-600 transition-colors">
-              <h3 className="text-xl font-bold text-white mb-3">Estimating</h3>
-              <p className="text-gray-400 text-sm">
-                Queue-based estimating with approvals, versioning, and immutable PDFs.
-              </p>
-            </Link>
+        <section className="bg-white py-16">
+          <div className="mx-auto max-w-6xl space-y-10 px-4">
+            <header className="max-w-3xl space-y-3">
+              <p className="text-xs uppercase tracking-[0.4em] text-[#6d768a]">Problem → Solution</p>
+              <h2 className="text-3xl font-semibold text-[#050d1a]">Different industries. Same enforcement expectations.</h2>
+            </header>
+            <div className="grid gap-6 md:grid-cols-3">
+              {industrySections.map((industry) => (
+                <article key={industry.title} className="flex h-full flex-col border border-[#d7dbe2] p-6">
+                  <div className="text-xs font-semibold uppercase tracking-[0.3em] text-[#0c1c36]">{industry.title}</div>
+                  <p className="mt-4 text-sm font-semibold text-[#0b1220]">{industry.challenge}</p>
+                  <p className="mt-3 text-sm text-[#4c566a]">{industry.response}</p>
+                  <div className="mt-4 h-1 w-12 bg-[#d5530d]" />
+                </article>
+              ))}
+            </div>
+          </div>
+        </section>
 
-            <Link href="/system/compliance" className="bg-gray-900 p-8 rounded-lg border border-gray-800 hover:border-orange-600 transition-colors">
-              <h3 className="text-xl font-bold text-white mb-3">Compliance</h3>
-              <p className="text-gray-400 text-sm">
-                Employees, certifications, documents, QR verification, audit logs.
-              </p>
-            </Link>
+        <section className="bg-white py-20">
+          <div className="mx-auto max-w-6xl space-y-12 px-4">
+            <header className="max-w-3xl space-y-3">
+              <p className="text-xs uppercase tracking-[0.4em] text-[#6d768a]">Operational Coverage</p>
+              <h2 className="text-3xl font-semibold text-[#050d1a]">One operating record spans CRM, estimating, dispatch, and compliance.</h2>
+              <p className="text-sm text-[#4c566a]">Each module uses the same enforcement logic, so field teams move from bid to proof without duplicating data or losing audit context.</p>
+            </header>
+            <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-4">
+              {operationalCoverage.map((area) => (
+                <article key={area.name} className="space-y-3 border-b border-[#d7dbe2] pb-6">
+                  <h3 className="text-lg font-semibold text-[#050d1a]">{area.name}</h3>
+                  {area.lines.map((line) => (
+                    <p key={line} className="text-sm text-[#4c566a]">
+                      {line}
+                    </p>
+                  ))}
+                </article>
+              ))}
+            </div>
+            <div className="border-t border-[#c9ceda] pt-8">
+              <p className="text-xs uppercase tracking-[0.4em] text-[#6d768a]">Operational Flow</p>
+              <div className="mt-4 flex flex-wrap items-center gap-3 text-sm font-semibold text-[#0b1220]">
+                {flowSteps.map((step, index) => (
+                  <div key={step} className="flex items-center gap-3">
+                    <span>{step}</span>
+                    {index < flowSteps.length - 1 && (
+                      <span aria-hidden className="text-[#d5530d]">
+                        →
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </section>
 
-            <Link href="/system/governance" className="bg-gray-900 p-8 rounded-lg border border-gray-800 hover:border-orange-600 transition-colors">
-              <h3 className="text-xl font-bold text-white mb-3">Governance</h3>
-              <p className="text-gray-400 text-sm">
-                Retention, history, and controls for organizations that cannot slip.
+        <section className="bg-[#050d1a] py-12 text-white">
+          <div className="mx-auto flex max-w-5xl flex-col gap-5 px-4 md:flex-row md:items-center md:justify-between">
+            <div className="space-y-3">
+              <p className="text-xs uppercase tracking-[0.4em] text-white/60">Security & Governance</p>
+              <p className="text-base text-white/80 md:max-w-3xl">
+                Access controls, audit logs, signed PDFs, and compliance snapshots are enforced server-side so leadership can prove every operational decision without assembling evidence after the fact.
               </p>
+            </div>
+            <Link
+              href="/security"
+              className="rounded-md border border-white/60 px-6 py-3 text-center text-sm font-semibold text-white transition hover:border-white"
+            >
+              View Security & Governance
             </Link>
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* Pricing Preview */}
-      <section className="py-20 bg-gray-900/30">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl font-bold text-white mb-4">
-              Plan tiers aligned to enforcement.
-            </h2>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-            <div className="bg-gray-900 p-6 rounded-lg border border-gray-800 text-center">
-              <h3 className="text-xl font-bold text-white mb-2">Starter</h3>
-              <p className="text-gray-400 text-sm">14-day controlled access</p>
-            </div>
-            <div className="bg-gray-900 p-6 rounded-lg border border-gray-800 text-center">
-              <h3 className="text-xl font-bold text-white mb-2">Growth</h3>
-              <p className="text-gray-400 text-sm">Operational CRM</p>
-            </div>
-            <div className="bg-gray-900 p-6 rounded-lg border border-gray-800 text-center">
-              <h3 className="text-xl font-bold text-white mb-2">Pro</h3>
-              <p className="text-gray-400 text-sm">Compliance-ready</p>
-            </div>
-            <div className="bg-gray-900 p-6 rounded-lg border border-gray-800 text-center">
-              <h3 className="text-xl font-bold text-white mb-2">Enterprise</h3>
-              <p className="text-gray-400 text-sm">Governance-grade</p>
-            </div>
-          </div>
-
-          <div className="text-center">
+        <section className="bg-white py-16">
+          <div className="mx-auto flex max-w-5xl flex-col items-center gap-3 px-4 text-center">
+            <p className="text-xs uppercase tracking-[0.4em] text-[#6d768a]">Pricing</p>
+            <p className="text-base text-[#0b1220]">Pick the enforcement level your crews need—no per-seat surprises.</p>
             <Link
               href="/pricing"
-              className="inline-block bg-orange-600 text-white px-8 py-3 rounded-lg hover:bg-orange-700 font-medium"
+              className="rounded-md bg-[#d5530d] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#b6440b]"
             >
-              View Full Pricing
+              View Pricing
             </Link>
           </div>
-        </div>
-      </section>
-
-      {/* Request Demo Section */}
-      <section className="py-20">
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl font-bold text-white mb-4">
-              Request a live walkthrough of the real system.
-            </h2>
-            <div className="text-gray-400 space-y-2">
-              <p>You will see:</p>
-              <ul className="text-sm space-y-1">
-                <li>Production data model (no sandbox)</li>
-                <li>Estimating, compliance, and governance in one pass</li>
-                <li>Security and retention controls in context</li>
-              </ul>
-            </div>
-          </div>
-
-          <div className="bg-gray-900 p-8 rounded-lg border border-gray-800">
-            <form action="/api/request-demo" method="POST" className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label htmlFor="name" className="block text-sm font-medium text-gray-300 mb-2">
-                    Name *
-                  </label>
-                  <input
-                    type="text"
-                    id="name"
-                    name="name"
-                    required
-                    className="w-full px-4 py-3 bg-gray-950 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
-                  />
-                </div>
-                <div>
-                  <label htmlFor="company" className="block text-sm font-medium text-gray-300 mb-2">
-                    Company *
-                  </label>
-                  <input
-                    type="text"
-                    id="company"
-                    name="company"
-                    required
-                    className="w-full px-4 py-3 bg-gray-950 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label htmlFor="email" className="block text-sm font-medium text-gray-300 mb-2">
-                  Email *
-                </label>
-                <input
-                  type="email"
-                  id="email"
-                  name="email"
-                  required
-                  className="w-full px-4 py-3 bg-gray-950 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
-                />
-              </div>
-
-              <div>
-                <label htmlFor="industry" className="block text-sm font-medium text-gray-300 mb-2">
-                  Industry *
-                </label>
-                <select
-                  id="industry"
-                  name="industry"
-                  required
-                  className="w-full px-4 py-3 bg-gray-950 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
-                >
-                  <option value="">Select industry</option>
-                  <option value="construction">Construction</option>
-                  <option value="railroad">Railroad</option>
-                  <option value="environmental">Environmental</option>
-                  <option value="other">Other</option>
-                </select>
-              </div>
-
-              <div>
-                <label htmlFor="message" className="block text-sm font-medium text-gray-300 mb-2">
-                  Message (optional)
-                </label>
-                <textarea
-                  id="message"
-                  name="message"
-                  rows={4}
-                  className="w-full px-4 py-3 bg-gray-950 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
-                ></textarea>
-              </div>
-
-              <button
-                type="submit"
-                className="w-full bg-orange-600 text-white px-6 py-4 rounded-lg hover:bg-orange-700 font-semibold text-lg"
-              >
-                Request Demo
-              </button>
-            </form>
-          </div>
-        </div>
-      </section>
-
-      {/* Security Callout */}
-      <section className="py-12 border-t border-gray-800 bg-gray-900/30">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-center text-sm text-gray-400">
-            <div>Role-based access enforced server-side</div>
-            <div>Immutable audit logs</div>
-            <div>Versioned documents</div>
-            <div>Retention controls by design</div>
-          </div>
-          <div className="text-center mt-6">
-            <Link href="/security" className="text-orange-500 hover:text-orange-400 text-sm">
-              Learn more about security →
-            </Link>
-          </div>
-        </div>
-      </section>
-
-      {/* Footer */}
-      <footer className="border-t border-gray-800 py-12">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <div>
-              <div className="text-2xl font-bold text-white mb-2">T-REX AI OS</div>
-              <p className="text-gray-500 text-sm">
-                Command system for regulated field operations.
-              </p>
-            </div>
-            <div className="flex flex-col md:items-end gap-3">
-              <Link href="/pricing" className="text-gray-400 hover:text-white text-sm">
-                Pricing
-              </Link>
-              <a href={`mailto:${process.env.NEXT_PUBLIC_SUPPORT_EMAIL || 'jennnull4@gmail.com'}`} className="text-gray-400 hover:text-white text-sm">
-                Contact Support
-              </a>
-              <Link href="/legal/terms" className="text-gray-400 hover:text-white text-sm">
-                Terms
-              </Link>
-              <Link href="/legal/privacy" className="text-gray-400 hover:text-white text-sm">
-                Privacy
-              </Link>
-            </div>
-          </div>
-          <div className="mt-8 pt-8 border-t border-gray-800 text-center text-gray-500 text-sm">
-            © {new Date().getFullYear()} T-REX AI OS. All rights reserved.
-          </div>
-        </div>
-      </footer>
+        </section>
+      </main>
+      <MarketingFooter />
     </div>
   )
 }

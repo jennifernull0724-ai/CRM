@@ -6,9 +6,26 @@ export type TimelineFilters = {
   limit?: number
 }
 
-export async function getContactWorkspace(contactId: string, companyId: string, filters: TimelineFilters = {}) {
+type ContactWorkspaceContext = {
+  userId: string
+  role?: string | null
+}
+
+export async function getContactWorkspace(
+  contactId: string,
+  companyId: string,
+  filters: TimelineFilters = {},
+  context?: ContactWorkspaceContext
+) {
+  const normalizedRole = context?.role ? context.role.toLowerCase() : null
+  const shouldScopeToOwner = normalizedRole === 'user' && Boolean(context?.userId)
+
   const contact = await prisma.contact.findFirst({
-    where: { id: contactId, companyId },
+    where: {
+      id: contactId,
+      companyId,
+      ...(shouldScopeToOwner ? { ownerId: context!.userId } : {}),
+    },
     include: {
       owner: { select: { id: true, name: true, role: true, email: true } },
       createdBy: { select: { id: true, name: true } },
@@ -61,13 +78,21 @@ export async function getContactWorkspace(contactId: string, companyId: string, 
       select: { id: true, name: true, email: true, role: true },
     }),
     prisma.deal.findMany({
-      where: { contactId: contact.id },
+      where: {
+        contactId: contact.id,
+        companyId,
+        ...(shouldScopeToOwner ? { createdById: context!.userId } : {}),
+      },
       orderBy: { createdAt: 'desc' },
       take: 8,
       select: { id: true, name: true, stage: true, value: true, updatedAt: true },
     }),
     prisma.estimate.findMany({
-      where: { contactId: contact.id },
+      where: {
+        contactId: contact.id,
+        companyId,
+        ...(shouldScopeToOwner ? { createdById: context!.userId } : {}),
+      },
       orderBy: { createdAt: 'desc' },
       take: 8,
       select: { id: true, quoteNumber: true, status: true, createdAt: true, updatedAt: true },

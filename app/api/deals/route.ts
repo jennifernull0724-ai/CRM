@@ -4,11 +4,12 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
 import { enforceCanCreateDeal, enforceCanWrite, PricingEnforcementError } from '@/lib/billing/enforcement'
+import { revalidateContactSurfaces } from '@/lib/contacts/cache'
 
 const dealSchema = z.object({
   name: z.string().min(1),
   description: z.string().optional(),
-  contactId: z.string(),
+  contactId: z.string().min(1, 'Contact is required'),
   companyId: z.string().optional(),
   assignedToId: z.string().optional(),
   value: z.number().optional(),
@@ -83,10 +84,10 @@ export async function POST(req: NextRequest) {
     const body = await req.json()
     const validated = dealSchema.parse(body)
 
-    // Verify contact exists
-    const contact = await prisma.contact.findUnique({
-      where: { id: validated.contactId },
-      include: { company: true },
+    // Verify contact exists inside the current workspace
+    const contact = await prisma.contact.findFirst({
+      where: { id: validated.contactId, companyId: session.user.companyId },
+      select: { id: true, firstName: true, lastName: true, companyId: true },
     })
 
     if (!contact) {
@@ -125,23 +126,47 @@ export async function POST(req: NextRequest) {
       },
     })
 
+    const activityTimestamp = deal.createdAt
+
     // Update contact lastActivityAt
     await prisma.contact.update({
-      where: { id: validated.contactId },
-      data: { lastActivityAt: new Date() },
+      where: { id: contact.id },
+      data: { lastActivityAt: activityTimestamp, activityState: 'ACTIVE' },
     })
 
     // Log DEAL_CREATED activity
     await prisma.activity.create({
       data: {
+        companyId: contact.companyId,
         type: 'DEAL_CREATED',
         subject: `Deal created: ${deal.name}`,
         description: `New deal created for ${contact.firstName} ${contact.lastName}`,
         dealId: deal.id,
         contactId: contact.id,
         userId: session.user.id,
+        metadata: {
+          dealId: deal.id,
+          contactId: contact.id,
+        },
       },
     })
+
+    await prisma.accessAuditLog.create({
+      data: {
+        companyId: contact.companyId,
+        actorId: session.user.id,
+        action: 'DEAL_CREATED_FROM_CONTACT',
+        metadata: {
+          contactId: contact.id,
+          dealId: deal.id,
+          actorId: session.user.id,
+          companyId: contact.companyId,
+          timestamp: activityTimestamp.toISOString(),
+        },
+      },
+    })
+
+    revalidateContactSurfaces(contact.id)
 
     return NextResponse.json({ deal }, { status: 201 })
   } catch (error) {

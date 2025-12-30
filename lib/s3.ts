@@ -150,15 +150,31 @@ export async function uploadDealPdf(
   return uploadFile(file, key, 'application/pdf')
 }
 
-export async function uploadEstimatePdf(
-  file: Buffer,
-  companyId: string,
-  estimateId: string,
-  revisionNumber: number,
-  kind: 'estimate' | 'quote'
-): Promise<UploadResult> {
-  const key = buildObjectKey(companyId, null, `estimates/${estimateId}/revisions/${revisionNumber}/${kind}`, `${kind}.pdf`)
+export async function uploadEstimatePdf(params: {
+  file: Buffer
+  companyId: string
+  estimateId: string
+  revisionNumber: number
+  variant: 'estimate' | 'quote'
+  pdfVersion: number
+  pdfVersionId: string
+}): Promise<UploadResult> {
+  const { file, companyId, estimateId, revisionNumber, variant, pdfVersion, pdfVersionId } = params
+  const key = `companies/${companyId}/estimating/${estimateId}/pdfs/v${revisionNumber}/pdf-v${pdfVersion}-${variant}-${pdfVersionId}.pdf`
   return uploadFile(file, key, 'application/pdf')
+}
+
+export async function uploadDealBidDocument(params: {
+  file: Buffer
+  companyId: string
+  dealId: string
+  fileName: string
+  contentType: string
+}): Promise<UploadResult> {
+  const { file, companyId, dealId, fileName, contentType } = params
+  const safeType = contentType && contentType.trim().length > 0 ? contentType : 'application/octet-stream'
+  const key = buildObjectKey(companyId, null, `deals/${dealId}/bid-documents`, fileName || 'bid-doc')
+  return uploadFile(file, key, safeType)
 }
 
 export async function uploadCompanyComplianceDocumentVersion(params: {

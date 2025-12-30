@@ -12,8 +12,13 @@
 | Request Demo | `/request-demo` | `app/request-demo/page.tsx` | ✅ | Submits to backend + email |
 | Legal Hub | `/legal` | `app/legal/page.tsx` | 🚧 | Terms + Privacy content |
 | Dashboard Router | `/dashboard` | `app/dashboard/page.tsx` | 🚧 | Redirects per role |
-| User Dashboard | `/dashboard/user` | `app/dashboard/user/page.tsx` | ✅ | Tasks, deals, activity |
-| Estimator Dashboard | `/dashboard/estimator` | `app/dashboard/estimator/page.tsx` | 🚧 | Assigned deals view |
+| CRM Home | `/crm` | `app/crm/page.tsx` | ✅ | Tasks, deals, activity |
+| CRM Contacts | `/crm/contacts` | `app/crm/contacts/page.tsx` | ✅ | Ownership-scoped table + quick actions |
+| CRM Deals | `/crm/deals` | `app/crm/deals/page.tsx` | ✅ | Owner-only list, estimating handoff, estimate viewer |
+| CRM Deal Create | `/crm/deals/new` | `app/crm/deals/new/page.tsx` | ✅ | Ownership-locked intake form + activity logging |
+| CRM Deal Estimate Viewer | `/crm/deals/[dealId]/estimate` | `app/crm/deals/[dealId]/estimate/page.tsx` | ✅ | Read-only estimate view with approved PDF download/email |
+| Estimating Console | `/estimating` | `app/estimating/page.tsx` | 🚧 | Pricing authority surface |
+| Dispatch Console | `/dispatch` | `app/dispatch/page.tsx` | 🚧 | Operational execution surface |
 | Admin Dashboard | `/dashboard/admin` | `app/dashboard/admin/page.tsx` | 🚧 | Org pipeline, compliance |
 | Owner Dashboard | `/dashboard/owner` | `app/dashboard/owner/page.tsx` | 🚧 | Revenue + compliance risk |
 | Contacts Index | `/contacts` | `app/contacts/page.tsx` | ✅ | Search, filters, table |
@@ -30,7 +35,7 @@
 | QR Verify | `/verify/employee/[qrToken]` | `app/verify/employee/[qrToken]/page.tsx` | 🚧 | Public verification |
 | Settings Hub | `/settings` | `app/settings/page.tsx` | 🚧 | Nav to profile / estimating / billing |
 | Settings Profile | `/settings/profile` | `app/settings/profile/page.tsx` | 🚧 | User profile + email integration |
-| Settings Estimating | `/settings/estimating` | `app/settings/estimating/page.tsx` | 🚧 | Templates + presets |
+| Estimating Settings | `/estimating/settings` | `app/estimating/settings/page.tsx` | ✅ | Email, presets, branding |
 | Settings Billing | `/settings/billing` | `app/settings/billing/page.tsx` | 🚧 | Plan, seats, upgrade, Stripe portal |
 | Upgrade Checkout | `/upgrade` | `app/upgrade/page.tsx` | ✅ | Paid tiers + Stripe launch |
 | Upgrade Success | `/upgrade/success` | `app/upgrade/success/page.tsx` | ✅ | Post-checkout instructions |

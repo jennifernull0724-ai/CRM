@@ -21,7 +21,9 @@ export type GenerateEstimatePdfParams = {
   industry: EstimateIndustry
   contactName: string
   contactEmail?: string | null
+  contactCompany?: string | null
   createdDate: Date
+  generatedAt: Date
   scopeOfWork: string
   assumptions?: string | null
   exclusions?: string | null
@@ -139,6 +141,12 @@ export async function generateEstimatePdf(params: GenerateEstimatePdfParams): Pr
     }
   }
 
+  doc.fillColor('#0F172A').font('Helvetica-Bold').fontSize(14).text(params.companyName)
+  doc.fillColor('#475569')
+    .font('Helvetica')
+    .fontSize(9)
+    .text(`Generated: ${params.generatedAt.toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })}`)
+
   doc.fillColor('#1E40AF').font('Helvetica-Bold').fontSize(22).text(params.variant === 'quote' ? 'Client Quote' : 'Estimate Summary', {
     align: 'right',
   })
@@ -154,6 +162,9 @@ export async function generateEstimatePdf(params: GenerateEstimatePdfParams): Pr
   }
   doc.text(`Industry: ${params.industry}`)
   doc.text(`Contact: ${params.contactName}${params.contactEmail ? ` • ${params.contactEmail}` : ''}`)
+  if (params.contactCompany) {
+    doc.text(`Contact Company: ${params.contactCompany}`)
+  }
   doc.text(`Prepared: ${params.createdDate.toLocaleDateString('en-US', { dateStyle: 'medium' })}`)
 
   drawSectionHeading(doc, 'Scope of Work')

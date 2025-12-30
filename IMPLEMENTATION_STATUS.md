@@ -58,7 +58,7 @@ All database models are fully defined and ready:
 - ✅ Contact creation (`/contacts/new`) - Server action form
 - ✅ Contact detail (`/contacts/[contactId]`) - Command center with tasks, notes, deals, activity
 - ✅ Deal pipeline (`/deals`) - HubSpot-style kanban view
-- ✅ User dashboard (`/dashboard/user`) - Metrics, tasks, recent activity
+- ✅ CRM home (`/crm`) - Metrics, tasks, recent activity
 
 **Layouts:**
 - ✅ Root layout (minimal for public pages)
@@ -205,7 +205,7 @@ All database models are fully defined and ready:
 
 **Files to Create:**
 - `/app/settings/crm/page.tsx` - Pipeline/stage configuration
-- `/app/settings/estimating/page.tsx` - Templates and branding
+- `/app/estimating/settings/page.tsx` - Templates and branding
 - `/app/settings/users/page.tsx` - User management
 - `/app/settings/email/page.tsx` - Email template editor
 - `/app/api/settings/*/route.ts` - Settings APIs
@@ -234,7 +234,7 @@ All database models are fully defined and ready:
 - `/app/api/webhooks/stripe/route.ts` - Stripe subscription events
 
 **Analytics:**
-- `/app/dashboard/estimator/page.tsx` - Estimator metrics
+- `/app/estimating/page.tsx` - Estimating console metrics
 - `/app/dashboard/admin/page.tsx` - Admin analytics
 - `/app/dashboard/owner/page.tsx` - Full analytics
 

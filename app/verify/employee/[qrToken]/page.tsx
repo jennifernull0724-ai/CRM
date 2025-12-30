@@ -28,6 +28,7 @@ type SnapshotPayload = {
     companyName: string
   }
   certifications: SnapshotCertification[]
+  failureReasons: { type: string; label: string; entityId?: string | null }[]
 }
 
 export default async function VerifyEmployeePage({ params }: { params: { qrToken: string } }) {
@@ -103,6 +104,21 @@ export default async function VerifyEmployeePage({ params }: { params: { qrToken
               </div>
             ))}
           </div>
+        </section>
+
+        <section className="space-y-2 rounded-2xl border border-slate-200 bg-white p-4">
+          <h2 className="text-lg font-semibold text-slate-900">Failure reasons</h2>
+          {payload.failureReasons.length === 0 ? (
+            <p className="text-sm text-emerald-700">No failures recorded in this snapshot.</p>
+          ) : (
+            <ul className="space-y-2 text-sm text-slate-700">
+              {payload.failureReasons.map((reason, idx) => (
+                <li key={`${reason.type}-${reason.entityId ?? idx}`} className="rounded-lg bg-slate-50 px-3 py-2">
+                  <span className="font-semibold">{reason.type}</span>: {reason.label}
+                </li>
+              ))}
+            </ul>
+          )}
         </section>
 
         <footer className="border-t border-slate-200 pt-4 text-xs text-slate-500">

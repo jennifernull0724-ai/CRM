@@ -174,6 +174,19 @@ STRIPE_SECRET_KEY=sk_live_...
 STRIPE_PUBLISHABLE_KEY=pk_live_...
 STRIPE_WEBHOOK_SECRET=whsec_...
 
+# Resend transactional email
+RESEND_API_KEY=re_...
+RESEND_WELCOME_TEMPLATE_ID=post_purchase_welcome_v1
+EMAIL_FROM="T-REX <no-reply@trexaios.com>"
+EMAIL_REPLY_TO=ops@trexaios.com
+SUPPORT_EMAIL=support@trexaios.com
+ADMIN_NOTIFICATION_EMAIL=ops@trexaios.com
+CONTACT_FORM_TO=jennnull4@gmail.com
+REQUEST_DEMO_TO=jennnull4@gmail.com
+SECURITY_FORM_TO=jennnull4@gmail.com
+SUPPORT_FORM_TO=jennnull4@gmail.com
+NEXT_PUBLIC_SUPPORT_EMAIL=support@trexaios.com
+
 # Email (Optional - for Gmail/Outlook integration)
 GMAIL_CLIENT_ID=your-gmail-client-id
 GMAIL_CLIENT_SECRET=your-gmail-client-secret
