@@ -46,9 +46,8 @@ export function LoginPageClient() {
       <section className="flex w-full flex-1 items-center justify-center bg-white px-6 py-12">
         <div className="w-full max-w-[420px] space-y-8">
           <header className="space-y-3">
-            <p className="text-xs uppercase tracking-[0.4em] text-[#6d768a]">Secure Access</p>
-            <h2 className="text-3xl font-semibold text-[#050d1a]">System sign-in</h2>
-            <p className="text-sm text-[#4c566a]">Credentials are issued by your workspace administrators.</p>
+            <h2 className="text-3xl font-semibold text-[#050d1a]">System Sign-In</h2>
+            <p className="text-sm text-[#4c566a]">Enter your authorized credentials to access the system.</p>
           </header>
           <div className="rounded-sm border border-[#d7dbe2] bg-white p-6 shadow-[0_25px_60px_rgba(5,13,26,0.18)]">
             <form onSubmit={handleSubmit} className="space-y-5">
@@ -105,13 +104,10 @@ export function LoginPageClient() {
           </div>
           <div className="space-y-3">
             <Link
-              href="/signup"
+              href="/contact-sales"
               className="inline-flex w-full items-center justify-center rounded-sm border border-[#0b1220] px-4 py-3 text-sm font-semibold text-[#0b1220]"
             >
-              Create account
-            </Link>
-            <Link href="/" className="text-sm font-medium text-[#0b1220]/60">
-              Back to home
+              Contact your administrator for access
             </Link>
           </div>
           <p className="text-xs text-[#4c566a]">Access is logged. Activity is audited.</p>
