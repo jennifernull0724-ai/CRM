@@ -102,15 +102,36 @@ function findRestrictionViolation(
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
+
+  // 🔒 ABSOLUTE STATIC FILE BYPASS - MUST BE FIRST
+  // These files must NEVER hit auth middleware
+  if (
+    pathname.startsWith('/_next/') ||
+    pathname.startsWith('/public/') ||
+    pathname.endsWith('.json') ||
+    pathname.endsWith('.xml') ||
+    pathname.endsWith('.ico') ||
+    pathname.endsWith('.png') ||
+    pathname.endsWith('.jpg') ||
+    pathname.endsWith('.jpeg') ||
+    pathname.endsWith('.svg') ||
+    pathname.endsWith('.webp') ||
+    pathname.endsWith('.css') ||
+    pathname.endsWith('.js') ||
+    pathname.endsWith('.map') ||
+    pathname === '/site.manifest.json' ||
+    pathname === '/manifest.json' ||
+    pathname === '/browserconfig.xml' ||
+    pathname === '/favicon.ico' ||
+    pathname === '/robots.txt' ||
+    pathname === '/sitemap.xml'
+  ) {
+    return NextResponse.next()
+  }
+
   const isApiRoute = pathname.startsWith('/api')
   const method = request.method.toUpperCase()
   const isWrite = WRITE_METHODS.includes(method)
-
-  // CRITICAL: Never intercept static assets
-  // This ensures manifest.json, favicon.ico, etc. are served directly
-  if (isStaticAsset(pathname)) {
-    return NextResponse.next()
-  }
 
   // Allow all public paths to bypass authentication
   if (isPublicPath(pathname)) {
@@ -205,10 +226,10 @@ export const config = {
      * Match all request paths except:
      * - _next/static (static files)
      * - _next/image (image optimization files)
-     * - favicon.ico, manifest.json, robots.txt, sitemap.xml, browserconfig.xml
+     * - favicon.ico, manifest.json, site.manifest.json, robots.txt, sitemap.xml, browserconfig.xml
      * - public folder files
      * - files with extensions: .ico, .png, .jpg, .jpeg, .gif, .svg, .webp, .css, .js, .map, .json, .xml, .txt
      */
-    '/((?!_next/static|_next/image|favicon\\.ico|manifest\\.json|robots\\.txt|sitemap\\.xml|browserconfig\\.xml|.*\\.(?:ico|png|jpg|jpeg|gif|svg|webp|css|js|map|json|xml|txt)$).*)',
+    '/((?!_next/static|_next/image|favicon\\.ico|manifest\\.json|site\\.manifest\\.json|robots\\.txt|sitemap\\.xml|browserconfig\\.xml|.*\\.(?:ico|png|jpg|jpeg|gif|svg|webp|css|js|map|json|xml|txt)$).*)',
   ],
 }
