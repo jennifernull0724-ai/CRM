@@ -212,19 +212,21 @@ export default function LandingPage() {
         </section>
 
         <section className="bg-slate-950/80 py-20 text-white">
-          <div className="mx-auto flex max-w-7xl flex-col gap-8 px-6 md:flex-row md:items-center md:justify-between">
-            <div className="space-y-4 rounded-2xl bg-slate-900/20 p-8 md:flex-1">
-              <p className="text-sm font-semibold uppercase tracking-[0.3em] text-orange-400">Security & Governance</p>
-              <p className="text-xl leading-relaxed text-slate-300 md:max-w-3xl">
-                Access controls, audit logs, signed PDFs, and compliance snapshots are enforced server-side so leadership can prove every operational decision without assembling evidence after the fact.
-              </p>
+          <div className="mx-auto max-w-5xl px-6">
+            <div className="flex flex-col items-center gap-8 rounded-3xl border border-slate-700/50 bg-slate-900/80 p-12 shadow-2xl shadow-black/40 backdrop-blur-sm text-center">
+              <div className="space-y-4">
+                <p className="text-sm font-semibold uppercase tracking-[0.3em] text-orange-400">Security & Governance</p>
+                <p className="text-xl leading-relaxed text-slate-300">
+                  Access controls, audit logs, signed PDFs, and compliance snapshots are enforced server-side so leadership can prove every operational decision without assembling evidence after the fact.
+                </p>
+              </div>
+              <Link
+                href="/security"
+                className="rounded-full border-2 border-slate-700/60 px-8 py-4 text-center text-base font-semibold text-white transition hover:border-orange-500 hover:bg-slate-900/50"
+              >
+                View Security & Governance
+              </Link>
             </div>
-            <Link
-              href="/security"
-              className="rounded-full border-2 border-slate-700/60 px-8 py-4 text-center text-base font-semibold text-white transition hover:border-orange-500 hover:bg-slate-900/50"
-            >
-              View Security & Governance
-            </Link>
           </div>
         </section>
 
