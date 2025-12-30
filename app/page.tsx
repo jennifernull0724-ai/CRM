@@ -230,7 +230,7 @@ export default function LandingPage() {
 
         <section className="bg-slate-950 py-24">
           <div className="mx-auto flex max-w-5xl flex-col items-center gap-6 px-6 text-center">
-            <div className="space-y-6 rounded-3xl bg-slate-950/40 p-12">
+            <div className="space-y-6 rounded-3xl border border-slate-700/50 bg-slate-900/80 p-12 shadow-2xl shadow-black/40 backdrop-blur-sm">
               <p className="text-sm font-semibold uppercase tracking-[0.3em] text-orange-400">Pricing</p>
               <p className="text-2xl font-semibold text-slate-300">Pick the enforcement level your crews need—no per-seat surprises.</p>
               <Link
