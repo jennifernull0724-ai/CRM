@@ -58,9 +58,20 @@ const RESTRICTION_ROUTE_MAP: Record<PlanRestrictionKey, RegExp[]> = {
 
 const WRITE_METHODS = ['POST', 'PUT', 'PATCH', 'DELETE']
 
+// Static file extensions that should never be intercepted
+const STATIC_EXTENSIONS = [
+  '.ico', '.png', '.jpg', '.jpeg', '.gif', '.svg', '.webp',
+  '.css', '.js', '.map', '.json', '.xml', '.txt'
+]
+
 function isPublicPath(pathname: string): boolean {
   return PUBLIC_PATHS.some((path) => pathname === path || pathname.startsWith(path))
 }
+
+function isStaticAsset(pathname: string): boolean {
+  return STATIC_EXTENSIONS.some((ext) => pathname.endsWith(ext))
+}
+
 
 function shouldBypassPlan(pathname: string): boolean {
   return (
@@ -94,6 +105,12 @@ export async function proxy(request: NextRequest) {
   const isApiRoute = pathname.startsWith('/api')
   const method = request.method.toUpperCase()
   const isWrite = WRITE_METHODS.includes(method)
+
+  // CRITICAL: Never intercept static assets
+  // This ensures manifest.json, favicon.ico, etc. are served directly
+  if (isStaticAsset(pathname)) {
+    return NextResponse.next()
+  }
 
   // Allow all public paths to bypass authentication
   if (isPublicPath(pathname)) {
@@ -184,6 +201,14 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon\\.ico|.*\\.(?:png|jpg|jpeg|gif|svg|webp|ico|json|xml|txt)).*)',
+    /*
+     * Match all request paths except:
+     * - _next/static (static files)
+     * - _next/image (image optimization files)
+     * - favicon.ico, manifest.json, robots.txt, sitemap.xml, browserconfig.xml
+     * - public folder files
+     * - files with extensions: .ico, .png, .jpg, .jpeg, .gif, .svg, .webp, .css, .js, .map, .json, .xml, .txt
+     */
+    '/((?!_next/static|_next/image|favicon\\.ico|manifest\\.json|robots\\.txt|sitemap\\.xml|browserconfig\\.xml|.*\\.(?:ico|png|jpg|jpeg|gif|svg|webp|css|js|map|json|xml|txt)$).*)',
   ],
 }

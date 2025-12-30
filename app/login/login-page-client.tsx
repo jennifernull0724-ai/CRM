@@ -115,6 +115,9 @@ export function LoginPageClient() {
             </Link>
           </div>
           <p className="text-xs text-[#4c566a]">Access is logged. Activity is audited.</p>
+          <div className="pt-8 text-center">
+            <p className="text-xs text-[#6d768a] font-medium">Powered by T-REX</p>
+          </div>
         </div>
       </section>
     </div>
