@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 
 const navLinks = [
   { label: 'Pricing', href: '/pricing' },
@@ -18,8 +19,11 @@ export function MarketingHeader() {
   return (
     <header className="border-b border-white/10 bg-[#050d1a] text-white">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4">
-        <Link href="/" className="text-xl font-semibold tracking-wide" onClick={closeMobile}>
-          T-REX AI OS
+        <Link href="/" className="flex items-center gap-2 text-xl font-semibold tracking-wide" onClick={closeMobile}>
+          <Image src="/favicon-32x32.png" alt="T-REX AI OS" width={32} height={32} />
+          <span>
+            T-RE<span className="text-orange-500">X</span> AI OS
+          </span>
         </Link>
         <nav className="hidden items-center gap-6 text-sm font-medium md:flex">
           {navLinks.map((item) => (
