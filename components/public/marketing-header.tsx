@@ -18,7 +18,7 @@ export function MarketingHeader() {
 
   return (
     <header className="border-b border-gray-200 bg-white">
-      <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4">
+      <div className="flex h-16 items-center justify-between px-6">
         <Link href="/" className="flex items-center gap-2 text-xl font-semibold tracking-wide" onClick={closeMobile}>
           <Image src="/T-REX (1).png" alt="T-REX AI OS" width={180} height={60} className="h-14 w-auto" />
         </Link>
