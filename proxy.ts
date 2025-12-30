@@ -220,6 +220,8 @@ export async function proxy(request: NextRequest) {
   return NextResponse.next()
 }
 
+export const middleware = proxy
+
 export const config = {
   matcher: [
     /*
