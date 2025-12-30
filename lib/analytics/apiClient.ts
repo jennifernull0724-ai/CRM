@@ -11,8 +11,8 @@ function resolveBaseUrl(): string {
   )
 }
 
-function serializeCookies(): string | undefined {
-  const store = cookies()
+async function serializeCookies(): Promise<string | undefined> {
+  const store = await cookies()
   const serialized = store
     .getAll()
     .map((cookie) => `${cookie.name}=${cookie.value}`)
@@ -23,7 +23,7 @@ function serializeCookies(): string | undefined {
 export async function fetchContactAnalytics<T>(endpoint: string): Promise<T> {
   const baseUrl = resolveBaseUrl()
   const resolvedUrl = endpoint.startsWith('http') ? endpoint : new URL(endpoint, baseUrl).toString()
-  const cookieHeader = serializeCookies()
+  const cookieHeader = await serializeCookies()
   const response = await fetch(resolvedUrl, {
     headers: cookieHeader ? { Cookie: cookieHeader } : undefined,
     cache: 'no-store',

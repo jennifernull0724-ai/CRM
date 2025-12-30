@@ -1,4 +1,5 @@
 import { notFound } from 'next/navigation'
+import { EstimateStatus } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { requireEstimatorContext } from '@/lib/estimating/auth'
 import { listEstimatingPresets, groupPresetsByIndustry } from '@/lib/estimating/presets'
@@ -71,7 +72,7 @@ export default async function EstimateDetailPage({ params }: { params: { estimat
   const locked = revision.locked || record.status === 'APPROVED' || record.status === 'SENT_TO_DISPATCH'
   const status = record.status
 
-  const canSubmit = status === 'DRAFT' || status === 'RETURNED_TO_USER'
+  const canSubmit = status === 'DRAFT' || status === EstimateStatus.RETURNED_TO_USER
   const canApprove = status === 'AWAITING_APPROVAL'
   const canReturn = status === 'AWAITING_APPROVAL'
   const canDispatch = status === 'APPROVED'

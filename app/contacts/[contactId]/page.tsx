@@ -41,6 +41,13 @@ const DEFAULT_TIMELINE_TYPES = TIMELINE_FILTERS.map((filter) => filter.value)
 
 type SearchParams = Record<string, string | string[] | undefined>
 
+type WorkspaceUser = {
+  id: string
+  name: string | null
+  role?: string | null
+  email?: string | null
+}
+
 type PageProps = {
   params: { contactId: string }
   searchParams?: SearchParams
@@ -71,16 +78,34 @@ export default async function ContactDetailPage({ params, searchParams }: PagePr
   }
 
   const { contact } = workspace
-  const openTasks = workspace.tasks.filter((task) => !task.completed)
-  const completedTasks = workspace.tasks.filter((task) => task.completed).slice(0, 5)
+  const normalizedTasks: TaskPanelProps['tasks'] = workspace.tasks.map((task) => ({
+    id: task.id,
+    title: task.title,
+    dueDate: task.dueDate,
+    priority: task.priority ?? 'medium',
+    notes: task.notes,
+    assignedTo: task.assignedTo
+      ? {
+          id: task.assignedTo.id,
+          name: task.assignedTo.name,
+          email: task.assignedTo.email ?? null,
+        }
+      : undefined,
+    createdAt: task.createdAt,
+    completed: Boolean(task.completedAt),
+  }))
+  const openTasks = normalizedTasks.filter((task) => !task.completed)
+  const completedTasks = normalizedTasks.filter((task) => task.completed).slice(0, 5)
   const overdueTasks = openTasks.filter((task) => task.dueDate && task.dueDate < new Date()).length
-  const mentionableUsers = workspace.workspaceUsers.map((user) => ({
+  const mentionableUsers = workspace.workspaceUsers.map((user: WorkspaceUser) => ({
     id: user.id,
     name: user.name ?? 'Workspace user',
     role: user.role ?? 'user',
     email: user.email,
   }))
-  const mentionLookup = new Map(workspace.workspaceUsers.map((user) => [user.id, user]))
+  const mentionLookup = new Map<string, { id: string; name: string | null }>(
+    workspace.workspaceUsers.map((user: WorkspaceUser) => [user.id, { id: user.id, name: user.name }])
+  )
 
   const noteComposerAction = (state: ActionState, formData: FormData) => createContactNoteAction(contact.id, state, formData)
   const createTask = (state: ActionState | FormData, formData?: FormData) => createContactTaskAction(contact.id, state, formData)
@@ -140,7 +165,7 @@ export default async function ContactDetailPage({ params, searchParams }: PagePr
               tasks={openTasks}
               completedTasks={completedTasks}
               overdueTasks={overdueTasks}
-              users={workspace.workspaceUsers.map((user) => ({ id: user.id, name: user.name ?? 'Workspace user' }))}
+              users={workspace.workspaceUsers.map((user: WorkspaceUser) => ({ id: user.id, name: user.name ?? 'Workspace user' }))}
               createAction={createTask}
               updateAction={updateTask}
               completeAction={completeTask}
@@ -251,6 +276,8 @@ function NotesPanel({ notes, mentionableUsers, mentionLookup, action }: NotesPan
   )
 }
 
+type TaskAction = (stateOrFormData: ActionState | FormData, formData?: FormData) => Promise<ActionState>
+
 type TaskPanelProps = {
   tasks: Array<{
     id: string
@@ -260,16 +287,21 @@ type TaskPanelProps = {
     notes: string | null
     assignedTo?: { id: string; name: string; email: string | null }
     createdAt: Date
+    completed: boolean
   }>
   completedTasks: TaskPanelProps['tasks']
   overdueTasks: number
   users: Array<{ id: string; name: string }>
-  createAction: (stateOrFormData: ActionState | FormData, formData?: FormData) => Promise<ActionState>
-  updateAction: (taskId: string) => (stateOrFormData: ActionState | FormData, formData?: FormData) => Promise<ActionState>
-  completeAction: (taskId: string) => (stateOrFormData: ActionState | FormData, formData?: FormData) => Promise<ActionState>
+  createAction: TaskAction
+  updateAction: (taskId: string) => TaskAction
+  completeAction: (taskId: string) => TaskAction
 }
 
 function TasksPanel({ tasks, completedTasks, overdueTasks, users, createAction, updateAction, completeAction }: TaskPanelProps) {
+  const bindAction = (action: TaskAction) => async (formData: FormData) => {
+    await action(formData)
+  }
+
   return (
     <section className="rounded-3xl border border-slate-800 bg-slate-900/80 p-5">
       <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
@@ -280,7 +312,7 @@ function TasksPanel({ tasks, completedTasks, overdueTasks, users, createAction, 
         <div className="text-xs text-rose-300">{overdueTasks} overdue</div>
       </div>
       <div className="mt-6 grid gap-6 lg:grid-cols-[1.1fr,1fr]">
-        <form action={createAction} className="space-y-3 rounded-2xl border border-slate-800 bg-slate-950/40 p-4">
+        <form action={bindAction(createAction)} className="space-y-3 rounded-2xl border border-slate-800 bg-slate-950/40 p-4">
           <p className="text-xs uppercase tracking-[0.4em] text-slate-500">Create task</p>
           <input name="title" placeholder="Task title" className="w-full rounded-2xl border border-slate-800 bg-slate-900/70 px-3 py-2 text-sm text-slate-100" required />
           <div className="grid gap-3 md:grid-cols-2">
@@ -328,7 +360,7 @@ function TasksPanel({ tasks, completedTasks, overdueTasks, users, createAction, 
                     <p className="text-base font-semibold text-white">{task.title}</p>
                     <p className="text-xs text-slate-500">Due {task.dueDate ? formatRelativeSafe(task.dueDate) : 'No due date'} · {task.priority}</p>
                   </div>
-                  <form action={completeAction(task.id)}>
+                  <form action={bindAction(completeAction(task.id))}>
                     <button className="rounded-full border border-emerald-300/50 px-3 py-1 text-xs text-emerald-200 hover:bg-emerald-400/10">
                       Mark complete
                     </button>
@@ -337,7 +369,7 @@ function TasksPanel({ tasks, completedTasks, overdueTasks, users, createAction, 
                 {task.notes && <p className="mt-2 text-sm text-slate-400">{task.notes}</p>}
                 <details className="mt-3 rounded-2xl border border-slate-800">
                   <summary className="cursor-pointer px-3 py-2 text-xs text-slate-400">Edit task</summary>
-                  <form action={updateAction(task.id)} className="space-y-2 px-3 py-2 text-sm">
+                  <form action={bindAction(updateAction(task.id))} className="space-y-2 px-3 py-2 text-sm">
                     <input name="title" defaultValue={task.title} className="w-full rounded-2xl border border-slate-800 bg-slate-900/70 px-2 py-1" />
                     <div className="grid gap-2 md:grid-cols-2">
                       <input type="date" name="dueDate" defaultValue={task.dueDate ? new Date(task.dueDate).toISOString().slice(0, 10) : ''} className="rounded-2xl border border-slate-800 bg-slate-900/70 px-2 py-1" />
@@ -383,12 +415,16 @@ function TasksPanel({ tasks, completedTasks, overdueTasks, users, createAction, 
 type ManualPanelAction = (stateOrFormData: ActionState | FormData, formData?: FormData) => Promise<ActionState>
 
 function ManualActivityPanel({ logCall, logMeeting, logSocial, logCustom }: { logCall: ManualPanelAction; logMeeting: ManualPanelAction; logSocial: ManualPanelAction; logCustom: ManualPanelAction }) {
+  const bindAction = (action: ManualPanelAction) => async (formData: FormData) => {
+    await action(formData)
+  }
+
   return (
     <section className="rounded-3xl border border-slate-800 bg-slate-900/80 p-5">
       <p className="text-xs uppercase tracking-[0.4em] text-slate-500">Manual activities</p>
       <h2 className="text-2xl font-semibold text-white">Log the touch</h2>
       <div className="mt-6 grid gap-4 lg:grid-cols-2">
-        <form action={logCall} className="space-y-2 rounded-2xl border border-slate-800 bg-slate-950/50 p-4 text-sm">
+        <form action={bindAction(logCall)} className="space-y-2 rounded-2xl border border-slate-800 bg-slate-950/50 p-4 text-sm">
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Call</p>
           <div className="grid gap-2 md:grid-cols-2">
             <select name="direction" className="rounded-2xl border border-slate-800 bg-slate-900/70 px-2 py-1">
@@ -403,7 +439,7 @@ function ManualActivityPanel({ logCall, logMeeting, logSocial, logCustom }: { lo
           <button className="w-full rounded-2xl bg-slate-800/80 px-3 py-2 text-xs uppercase tracking-wide text-slate-200">Log call</button>
         </form>
 
-        <form action={logMeeting} className="space-y-2 rounded-2xl border border-slate-800 bg-slate-950/50 p-4 text-sm">
+        <form action={bindAction(logMeeting)} className="space-y-2 rounded-2xl border border-slate-800 bg-slate-950/50 p-4 text-sm">
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Meeting</p>
           <select name="meetingType" className="rounded-2xl border border-slate-800 bg-slate-900/70 px-2 py-1">
             <option value="DISCOVERY">Discovery</option>
@@ -419,7 +455,7 @@ function ManualActivityPanel({ logCall, logMeeting, logSocial, logCustom }: { lo
           <button className="w-full rounded-2xl bg-slate-800/80 px-3 py-2 text-xs uppercase tracking-wide text-slate-200">Log meeting</button>
         </form>
 
-        <form action={logSocial} className="space-y-2 rounded-2xl border border-slate-800 bg-slate-950/50 p-4 text-sm">
+        <form action={bindAction(logSocial)} className="space-y-2 rounded-2xl border border-slate-800 bg-slate-950/50 p-4 text-sm">
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Social touch</p>
           <select name="platform" className="rounded-2xl border border-slate-800 bg-slate-900/70 px-2 py-1">
             <option value="LINKEDIN">LinkedIn</option>
@@ -434,7 +470,7 @@ function ManualActivityPanel({ logCall, logMeeting, logSocial, logCustom }: { lo
           <button className="w-full rounded-2xl bg-slate-800/80 px-3 py-2 text-xs uppercase tracking-wide text-slate-200">Log touch</button>
         </form>
 
-        <form action={logCustom} className="space-y-2 rounded-2xl border border-slate-800 bg-slate-950/50 p-4 text-sm">
+        <form action={bindAction(logCustom)} className="space-y-2 rounded-2xl border border-slate-800 bg-slate-950/50 p-4 text-sm">
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Custom</p>
           <input name="description" placeholder="Description" className="rounded-2xl border border-slate-800 bg-slate-900/70 px-2 py-1" required />
           <input type="datetime-local" name="occurredAt" className="rounded-2xl border border-slate-800 bg-slate-900/70 px-2 py-1" />

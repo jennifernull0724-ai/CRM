@@ -1,7 +1,8 @@
-import type { Prisma, WorkOrderActivityType, WorkOrderStatus } from '@prisma/client'
+import { Prisma } from '@prisma/client'
+import type { WorkOrderActivityType, WorkOrderStatus } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 
-export type WorkOrderActivityMetadata = Prisma.JsonValue
+export type WorkOrderActivityMetadata = Prisma.InputJsonValue
 
 export type WorkOrderActivityPayload = {
   companyId: string
@@ -22,7 +23,7 @@ export async function recordWorkOrderActivity(payload: WorkOrderActivityPayload)
       type: payload.type,
       previousStatus: payload.previousStatus ?? null,
       newStatus: payload.newStatus ?? null,
-      metadata: payload.metadata ?? null,
+      metadata: payload.metadata ?? Prisma.JsonNull,
     },
   })
 }

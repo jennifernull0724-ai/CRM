@@ -145,6 +145,7 @@ model Company {
   emailAttachments           EmailAttachment[]
   emailIngestionQueue        EmailIngestionQueue[]
   emailOAuthStates           EmailOAuthState[]
+  emailIntegrations          EmailIntegration[]
   emailRecipientPreferences  EmailRecipientPreference[]
   emailSignatures            EmailSignature[]
   emailTemplates             EmailTemplate[]
@@ -555,6 +556,23 @@ model Email {
   @@index([authorId])
   @@index([direction])
   @@index([threadId])
+}
+
+model EmailIntegration {
+  id             String        @id @default(cuid())
+  companyId      String
+  provider       EmailProvider
+  status         String        @default("disconnected")
+  isActive       Boolean       @default(false)
+  metadata       Json?
+  connectedAt    DateTime?
+  disconnectedAt DateTime?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  company        Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, provider])
+  @@index([companyId])
 }
 
 model EmailAttachment {
@@ -1534,6 +1552,7 @@ enum AccessAuditAction {
   ESTIMATE_APPROVED
   ESTIMATE_CREATED
   ESTIMATE_UPDATED
+  ESTIMATE_REVISION_CREATED
   ESTIMATE_RETURNED_TO_USER
   CONTACT_CREATED
   CONTACT_UPDATED

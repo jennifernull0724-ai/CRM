@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 
 export type SnapshotRuleConfig = {
@@ -41,7 +42,7 @@ export const DEFAULT_COMPLIANCE_POLICIES: CompliancePolicies = {
   },
 }
 
-type SystemSettingValue = Record<string, unknown> | string | number | boolean | null | string[] | number[]
+type SystemSettingValue = Prisma.InputJsonValue | null
 
 async function getSystemSetting<T extends SystemSettingValue>(companyId: string, key: string): Promise<T | null> {
   const record = await prisma.systemSetting.findUnique({
@@ -62,6 +63,8 @@ async function upsertSystemSetting<T extends SystemSettingValue>(
   value: T,
   updatedById?: string
 ): Promise<void> {
+  const normalizedValue = (value === null ? Prisma.JsonNull : value) as Prisma.InputJsonValue
+
   await prisma.systemSetting.upsert({
     where: {
       companyId_key: {
@@ -70,13 +73,13 @@ async function upsertSystemSetting<T extends SystemSettingValue>(
       },
     },
     update: {
-      value,
+      value: normalizedValue,
       updatedById,
     },
     create: {
       companyId,
       key,
-      value,
+      value: normalizedValue,
       updatedById,
     },
   })

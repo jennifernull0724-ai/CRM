@@ -8,14 +8,14 @@ function canonicalize(value: Json): Json {
   }
 
   if (value && typeof value === 'object') {
-    const entries = Object.entries(value as Record<string, Json>)
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([key, val]) => [key, canonicalize(val as Json)])
+    const sortedEntries = Object.entries(value as Record<string, Json>).sort(([a], [b]) => a.localeCompare(b))
+    const normalized: Record<string, Json> = {}
 
-    return entries.reduce<Record<string, Json>>((acc, [key, val]) => {
-      acc[key] = val
-      return acc
-    }, {})
+    for (const [key, val] of sortedEntries) {
+      normalized[key] = canonicalize(val as Json)
+    }
+
+    return normalized
   }
 
   return value

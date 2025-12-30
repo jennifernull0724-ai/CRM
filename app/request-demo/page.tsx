@@ -1,12 +1,19 @@
-'use client'
-
-import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 
-export default function RequestDemoPage() {
-  const searchParams = useSearchParams()
-  const success = searchParams.get('success')
-  const errorFlag = searchParams.get('error')
+type RequestDemoPageProps = {
+  searchParams?: Record<string, string | string[] | undefined>
+}
+
+const getSearchParam = (value?: string | string[]): string | null => {
+  if (Array.isArray(value)) {
+    return value[0] ?? null
+  }
+  return value ?? null
+}
+
+export default function RequestDemoPage({ searchParams }: RequestDemoPageProps) {
+  const success = getSearchParam(searchParams?.success)
+  const errorFlag = getSearchParam(searchParams?.error)
   const supportEmail = process.env.NEXT_PUBLIC_SUPPORT_EMAIL
 
   if (success === 'true') {

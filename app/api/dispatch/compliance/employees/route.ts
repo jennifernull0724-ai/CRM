@@ -47,11 +47,21 @@ export async function GET() {
     employeeCode: snap.employee.employeeId,
     name: `${snap.employee.firstName} ${snap.employee.lastName}`.trim(),
     role: snap.employee.role,
-    complianceStatus: snap.payload?.employee?.complianceStatus ?? snap.employee.complianceStatus,
+    complianceStatus: extractComplianceStatus(snap.payload) ?? snap.employee.complianceStatus,
     failureReasons: Array.isArray(snap.failureReasons) ? snap.failureReasons : [],
     snapshotHash: snap.snapshotHash,
     snapshotCreatedAt: snap.createdAt,
   }))
 
   return NextResponse.json({ items })
+}
+
+function extractComplianceStatus(input: unknown): string | null {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) {
+    return null
+  }
+
+  const maybeEmployee = (input as { employee?: { complianceStatus?: unknown } }).employee
+  const status = maybeEmployee?.complianceStatus
+  return typeof status === 'string' ? status : null
 }

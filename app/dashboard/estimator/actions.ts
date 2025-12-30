@@ -11,11 +11,37 @@ import { getDownloadUrl, getFileBuffer, uploadEstimatePdf } from '@/lib/s3'
 import { sendContactEmail } from '@/lib/email/service'
 import { normalizeRecipientList } from '@/lib/email/recipients'
 import { deriveCompanyNameFromEmail } from '@/lib/contacts/deriveCompany'
-import type { AccessAuditAction, EstimateDocumentKind, EstimateIndustry, EstimateStatus } from '@prisma/client'
-import { Prisma } from '@prisma/client'
+import type { AccessAuditAction, EstimateDocumentKind, EstimateIndustry } from '@prisma/client'
+import { Prisma, EstimateStatus } from '@prisma/client'
 
 const ESTIMATING_PATHS = ['/estimating']
 const BRANDING_PDF_LOGO_KEY = 'branding_pdf_logo'
+
+const ESTIMATE_WITH_REVISION_INCLUDE = {
+  contact: {
+    select: {
+      id: true,
+      firstName: true,
+      lastName: true,
+      email: true,
+      derivedCompanyName: true,
+      companyOverrideName: true,
+    },
+  },
+  currentRevision: {
+    include: {
+      lineItems: true,
+    },
+  },
+} as const
+
+type EstimateWithRevision = Prisma.EstimateGetPayload<{
+  include: typeof ESTIMATE_WITH_REVISION_INCLUDE
+}>
+
+type DefinedEstimateWithRevision = EstimateWithRevision & {
+  currentRevision: NonNullable<EstimateWithRevision['currentRevision']>
+}
 
 type ActionResponse<T = unknown> = { success: true; data?: T } | { success: false; error: string }
 
@@ -100,33 +126,17 @@ async function logEstimateEvent(
   })
 }
 
-async function ensureEstimateWithRevision(estimateId: string, companyId: string) {
+async function ensureEstimateWithRevision(estimateId: string, companyId: string): Promise<DefinedEstimateWithRevision> {
   const estimate = await prisma.estimate.findFirst({
     where: { id: estimateId, companyId },
-    include: {
-      contact: {
-        select: {
-          id: true,
-          firstName: true,
-          lastName: true,
-          email: true,
-          derivedCompanyName: true,
-          companyOverrideName: true,
-        },
-      },
-      currentRevision: {
-        include: {
-          lineItems: true,
-        },
-      },
-    },
+    include: ESTIMATE_WITH_REVISION_INCLUDE,
   })
 
   if (!estimate || !estimate.currentRevision) {
     throw new Error('Estimate not found')
   }
 
-  return estimate
+  return estimate as DefinedEstimateWithRevision
 }
 
 async function recomputeRevisionTotals(revisionId: string) {
@@ -391,7 +401,7 @@ export async function createEstimateAction(formData: FormData) {
           createdById: userId,
           quoteNumber,
           status: 'DRAFT',
-          currentRevision: 1,
+          currentRevisionNumber: 1,
           revisionCount: 1,
         },
       },
@@ -484,6 +494,7 @@ export async function startEstimateRevisionAction(formData: FormData) {
         presetBaseKey: item.presetBaseKey,
         presetLabel: item.presetLabel,
         presetIndustry: item.presetIndustry,
+        presetCategory: item.presetCategory,
         description: item.description,
         quantity: item.quantity,
         unit: item.unit,
@@ -499,7 +510,7 @@ export async function startEstimateRevisionAction(formData: FormData) {
     where: { id: estimate.id },
     data: {
       status: 'DRAFT',
-      currentRevision: newRevisionNumber,
+      currentRevisionNumber: newRevisionNumber,
       revisionCount: { increment: 1 },
       currentRevisionId: newRevision.id,
     },
@@ -609,6 +620,7 @@ export async function saveEstimateLineItemAction(formData: FormData) {
         presetBaseKey: preset.baseKey,
         presetLabel: preset.label,
         presetIndustry: preset.industry,
+        presetCategory: preset.industry,
         description,
         quantity: new Prisma.Decimal(quantity),
         unit,
@@ -627,6 +639,7 @@ export async function saveEstimateLineItemAction(formData: FormData) {
         presetBaseKey: preset.baseKey,
         presetLabel: preset.label,
         presetIndustry: preset.industry,
+        presetCategory: preset.industry,
         description,
         quantity: new Prisma.Decimal(quantity),
         unit,
@@ -790,7 +803,7 @@ export async function approveEstimateAction(formData: FormData) {
   revalidateEstimatingPaths(estimate.id)
 }
 
-export async function returnEstimateAction(formData: FormData) {
+export async function returnEstimateToUserAction(formData: FormData) {
   const { userId, companyId } = await requireEstimatingContext()
   const estimateId = formData.get('estimateId')?.toString()
   const reason = formData.get('reason')?.toString().trim() || 'Returned for revisions'
@@ -798,13 +811,16 @@ export async function returnEstimateAction(formData: FormData) {
 
   const estimate = await ensureEstimateWithRevision(estimateId, companyId)
 
-  if (!['AWAITING_APPROVAL', 'APPROVED'].includes(estimate.status)) {
+  if (estimate.status !== 'AWAITING_APPROVAL') {
     throw new Error('Only submitted estimates can be returned')
   }
 
   await prisma.$transaction([
-    prisma.estimateRevision.update({ where: { id: estimate.currentRevision.id }, data: { status: 'REVISION_REQUIRED', notes: reason, locked: false } }),
-    prisma.estimate.update({ where: { id: estimate.id }, data: { status: 'REVISION_REQUIRED' } }),
+    prisma.estimateRevision.update({
+      where: { id: estimate.currentRevision.id },
+      data: { status: EstimateStatus.RETURNED_TO_USER, notes: reason, locked: false },
+    }),
+    prisma.estimate.update({ where: { id: estimate.id }, data: { status: EstimateStatus.RETURNED_TO_USER } }),
   ])
 
   await logEstimateEvent(companyId, userId, 'ESTIMATE_RETURNED_TO_USER', estimate.id, { reason })
@@ -816,7 +832,7 @@ export async function sendEstimateToDispatchAction(formData: FormData) {
   const estimateId = formData.get('estimateId')?.toString()
   if (!estimateId) throw new Error('Estimate id required')
 
-  const estimate = await prisma.estimate.findFirst({ where: { id: estimateId, companyId }, select: { id: true, status: true, sentToDispatchAt: true } })
+  const estimate = await prisma.estimate.findFirst({ where: { id: estimateId, companyId }, select: { id: true, status: true, sentToDispatchAt: true, contactId: true } })
   if (!estimate) throw new Error('Estimate not found')
   if (estimate.status !== 'APPROVED') {
     throw new Error('Estimate must be approved before dispatch')
@@ -828,7 +844,7 @@ export async function sendEstimateToDispatchAction(formData: FormData) {
   if (existingRequest) {
     await prisma.dispatchRequest.update({ where: { id: existingRequest.id }, data: { status: 'QUEUED', queuedAt } })
   } else {
-    await prisma.dispatchRequest.create({ data: { companyId, estimateId: estimate.id, status: 'QUEUED', queuedAt } })
+    await prisma.dispatchRequest.create({ data: { companyId, estimateId: estimate.id, contactId: estimate.contactId, status: 'QUEUED', queuedAt } })
   }
 
   await prisma.estimate.update({

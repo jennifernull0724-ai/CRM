@@ -41,16 +41,29 @@ type ContactEmailComposerProps = {
   signature: SignatureOption
 }
 
-export function ContactEmailComposer({
-  action,
+export function ContactEmailComposer(props: ContactEmailComposerProps) {
+  const { action, ...rest } = props
+  const [state, formAction] = useFormState(action, INITIAL_STATE)
+  const resetKey = state.resetToken ?? 'contact-email-composer'
+
+  return <ContactEmailComposerForm key={resetKey} {...rest} state={state} formAction={formAction} />
+}
+
+type ContactEmailComposerFormProps = Omit<ContactEmailComposerProps, 'action'> & {
+  state: ActionState
+  formAction: (formData: FormData) => void
+}
+
+function ContactEmailComposerForm({
   initialTo,
   contactName,
   accountOptions,
   templateOptions,
   defaultTemplateId,
   signature,
-}: ContactEmailComposerProps) {
-  const [state, formAction] = useFormState(action, INITIAL_STATE)
+  state,
+  formAction,
+}: ContactEmailComposerFormProps) {
   const defaultAccountId = accountOptions[0]?.id ?? ''
   const [selectedAccountId, setSelectedAccountId] = useState(defaultAccountId)
   const defaultTemplate = useMemo(
@@ -68,23 +81,6 @@ export function ContactEmailComposer({
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const [attachments, setAttachments] = useState<File[]>([])
   const [attachmentError, setAttachmentError] = useState<string | null>(null)
-
-  useEffect(() => {
-    if (state.success) {
-      const resetTemplate = selectedTemplateId ? templateOptions.find((tpl) => tpl.id === selectedTemplateId) ?? null : null
-      setSubject(resetTemplate?.subject ?? '')
-      const resetBody = applySignature(resetTemplate?.body ?? '', signature, includeSignature)
-      setBodyHtml(resetBody)
-      if (editorRef.current) {
-        editorRef.current.innerHTML = resetBody
-      }
-      setAttachments([])
-      setAttachmentError(null)
-      if (fileInputRef.current) {
-        fileInputRef.current.value = ''
-      }
-    }
-  }, [state.success, includeSignature, selectedTemplateId, signature, templateOptions])
 
   useEffect(() => {
     if (editorRef.current && editorRef.current.innerHTML !== bodyHtml) {
@@ -367,7 +363,7 @@ function toPlainText(html: string): string {
   return html.replace(/<style[\s\S]*?<\/style>/gi, '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
 }
 
-function syncInputFiles(files: File[], inputRef: React.RefObject<HTMLInputElement>) {
+function syncInputFiles(files: File[], inputRef: React.RefObject<HTMLInputElement | null>) {
   const dataTransfer = new DataTransfer()
   files.forEach((file) => dataTransfer.items.add(file))
   if (inputRef.current) {

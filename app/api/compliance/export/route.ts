@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma'
 import { planAllowsFeature, type PlanKey } from '@/lib/billing/planTiers'
 import { logComplianceActivity } from '@/lib/compliance/activity'
 import { createComplianceSnapshot } from '@/lib/compliance/snapshots'
+import { Prisma } from '@prisma/client'
 
 function csvEscape(value: string) {
   if (value.includes(',') || value.includes('"') || value.includes('\n')) {
@@ -46,7 +47,14 @@ export async function GET(request: Request) {
     },
   })
 
-  const snapshotMetadata: { employeeId: string; snapshotId: string; snapshotHash: string; failureReasons: unknown[] }[] = []
+  type SnapshotMetadata = {
+    employeeId: string
+    snapshotId: string
+    snapshotHash: string
+    failureReasons: Prisma.InputJsonValue[]
+  }
+
+  const snapshotMetadata: SnapshotMetadata[] = []
 
   for (const employee of employees) {
     const { snapshot } = await createComplianceSnapshot({
@@ -58,7 +66,9 @@ export async function GET(request: Request) {
       employeeId: employee.id,
       snapshotId: snapshot.id,
       snapshotHash: snapshot.snapshotHash,
-      failureReasons: Array.isArray(snapshot.failureReasons) ? snapshot.failureReasons : [],
+      failureReasons: Array.isArray(snapshot.failureReasons)
+        ? (snapshot.failureReasons as Prisma.InputJsonValue[])
+        : [],
     })
   }
 
@@ -70,7 +80,7 @@ export async function GET(request: Request) {
       format,
       snapshotIds: snapshotMetadata.map((item) => item.snapshotId),
       employeeIds: snapshotMetadata.map((item) => item.employeeId),
-      failureReasons: snapshotMetadata.reduce<Record<string, unknown[]>>((acc, item) => {
+      failureReasons: snapshotMetadata.reduce<Record<string, Prisma.InputJsonValue>>((acc, item) => {
         acc[item.employeeId] = item.failureReasons
         return acc
       }, {}),

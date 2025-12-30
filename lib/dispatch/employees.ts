@@ -1,4 +1,5 @@
-import type { ComplianceStatus, Prisma } from '@prisma/client'
+import { Prisma } from '@prisma/client'
+import type { ComplianceStatus } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { summarizeEmployeeCompliance, type ComplianceGapSummary } from '@/lib/dispatch/compliance'
 

@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/prisma'
-import type { ComplianceActivityType } from '@prisma/client'
+import { Prisma, type ComplianceActivityType } from '@prisma/client'
 
 export type ComplianceActivityLog = {
   companyId: string
@@ -9,12 +9,19 @@ export type ComplianceActivityLog = {
   certificationId?: string
   companyDocumentId?: string
   companyDocumentVersionId?: string
-  metadata?: Record<string, unknown>
+  metadata?: Prisma.InputJsonValue
+}
+
+function normalizeActivity(entry: ComplianceActivityLog) {
+  return {
+    ...entry,
+    metadata: entry.metadata ?? Prisma.JsonNull,
+  }
 }
 
 export async function logComplianceActivity(entry: ComplianceActivityLog): Promise<void> {
   await prisma.complianceActivity.create({
-    data: entry,
+    data: normalizeActivity(entry),
   })
 }
 
@@ -24,6 +31,6 @@ export async function logActivities(batch: ComplianceActivityLog[]): Promise<voi
   }
 
   await prisma.complianceActivity.createMany({
-    data: batch,
+    data: batch.map(normalizeActivity),
   })
 }

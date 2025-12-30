@@ -4,7 +4,7 @@ import { formatDistanceToNow } from 'date-fns'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { getWorkOrderDetail, type DispatchWorkOrder } from '@/lib/dispatch/workOrders'
-import { listAssignableAssets, type AssignableAsset } from '@/lib/assets/registry'
+import { listAssignableAssets } from '@/lib/assets/registry'
 import { loadDispatchEmailComposerData, type DispatchEmailComposerData } from '@/lib/dispatch/emailComposer'
 import { AssetAssignmentPanel } from '@/app/dispatch/_components/asset-assignment-panel'
 import { EmployeeAssignmentPanel } from '@/app/dispatch/_components/employee-assignment-panel'
@@ -42,7 +42,9 @@ export default async function DispatchWorkOrderDetailPage({ params }: { params: 
 
   const isLocked = TERMINAL_WORK_ORDER_STATUSES.includes(workOrder.status)
   const nextStatuses = WORK_ORDER_STATUS_FLOW[workOrder.status] ?? []
-  const sendEmailAction = sendWorkOrderEmailAction.bind(null, workOrder.id)
+  const sendEmailAction = async (formData: FormData) => {
+    await sendWorkOrderEmailAction(workOrder.id, formData)
+  }
 
   return (
     <div className="space-y-8 px-4 pb-12 pt-8 lg:px-10">
@@ -505,7 +507,7 @@ function EmailComposer({
 }: {
   workOrder: DispatchWorkOrder
   composer: DispatchEmailComposerData
-  sendEmailAction: (formData: FormData) => Promise<unknown>
+  sendEmailAction: (formData: FormData) => Promise<void>
 }) {
   const hasAccounts = composer.accounts.length > 0
   const defaultAccountId = composer.accounts[0]?.id

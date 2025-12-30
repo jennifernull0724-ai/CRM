@@ -17,7 +17,9 @@ export interface CompliancePdfPayload {
   includeFullPacket?: boolean
 }
 
-function pipeToBuffer(doc: PDFDocument): Promise<Buffer> {
+type PdfDoc = InstanceType<typeof PDFDocument>
+
+function pipeToBuffer(doc: PdfDoc): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = []
     doc.on('data', (chunk) => chunks.push(chunk))
@@ -26,7 +28,7 @@ function pipeToBuffer(doc: PDFDocument): Promise<Buffer> {
   })
 }
 
-function renderHeader(doc: PDFDocument, payload: CompliancePdfPayload) {
+function renderHeader(doc: PdfDoc, payload: CompliancePdfPayload) {
   const { employee } = payload
   doc.fontSize(18).font('Helvetica-Bold').text('Compliance Verification Packet')
   doc.moveDown(0.5)
@@ -39,14 +41,15 @@ function renderHeader(doc: PDFDocument, payload: CompliancePdfPayload) {
   }
 }
 
-async function embedCertificationImages(doc: PDFDocument, certification: CertificationWithImages) {
+async function embedCertificationImages(doc: PdfDoc, certification: CertificationWithImages) {
   for (const image of certification.images) {
     if (!image.mimeType.startsWith('image/')) {
       continue
     }
     const buffer = await getComplianceFileBuffer(image.objectKey)
     doc.addPage({ margin: 40 })
-    doc.font('Helvetica-Bold').fontSize(14).text(`${certification.customName ?? certification.presetKey} — Image v${image.version}`)
+    const displayName = certification.customName ?? certification.presetKey ?? 'Certification'
+    doc.font('Helvetica-Bold').fontSize(14).text(`${displayName} — Image v${image.version}`)
     doc.moveDown(0.5)
     doc.font('Helvetica').fontSize(10).text(`Hash: ${image.sha256}`)
     doc.moveDown(0.5)
@@ -58,8 +61,9 @@ async function embedCertificationImages(doc: PDFDocument, certification: Certifi
   }
 }
 
-function renderCertificationSummary(doc: PDFDocument, certification: CertificationWithImages) {
-  doc.fontSize(12).font('Helvetica-Bold').text(certification.customName ?? certification.presetKey)
+function renderCertificationSummary(doc: PdfDoc, certification: CertificationWithImages) {
+  const displayName = certification.customName ?? certification.presetKey ?? 'Certification'
+  doc.fontSize(12).font('Helvetica-Bold').text(displayName)
   doc.moveDown(0.2)
   doc.fontSize(10).font('Helvetica')
   doc.text(`Category: ${certification.category}`)

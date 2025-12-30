@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import { getServerSession } from 'next-auth'
 import { redirect } from 'next/navigation'
-import { SurfaceShell } from '@/components/shells/surface-shell'
+import { SurfaceShell, type ShellNavItem } from '@/components/shells/surface-shell'
 import { authOptions } from '@/lib/auth'
 import { loadStandardSettings } from '@/lib/dashboard/standardSettings'
 
@@ -10,7 +10,7 @@ const USER_DASHBOARD_NAV = [
   { path: '/crm', label: 'CRM Workspace', icon: 'home' },
   { path: '/contacts', label: 'Contacts', icon: 'contacts' },
   { path: '/deals', label: 'Deals', icon: 'deals' },
-]
+] satisfies ShellNavItem[]
 
 export default async function UserDashboardLayout({ children }: { children: ReactNode }) {
   const session = await getServerSession(authOptions)

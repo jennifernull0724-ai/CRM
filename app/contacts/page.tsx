@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { getServerSession } from 'next-auth'
 import { formatDistanceToNow } from 'date-fns'
@@ -205,12 +206,12 @@ export default async function ContactsPage({ searchParams }: { searchParams: Sea
                   >
                     Apply filters
                   </button>
-                  <a
+                  <Link
                     href="/contacts"
                     className="rounded-2xl border border-slate-700 px-6 py-2 text-sm font-semibold text-slate-200 hover:border-slate-200"
                   >
                     Reset
-                  </a>
+                  </Link>
                 </div>
               </div>
             </div>
@@ -243,9 +244,9 @@ export default async function ContactsPage({ searchParams }: { searchParams: Sea
                   <tr key={contact.id} className="border-b border-slate-800/70 text-slate-200 hover:bg-slate-900">
                     <td className="px-4 py-4">
                       <div className="font-semibold text-white">
-                        <a href={`/contacts/${contact.id}`} className="hover:underline">
+                        <Link href={`/contacts/${contact.id}`} className="hover:underline">
                           {contact.firstName} {contact.lastName}
-                        </a>
+                        </Link>
                       </div>
                       <p className="text-xs text-slate-400">{contact.email}</p>
                       <p className="text-xs text-amber-300">{contact.attention.primaryReason}</p>

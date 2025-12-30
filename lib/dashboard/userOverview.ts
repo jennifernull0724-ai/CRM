@@ -109,6 +109,9 @@ export async function loadUserDashboardData(userId: string, companyId: string): 
       orderBy: { updatedAt: 'desc' },
       take: 12,
       include: {
+        contact: {
+          select: { firstName: true, lastName: true, email: true },
+        },
         deal: {
           select: {
             id: true,
@@ -174,35 +177,44 @@ export async function loadUserDashboardData(userId: string, companyId: string): 
         createdAt: activity.createdAt,
       })),
     })),
-    estimates: estimates.map((estimate) => ({
-      id: estimate.id,
-      status: estimate.status,
-      updatedAt: estimate.updatedAt,
-      dealName: estimate.deal.name,
-      contactName: buildFullName(estimate.deal.contact.firstName, estimate.deal.contact.lastName),
-      contactEmail: estimate.deal.contact.email,
-      value: estimate.deal.value,
-      latestPdfId: estimate.deal.pdfs[0]?.id ?? null,
-      latestPdfUrl: estimate.deal.pdfs[0]?.fileUrl ?? null,
-      dispatchRequestId: estimate.dispatchRequests[0]?.id ?? null,
-      dispatchStatus: estimate.dispatchRequests[0]?.status ?? null,
-      sentToDispatchAt: estimate.sentToDispatchAt,
-    })),
-    dispatchRecords: dispatchRecords.map((record) => ({
-      id: record.id,
-      status: record.status,
-      priority: record.priority,
-      queuedAt: record.queuedAt,
-      scheduledFor: record.scheduledFor,
-      estimateId: record.estimate?.id ?? null,
-      estimateName: record.estimate?.deal.name ?? null,
-      workOrders: record.workOrders.map((workOrder) => ({
-        id: workOrder.id,
-        title: workOrder.title,
-        status: workOrder.status,
-        createdAt: workOrder.createdAt,
-      })),
-    })),
+    estimates: estimates.map((estimate) => {
+      const deal = estimate.deal
+      const contact = deal?.contact ?? estimate.contact
+      const latestPdf = deal?.pdfs[0]
+
+      return {
+        id: estimate.id,
+        status: estimate.status,
+        updatedAt: estimate.updatedAt,
+        dealName: deal?.name ?? 'Standalone estimate',
+        contactName: buildFullName(contact.firstName, contact.lastName),
+        contactEmail: contact.email,
+        value: deal?.value ?? null,
+        latestPdfId: latestPdf?.id ?? null,
+        latestPdfUrl: latestPdf?.fileUrl ?? null,
+        dispatchRequestId: estimate.dispatchRequests[0]?.id ?? null,
+        dispatchStatus: estimate.dispatchRequests[0]?.status ?? null,
+        sentToDispatchAt: estimate.sentToDispatchAt,
+      }
+    }),
+    dispatchRecords: dispatchRecords.map((record) => {
+      const estimateDeal = record.estimate?.deal
+      return {
+        id: record.id,
+        status: record.status,
+        priority: record.priority,
+        queuedAt: record.queuedAt,
+        scheduledFor: record.scheduledFor,
+        estimateId: record.estimate?.id ?? null,
+        estimateName: estimateDeal?.name ?? null,
+        workOrders: record.workOrders.map((workOrder) => ({
+          id: workOrder.id,
+          title: workOrder.title,
+          status: workOrder.status,
+          createdAt: workOrder.createdAt,
+        })),
+      }
+    }),
     contactOptions: contactOptions.map((contact) => ({
       id: contact.id,
       name: buildFullName(contact.firstName, contact.lastName),

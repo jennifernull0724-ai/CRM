@@ -6,12 +6,12 @@ import { prisma } from '@/lib/prisma'
 import { requireEstimatorContext } from '@/lib/estimating/auth'
 import { enforceCanUseEmailIntegration } from '@/lib/billing/enforcement'
 
-const EMAIL_PROVIDERS: EmailProvider[] = ['gmail', 'outlook', 'custom']
+const EMAIL_PROVIDERS: EmailProvider[] = ['gmail', 'outlook']
 const TEMPLATE_SCOPES: EmailTemplateScope[] = ['estimating', 'global']
 
 type AllowedTemplateScope = (typeof TEMPLATE_SCOPES)[number]
 
-type MetadataPayload = Record<string, unknown>
+type MetadataPayload = Prisma.InputJsonValue
 
 function revalidateEstimatingSettings() {
   revalidatePath('/estimating/settings')
@@ -30,7 +30,7 @@ async function logAccessAction(
       companyId,
       actorId,
       action,
-      metadata,
+      metadata: metadata ?? Prisma.JsonNull,
     },
   })
 }
@@ -38,9 +38,9 @@ async function logAccessAction(
 function parseMetadataInput(value?: string | null): MetadataPayload | undefined {
   if (!value) return undefined
   try {
-    return JSON.parse(value)
+    return JSON.parse(value) as MetadataPayload
   } catch {
-    return { note: value }
+    return { value } as MetadataPayload
   }
 }
 
@@ -450,13 +450,17 @@ export async function updatePresetDetailsFromSettingsAction(formData: FormData) 
     throw new Error('Locked presets cannot be edited')
   }
 
-  const changes: MetadataPayload = {}
-  if (preset.label !== label) changes.label = { from: preset.label, to: label }
-  if (preset.defaultDescription !== description) changes.description = { from: preset.defaultDescription, to: description }
-  if (preset.defaultUnit !== unit) changes.unit = { from: preset.defaultUnit, to: unit }
-  if (Number(preset.defaultUnitCost) !== unitCost) changes.unitCost = { from: preset.defaultUnitCost.toString(), to: unitCost }
+  const changeEntries: Record<string, { from: string; to: string | number }> = {}
+  if (preset.label !== label) changeEntries.label = { from: preset.label, to: label }
+  if (preset.defaultDescription !== description) {
+    changeEntries.description = { from: preset.defaultDescription, to: description }
+  }
+  if (preset.defaultUnit !== unit) changeEntries.unit = { from: preset.defaultUnit, to: unit }
+  if (Number(preset.defaultUnitCost) !== unitCost) {
+    changeEntries.unitCost = { from: preset.defaultUnitCost.toString(), to: unitCost }
+  }
 
-  if (!Object.keys(changes).length) {
+  if (!Object.keys(changeEntries).length) {
     return
   }
 
@@ -473,7 +477,7 @@ export async function updatePresetDetailsFromSettingsAction(formData: FormData) 
   await logAccessAction(companyId, userId, 'ESTIMATING_PRESET_UPDATED', {
     presetId,
     baseKey: preset.baseKey,
-    changes,
+    changes: changeEntries,
   })
   revalidateEstimatingSettings()
 }

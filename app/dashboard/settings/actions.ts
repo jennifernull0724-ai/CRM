@@ -3,6 +3,7 @@
 import bcrypt from 'bcryptjs'
 import { revalidatePath } from 'next/cache'
 import { getServerSession } from 'next-auth'
+import type { Session } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { uploadFile, deleteFile } from '@/lib/s3'
@@ -49,7 +50,11 @@ const BRANDING_DISPATCH_PDF_LOGO_KEY = 'branding_dispatch_pdf_logo'
 const BRANDING_UI_LOGO_KEY = 'branding_ui_logo'
 const BASE_BRANDING_REVALIDATE_PATHS = ['/dashboard/owner', '/dashboard/admin', '/settings/branding', '/settings/profile'] as const
 
-function assertCanManageBranding(session: Awaited<ReturnType<typeof getServerSession>>) {
+type BrandingSession = Session & {
+  user: NonNullable<Session['user']> & { id: string; companyId: string; role: string }
+}
+
+function assertCanManageBranding(session: Session | null): asserts session is BrandingSession {
   if (!session?.user?.id || !session.user.companyId) {
     throw new Error('Unauthorized')
   }
@@ -71,8 +76,6 @@ export async function uploadPdfLogoAction(formData: FormData) {
   const session = await getServerSession(authOptions)
   assertCanManageBranding(session)
 
-  await enforceCanUploadFile(session.user.id)
-
   const file = formData.get('logo')
   if (!(file instanceof File)) {
     throw new Error('Logo file is required')
@@ -81,6 +84,8 @@ export async function uploadPdfLogoAction(formData: FormData) {
   if (!file.type.startsWith('image/')) {
     throw new Error('Only image files are allowed for PDF logos')
   }
+
+  await enforceCanUploadFile(session.user.id, file.size)
 
   const buffer = Buffer.from(await file.arrayBuffer())
   const upload = await uploadFile(buffer, `companies/${session.user.companyId}/branding/pdf`, file.type)
@@ -150,8 +155,6 @@ export async function uploadUiLogoAction(formData: FormData) {
   const session = await getServerSession(authOptions)
   assertCanManageBranding(session)
 
-  await enforceCanUploadFile(session.user.id)
-
   const file = formData.get('logo')
   if (!(file instanceof File)) {
     throw new Error('Logo file is required')
@@ -160,6 +163,8 @@ export async function uploadUiLogoAction(formData: FormData) {
   if (!file.type.startsWith('image/')) {
     throw new Error('Only image files are allowed for UI logos')
   }
+
+  await enforceCanUploadFile(session.user.id, file.size)
 
   const buffer = Buffer.from(await file.arrayBuffer())
   const upload = await uploadFile(buffer, `companies/${session.user.companyId}/branding/ui`, file.type)
@@ -229,8 +234,6 @@ export async function uploadDispatchPdfLogoAction(formData: FormData) {
   const session = await getServerSession(authOptions)
   assertCanManageBranding(session)
 
-  await enforceCanUploadFile(session.user.id)
-
   const file = formData.get('logo')
   if (!(file instanceof File)) {
     throw new Error('Logo file is required')
@@ -239,6 +242,8 @@ export async function uploadDispatchPdfLogoAction(formData: FormData) {
   if (!file.type.startsWith('image/')) {
     throw new Error('Only image files are allowed for dispatch PDF logos')
   }
+
+  await enforceCanUploadFile(session.user.id, file.size)
 
   const buffer = Buffer.from(await file.arrayBuffer())
   const upload = await uploadFile(buffer, `companies/${session.user.companyId}/branding/dispatch`, file.type)

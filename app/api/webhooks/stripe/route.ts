@@ -10,7 +10,7 @@ const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET
 
 const stripe = stripeSecret
   ? new Stripe(stripeSecret, {
-      apiVersion: '2024-12-18.acacia',
+      apiVersion: '2025-12-15.clover',
     })
   : null
 
@@ -21,7 +21,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Stripe is not configured' }, { status: 500 })
   }
 
-  const signature = headers().get('stripe-signature')
+  const headerStore = await headers()
+  const signature = headerStore.get('stripe-signature')
 
   if (!signature) {
     return NextResponse.json({ error: 'Missing Stripe signature' }, { status: 400 })
@@ -58,11 +59,12 @@ async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice, templateVe
     return
   }
 
-  if (!invoice.paid || (invoice.amount_paid ?? 0) === 0) {
+  if (invoice.status !== 'paid' || (invoice.amount_paid ?? 0) === 0) {
     return
   }
 
-  const subscriptionId = typeof invoice.subscription === 'string' ? invoice.subscription : invoice.subscription?.id
+  const subscriptionField = (invoice as { subscription?: string | Stripe.Subscription | null }).subscription
+  const subscriptionId = typeof subscriptionField === 'string' ? subscriptionField : subscriptionField?.id
 
   if (!subscriptionId) {
     console.warn('Stripe webhook invoice missing subscription reference', invoice.id)
@@ -173,6 +175,8 @@ async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice, templateVe
     templateVersion,
   })
 
+  const resolvedCustomerId = typeof invoice.customer === 'string' ? invoice.customer : invoice.customer?.id ?? null
+
   await prisma.accessAuditLog.create({
     data: {
       companyId,
@@ -181,7 +185,7 @@ async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice, templateVe
       metadata: {
         invoiceId: invoice.id,
         subscriptionId,
-        stripeCustomerId: invoice.customer,
+        stripeCustomerId: resolvedCustomerId,
         planKey,
         planName: plan.name,
         planPriceLabel: plan.priceLabel,

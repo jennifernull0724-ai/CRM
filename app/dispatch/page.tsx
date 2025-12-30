@@ -16,7 +16,7 @@ import { resolveRoleDestination } from '@/lib/auth/roleDestinations'
 
 const DISPATCH_ROLES = ['dispatch', 'admin', 'owner']
 const INDUSTRY_LABELS: Record<EstimateIndustry, string> = {
-  RAILROAD: 'Railroad',
+  RAIL: 'Railroad',
   CONSTRUCTION: 'Construction',
   ENVIRONMENTAL: 'Environmental',
 }
@@ -462,7 +462,7 @@ function formatCurrency(value: number) {
 }
 
 async function fetchDispatchDashboard(): Promise<DispatchDashboardResponse> {
-  const headerList = headers()
+  const headerList = await headers()
   const host = headerList.get('x-forwarded-host') ?? headerList.get('host')
   const protocol = headerList.get('x-forwarded-proto') ?? 'http'
 
@@ -470,7 +470,7 @@ async function fetchDispatchDashboard(): Promise<DispatchDashboardResponse> {
     throw new Error('Missing host header for dispatch dashboard request')
   }
 
-  const cookieStore = cookies()
+  const cookieStore = await cookies()
   const serializedCookies = cookieStore.getAll().map((cookie) => `${cookie.name}=${cookie.value}`).join('; ')
   const response = await fetch(`${protocol}://${host}/api/dashboard/dispatch`, {
     method: 'GET',

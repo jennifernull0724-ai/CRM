@@ -48,14 +48,14 @@ async function recordAssetAudit(
   companyId: string,
   actorId: string,
   action: AccessAuditAction,
-  metadata: Record<string, unknown>
+  metadata?: Prisma.InputJsonValue
 ) {
   await prisma.accessAuditLog.create({
     data: {
       companyId,
       actorId,
       action,
-      metadata,
+      metadata: metadata ?? Prisma.JsonNull,
     },
   })
 }

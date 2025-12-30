@@ -1,4 +1,4 @@
-import type { Prisma } from '@prisma/client'
+import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { evaluateContactAttention, type AttentionResult } from '@/lib/contacts/attention'
 

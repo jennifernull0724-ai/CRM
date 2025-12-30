@@ -5,6 +5,13 @@ import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { createCrmDealAction } from '@/app/crm/deals/actions'
 
+function bindCreateDealAction(action: typeof createCrmDealAction) {
+  return async (formData: FormData) => {
+    'use server'
+    await action(formData)
+  }
+}
+
 export default async function CrmCreateDealPage() {
   const session = await auth()
   if (!session?.user?.companyId) {
@@ -30,7 +37,7 @@ export default async function CrmCreateDealPage() {
           <h1 className="mt-2 text-3xl font-semibold text-slate-900">Create deal</h1>
           <p className="mt-2 text-sm text-slate-500">Contacts are limited to records you own. Estimating takes over after submission.</p>
         </div>
-        <form action={createCrmDealAction} className="space-y-4">
+        <form action={bindCreateDealAction(createCrmDealAction)} className="space-y-4">
           <label className="block text-sm font-medium text-slate-600">
             Contact
             <select

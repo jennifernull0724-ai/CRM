@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useActionState, useEffect, useRef } from 'react'
+import { useState, useActionState, useRef } from 'react'
 import { createContactAction, type ActionState } from '@/app/contacts/actions'
 import { deriveCompanyNameFromEmail } from '@/lib/contacts/deriveCompany'
 
@@ -16,21 +16,46 @@ type Props = {
 }
 
 export function ContactCreateSheet({ triggerLabel = 'New contact', source = 'contacts:index', variant = 'solid', size = 'md', defaultOpen = false, presentation = 'sheet' }: Props) {
+  const [state, formAction, pending] = useActionState(createContactAction, initialState)
+  const resetKey = state.resetToken ?? 'contact-create-sheet'
+
+  return (
+    <ContactCreateSheetForm
+      key={resetKey}
+      triggerLabel={triggerLabel}
+      source={source}
+      variant={variant}
+      size={size}
+      defaultOpen={defaultOpen}
+      presentation={presentation}
+      state={state}
+      formAction={formAction}
+      pending={pending}
+    />
+  )
+}
+
+type ContactCreateSheetFormProps = Props & {
+  state: ActionState
+  formAction: (formData: FormData) => void
+  pending: boolean
+}
+
+function ContactCreateSheetForm({
+  triggerLabel = 'New contact',
+  source = 'contacts:index',
+  variant = 'solid',
+  size = 'md',
+  defaultOpen = false,
+  presentation = 'sheet',
+  state,
+  formAction,
+  pending,
+}: ContactCreateSheetFormProps) {
   const isPanel = presentation === 'panel'
   const [open, setOpen] = useState(isPanel ? true : defaultOpen)
   const [emailPreview, setEmailPreview] = useState('')
   const formRef = useRef<HTMLFormElement>(null)
-  const [state, formAction, pending] = useActionState(createContactAction, initialState)
-
-  useEffect(() => {
-    if (state.success) {
-      formRef.current?.reset()
-      setEmailPreview('')
-      if (!isPanel) {
-        setOpen(false)
-      }
-    }
-  }, [state.success, isPanel])
 
   const derivedCompany = emailPreview ? deriveCompanyNameFromEmail(emailPreview) : 'Unknown organization'
 

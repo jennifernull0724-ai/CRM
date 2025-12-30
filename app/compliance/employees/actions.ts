@@ -12,7 +12,7 @@ import { deleteFile, uploadComplianceCertificationImage, uploadComplianceFile } 
 import { logComplianceActivity } from '@/lib/compliance/activity'
 import { createComplianceSnapshot } from '@/lib/compliance/snapshots'
 
-const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$
+const EMAIL_PATTERN = new RegExp('^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$')
 
 async function requireComplianceContext(level: 'core' | 'advanced' = 'core') {
   const session = await getServerSession(authOptions)

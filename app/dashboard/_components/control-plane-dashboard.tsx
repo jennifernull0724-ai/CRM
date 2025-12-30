@@ -1,4 +1,3 @@
-import Link from 'next/link'
 import { formatDistanceToNow } from 'date-fns'
 import type { ControlPlaneData } from '@/lib/dashboard/controlPlane'
 import type { PlanKey } from '@/lib/billing/planTiers'
@@ -53,6 +52,9 @@ export function ControlPlaneDashboard({ variant, data }: Props) {
     companyDocuments,
   } = data
 
+  const governanceUsers = Array.isArray(governance.users) ? governance.users : []
+  const governanceAuditLogs = Array.isArray(governance.auditLogs) ? governance.auditLogs : []
+
   const dispatchStatusMap = analytics.dispatch.summaries.reduce<Record<string, number>>((acc, summary) => {
     acc[summary.status] = summary.count
     return acc
@@ -64,11 +66,11 @@ export function ControlPlaneDashboard({ variant, data }: Props) {
   }, {})
 
   const workOrderStats = [
-    { label: 'Draft', value: analytics.workOrders.summaries.find((entry) => entry.status === 'DRAFT')?._count ?? 0 },
-    { label: 'Scheduled', value: analytics.workOrders.summaries.find((entry) => entry.status === 'SCHEDULED')?._count ?? 0 },
-    { label: 'In progress', value: analytics.workOrders.summaries.find((entry) => entry.status === 'IN_PROGRESS')?._count ?? 0 },
-    { label: 'Completed', value: analytics.workOrders.summaries.find((entry) => entry.status === 'COMPLETED')?._count ?? 0 },
-    { label: 'Cancelled', value: analytics.workOrders.summaries.find((entry) => entry.status === 'CANCELLED')?._count ?? 0 },
+    { label: 'Draft', value: analytics.workOrders.summaries.find((entry) => entry.status === 'DRAFT')?.count ?? 0 },
+    { label: 'Scheduled', value: analytics.workOrders.summaries.find((entry) => entry.status === 'SCHEDULED')?.count ?? 0 },
+    { label: 'In progress', value: analytics.workOrders.summaries.find((entry) => entry.status === 'IN_PROGRESS')?.count ?? 0 },
+    { label: 'Completed', value: analytics.workOrders.summaries.find((entry) => entry.status === 'COMPLETED')?.count ?? 0 },
+    { label: 'Cancelled', value: analytics.workOrders.summaries.find((entry) => entry.status === 'CANCELLED')?.count ?? 0 },
     { label: 'Compliance blocked', value: analytics.workOrders.blocked.count },
   ]
 
@@ -80,6 +82,52 @@ export function ControlPlaneDashboard({ variant, data }: Props) {
     variant === 'owner'
       ? 'Dashboards are the lens only: analytics plus access governance.'
       : 'Read-only analytics with invite/role/disable controls.'
+
+  const governanceUserRows = governanceUsers.map((user) => {
+    const normalizedRole = user.role.toLowerCase()
+    const roleOptions = variant === 'owner' ? ['owner', 'admin', ...editableAdminRoles] : editableAdminRoles
+    const canEditRole = variant === 'owner' || editableAdminRoles.includes(normalizedRole)
+
+    return (
+      <tr key={user.id} className="odd:bg-white even:bg-slate-50/40">
+        <td className="px-3 py-2">
+          <p className="font-semibold text-slate-800">{user.name}</p>
+          <p className="text-xs text-slate-500">{user.email}</p>
+        </td>
+        <td className="px-3 py-2">
+          {canEditRole ? (
+            <form action={updateUserRoleAction} className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <input type="hidden" name="userId" value={user.id} />
+              <select name="role" defaultValue={normalizedRole} className="rounded-lg border border-slate-200 px-2 py-1 text-xs">
+                {roleOptions.map((roleOption) => (
+                  <option key={roleOption} value={roleOption}>
+                    {formatRoleLabel(roleOption)}
+                  </option>
+                ))}
+              </select>
+              <button type="submit" className="rounded-lg border border-slate-200 px-2 py-1 text-xs">
+                Update
+              </button>
+            </form>
+          ) : (
+            <p className="text-xs font-semibold text-slate-500">Owner managed</p>
+          )}
+        </td>
+        <td className="px-3 py-2">
+          <form action={setUserDisabledAction}>
+            <input type="hidden" name="userId" value={user.id} />
+            <input type="hidden" name="disabled" value={(!user.disabled).toString()} />
+            <button
+              type="submit"
+              className={`rounded-lg px-3 py-1 text-xs font-semibold ${user.disabled ? 'bg-emerald-600 text-white' : 'bg-rose-600 text-white'}`}
+            >
+              {user.disabled ? 'Enable' : 'Disable'}
+            </button>
+          </form>
+        </td>
+      </tr>
+    )
+  })
 
   return (
     <div className="space-y-8">
@@ -220,7 +268,7 @@ export function ControlPlaneDashboard({ variant, data }: Props) {
           <div className="rounded-2xl border border-slate-100 bg-slate-50/60 p-4">
             <p className="text-xs uppercase tracking-wide text-slate-500">Policies</p>
             <p className="mt-2 text-sm text-slate-700">
-              {compliancePolicies.auditWindowDays} day audit window · {compliancePolicies.overrideThreshold}% override threshold.
+              {compliancePolicies.retentionYears} year retention · {compliancePolicies.expirationGraceDays}-day expiration grace window.
             </p>
             <p className="mt-2 text-xs text-slate-500">Policy edits live in /compliance/settings.</p>
           </div>
@@ -316,56 +364,14 @@ export function ControlPlaneDashboard({ variant, data }: Props) {
                   </tr>
                 </thead>
                 <tbody>
-                  {governance.users.map((user) => {
-                    const normalizedRole = user.role.toLowerCase()
-                    const roleOptions = variant === 'owner' ? ['owner', 'admin', ...editableAdminRoles] : editableAdminRoles
-                    const canEditRole = variant === 'owner' || editableAdminRoles.includes(normalizedRole)
-                    return (
-                      <tr key={user.id} className="odd:bg-white even:bg-slate-50/40">
-                        <td className="px-3 py-2">
-                          <p className="font-semibold text-slate-800">{user.name}</p>
-                          <p className="text-xs text-slate-500">{user.email}</p>
-                        </td>
-                        <td className="px-3 py-2">
-                          {canEditRole ? (
-                            <form action={updateUserRoleAction} className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                              <input type="hidden" name="userId" value={user.id} />
-                              <select name="role" defaultValue={normalizedRole} className="rounded-lg border border-slate-200 px-2 py-1 text-xs">
-                                {roleOptions.map((roleOption) => (
-                                  <option key={roleOption} value={roleOption}>
-                                    {formatRoleLabel(roleOption)}
-                                  </option>
-                                ))}
-                              </select>
-                              <button type="submit" className="rounded-lg border border-slate-200 px-2 py-1 text-xs">
-                                Update
-                              </button>
-                            </form>
-                          ) : (
-                            <p className="text-xs font-semibold text-slate-500">Owner managed</p>
-                          )}
-                        </td>
-                      <td className="px-3 py-2">
-                        <form action={setUserDisabledAction}>
-                          <input type="hidden" name="userId" value={user.id} />
-                          <input type="hidden" name="disabled" value={(!user.disabled).toString()} />
-                          <button
-                            type="submit"
-                            className={`rounded-lg px-3 py-1 text-xs font-semibold ${user.disabled ? 'bg-emerald-600 text-white' : 'bg-rose-600 text-white'}`}
-                          >
-                            {user.disabled ? 'Enable' : 'Disable'}
-                          </button>
-                        </form>
-                      </td>
-                    </tr>
-                  ))}
+                  {governanceUserRows}
                 </tbody>
               </table>
             </div>
             <div className="rounded-2xl border border-slate-100 bg-white p-4">
               <p className="text-sm font-semibold text-slate-700">Recent access events</p>
               <ul className="mt-3 space-y-2 text-xs text-slate-600">
-                {governance.auditLogs.slice(0, 5).map((log) => (
+                {governanceAuditLogs.slice(0, 5).map((log) => (
                   <li key={log.id} className="rounded border border-slate-100 bg-slate-50 p-2">
                     <p className="font-semibold text-slate-800">{formatAuditAction(log.action)}</p>
                     <p>{log.actorName ?? 'System'} → {log.targetEmail ?? 'unknown target'}</p>

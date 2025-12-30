@@ -69,14 +69,16 @@ const DISPATCH_PRESET_SEEDS: ScopedSeeds = {
 
 const seedMap = buildSeedMap()
 
-function buildSeedMap(): Map<string, SeedWithOrder> {
-  const map = new Map<string, SeedWithOrder>()
-  (Object.entries(DISPATCH_PRESET_SEEDS) as Array<[DispatchPresetScope, DispatchPresetSeed[]]>).forEach(([scope, seeds]) => {
-    seeds.forEach((seed, index) => {
-      const key = makeSeedKey(scope, seed.name)
-      map.set(key, { ...seed, sortOrder: index })
-    })
-  })
+function buildSeedMap(): Record<string, SeedWithOrder> {
+  const map: Record<string, SeedWithOrder> = Object.create(null)
+  ;(Object.entries(DISPATCH_PRESET_SEEDS) as Array<[DispatchPresetScope, DispatchPresetSeed[]]>).forEach(
+    ([scope, seeds]: [DispatchPresetScope, DispatchPresetSeed[]]) => {
+      seeds.forEach((seed, index) => {
+        const key = makeSeedKey(scope, seed.name)
+        map[key] = { ...seed, sortOrder: index }
+      })
+    }
+  )
   return map
 }
 
@@ -89,7 +91,7 @@ export async function ensureDispatchPresets(companyId: string): Promise<Dispatch
   const existingMap = new Map(existing.map((preset) => [makeSeedKey(preset.scope, preset.name), preset]))
   const createPayload: Prisma.DispatchPresetCreateManyInput[] = []
 
-  seedMap.forEach((seed, key) => {
+  Object.entries(seedMap).forEach(([key, seed]) => {
     if (existingMap.has(key)) {
       return
     }
@@ -113,7 +115,7 @@ export async function ensureDispatchPresets(companyId: string): Promise<Dispatch
 
   const updates = existing
     .map((preset) => {
-      const seed = seedMap.get(makeSeedKey(preset.scope, preset.name))
+      const seed = seedMap[makeSeedKey(preset.scope, preset.name)]
       if (!seed) {
         return null
       }

@@ -6,6 +6,13 @@ import { auth } from '@/lib/auth'
 import { getCrmDeals } from '@/lib/crm/deals'
 import { submitDealToEstimatingAction } from '@/app/crm/deals/actions'
 
+function bindSubmitAction(action: typeof submitDealToEstimatingAction) {
+  return async (formData: FormData) => {
+    'use server'
+    await action(formData)
+  }
+}
+
 function canSubmit(stage: string) {
   const normalized = stage?.toUpperCase?.() ?? ''
   return normalized === 'OPEN' || normalized === 'RETURNED'
@@ -87,7 +94,7 @@ export default async function CrmDealsPage() {
                     <td className="px-6 py-4 text-sm">
                       <div className="flex flex-col gap-2">
                         {canSubmit(deal.stage) ? (
-                          <form action={submitDealToEstimatingAction}>
+                          <form action={bindSubmitAction(submitDealToEstimatingAction)}>
                             <input type="hidden" name="dealId" value={deal.id} />
                             <button className="w-full rounded-full border border-slate-300 px-3 py-1 text-xs font-semibold text-slate-700 hover:border-slate-900">
                               Send to Estimating

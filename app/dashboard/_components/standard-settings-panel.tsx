@@ -1,3 +1,4 @@
+import Image from 'next/image'
 import { formatDistanceToNow } from 'date-fns'
 import type { StandardSettingsData } from '@/lib/dashboard/standardSettings'
 import {
@@ -352,7 +353,14 @@ export function StandardSettingsPanel({ viewer, settings }: Props) {
               <div>
                 <p className="text-xs uppercase tracking-wide text-slate-500">CRM UI logo</p>
                 {settings.branding.uiLogoUrl ? (
-                  <img src={settings.branding.uiLogoUrl} alt="CRM UI logo" className="mt-2 h-16 w-auto rounded-lg border border-slate-200 bg-white object-contain" />
+                  <Image
+                    src={settings.branding.uiLogoUrl}
+                    alt="CRM UI logo"
+                    width={256}
+                    height={64}
+                    className="mt-2 h-16 w-auto rounded-lg border border-slate-200 bg-white object-contain"
+                    unoptimized
+                  />
                 ) : (
                   <p className="mt-2 text-slate-500">No logo uploaded.</p>
                 )}
@@ -362,7 +370,14 @@ export function StandardSettingsPanel({ viewer, settings }: Props) {
                 <p className="text-xs uppercase tracking-wide text-slate-500">Estimating PDF logo</p>
                 {settings.branding.pdfLogoUrl ? (
                   <div className="space-y-3">
-                    <img src={settings.branding.pdfLogoUrl} alt="PDF logo" className="mt-2 h-16 w-auto rounded-lg border border-slate-200 bg-white object-contain" />
+                    <Image
+                      src={settings.branding.pdfLogoUrl}
+                      alt="PDF logo"
+                      width={256}
+                      height={64}
+                      className="mt-2 h-16 w-auto rounded-lg border border-slate-200 bg-white object-contain"
+                      unoptimized
+                    />
                     <p className="text-xs text-slate-500">{settings.branding.pdfLogoFileName ?? 'Uploaded logo'}</p>
                     <form action={uploadPdfLogoAction} encType="multipart/form-data" className="flex flex-col gap-2 text-xs">
                       <input type="hidden" name="replace" value="true" />
@@ -399,10 +414,13 @@ export function StandardSettingsPanel({ viewer, settings }: Props) {
                 <p className="text-xs uppercase tracking-wide text-slate-500">Dispatch PDF logo</p>
                 {settings.branding.dispatchPdfLogoUrl ? (
                   <div className="space-y-3">
-                    <img
+                    <Image
                       src={settings.branding.dispatchPdfLogoUrl}
                       alt="Dispatch PDF logo"
+                      width={256}
+                      height={64}
                       className="mt-2 h-16 w-auto rounded-lg border border-slate-200 bg-white object-contain"
+                      unoptimized
                     />
                     <p className="text-xs text-slate-500">{settings.branding.dispatchPdfLogoFileName ?? 'Uploaded logo'}</p>
                     <form action={uploadDispatchPdfLogoAction} encType="multipart/form-data" className="flex flex-col gap-2 text-xs">

@@ -4,6 +4,7 @@ import { createHash, randomUUID } from 'crypto'
 import { revalidatePath } from 'next/cache'
 import { getServerSession } from 'next-auth'
 import type { AccessAuditAction, WorkOrderDiscipline, WorkOrderStatus } from '@prisma/client'
+import { Prisma } from '@prisma/client'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { assertWorkOrderMutable, transitionWorkOrderStatus } from '@/lib/dispatch/workOrderLifecycle'
@@ -110,18 +111,20 @@ function isNoteStateEmpty(state: WorkOrderNoteState): boolean {
   return !state.operationsNotes && !state.gateAccessCode && !state.onsitePocName && !state.onsitePocPhone && !state.specialInstructions
 }
 
+type AuditMetadata = Prisma.InputJsonValue | Record<string, unknown> | undefined
+
 async function logAssetAudit(
   companyId: string,
   actorId: string,
   action: AccessAuditAction,
-  metadata: Record<string, unknown>
+  metadata: AuditMetadata
 ) {
   await prisma.accessAuditLog.create({
     data: {
       companyId,
       actorId,
       action,
-      metadata,
+      metadata: metadata ? (metadata as Prisma.InputJsonValue) : Prisma.JsonNull,
     },
   })
 }
@@ -1270,6 +1273,12 @@ export async function addPresetToWorkOrderAction(formData: FormData) {
       presetId,
       overriddenNotes: preset.defaultNotes ?? null,
       addedById: userId,
+      nameSnapshot: preset.name,
+      scopeSnapshot: preset.scope,
+      defaultNotesSnapshot: preset.defaultNotes,
+      defaultScopeSnapshot: preset.scope,
+      isOtherSnapshot: preset.isOther,
+      lockedSnapshot: preset.locked,
     },
   })
 

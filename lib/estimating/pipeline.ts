@@ -1,7 +1,14 @@
 import { prisma } from '@/lib/prisma'
+import { EstimateStatus as EstimateStatusEnum } from '@prisma/client'
 import type { EstimateIndustry, EstimateStatus } from '@prisma/client'
 
-export const PIPELINE_STATUSES: EstimateStatus[] = ['DRAFT', 'AWAITING_APPROVAL', 'APPROVED', 'RETURNED_TO_USER', 'SENT_TO_DISPATCH']
+export const PIPELINE_STATUSES: EstimateStatus[] = [
+  EstimateStatusEnum.DRAFT,
+  EstimateStatusEnum.AWAITING_APPROVAL,
+  EstimateStatusEnum.APPROVED,
+  EstimateStatusEnum.RETURNED_TO_USER,
+  EstimateStatusEnum.SENT_TO_DISPATCH,
+]
 
 export type PipelineFilters = {
   status?: EstimateStatus | null
@@ -71,17 +78,18 @@ export async function loadEstimatingPipeline(companyId: string, filters: Pipelin
           industry: true,
           grandTotal: true,
           subtotal: true,
+          projectName: true,
         },
       },
     },
   })
 
   const buckets: PipelineBuckets = {
-    DRAFT: [],
-    AWAITING_APPROVAL: [],
-    APPROVED: [],
-    RETURNED_TO_USER: [],
-    SENT_TO_DISPATCH: [],
+    [EstimateStatusEnum.DRAFT]: [],
+    [EstimateStatusEnum.AWAITING_APPROVAL]: [],
+    [EstimateStatusEnum.APPROVED]: [],
+    [EstimateStatusEnum.RETURNED_TO_USER]: [],
+    [EstimateStatusEnum.SENT_TO_DISPATCH]: [],
   }
 
   for (const estimate of estimates) {

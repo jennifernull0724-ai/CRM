@@ -1,7 +1,8 @@
 'use server'
 
 import { getServerSession } from 'next-auth'
-import type { EstimateIndustry } from '@prisma/client'
+import type { AccessAuditAction, EstimateIndustry } from '@prisma/client'
+import { Prisma } from '@prisma/client'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
@@ -88,13 +89,19 @@ async function generateQuoteNumber(companyId: string): Promise<string> {
   throw new Error('Unable to generate a unique quote number')
 }
 
-async function logAuditEvent(client: AuditClient, companyId: string, actorId: string, action: string, metadata: Record<string, unknown>) {
+async function logAuditEvent(
+  client: AuditClient,
+  companyId: string,
+  actorId: string,
+  action: AccessAuditAction,
+  metadata: Prisma.InputJsonValue
+) {
   await client.accessAuditLog.create({
     data: {
       companyId,
       actorId,
       action,
-      metadata,
+      metadata: metadata ?? Prisma.JsonNull,
     },
   })
 }
@@ -121,9 +128,6 @@ export async function createEstimate(input: CreateEstimateInput): Promise<Create
       data: {
         companyId,
         contactId: contact.id,
-        projectName,
-        projectLocation,
-        industry: input.industry,
         quoteNumber,
         status: 'DRAFT',
         createdById: userId,
@@ -146,7 +150,6 @@ export async function createEstimate(input: CreateEstimateInput): Promise<Create
         exclusions,
         contactNameSnapshot: `${contact.firstName} ${contact.lastName}`.trim(),
         contactEmailSnapshot: contact.email,
-        createdById: userId,
       },
     })
 
@@ -219,6 +222,7 @@ export async function createEstimateRevision(input: CreateRevisionInput): Promis
     throw new Error('Estimate not found')
   }
 
+  const baseRevision = estimate.currentRevision
   const revisionNumber = (estimate.currentRevisionNumber ?? 0) + 1
   const timestamp = new Date()
   const contactName = `${estimate.contact.firstName} ${estimate.contact.lastName}`.trim()
@@ -230,15 +234,14 @@ export async function createEstimateRevision(input: CreateRevisionInput): Promis
         revisionNumber,
         status: 'DRAFT',
         quoteNumber: estimate.quoteNumber,
-        projectName: estimate.currentRevision.projectName,
-        projectLocation: estimate.currentRevision.projectLocation,
-        industry: estimate.currentRevision.industry,
-        scopeOfWork: estimate.currentRevision.scopeOfWork,
-        assumptions: estimate.currentRevision.assumptions,
-        exclusions: estimate.currentRevision.exclusions,
+        projectName: baseRevision.projectName,
+        projectLocation: baseRevision.projectLocation,
+        industry: baseRevision.industry,
+        scopeOfWork: baseRevision.scopeOfWork,
+        assumptions: baseRevision.assumptions,
+        exclusions: baseRevision.exclusions,
         contactNameSnapshot: contactName,
         contactEmailSnapshot: estimate.contact.email,
-        createdById: userId,
       },
     })
 

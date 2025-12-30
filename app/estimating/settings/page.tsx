@@ -1,3 +1,4 @@
+import Image from 'next/image'
 import Link from 'next/link'
 import { formatDistanceToNow } from 'date-fns'
 import type { EstimatePresetIndustry } from '@prisma/client'
@@ -601,10 +602,13 @@ function BrandingTab({ settings, canManageBranding }: { settings: StandardSettin
         </div>
         {settings.branding.uiLogoUrl ? (
           <div className="space-y-3">
-            <img
+            <Image
               src={settings.branding.uiLogoUrl}
               alt="UI logo"
+              width={256}
+              height={64}
               className="h-16 w-auto rounded-lg border border-slate-200 bg-white object-contain"
+              unoptimized
             />
             <form action={uploadUiLogoAction} encType="multipart/form-data" className="flex flex-col gap-2 text-sm">
               <input name="logo" type="file" accept="image/*" required disabled={!canManageBranding} />
@@ -651,10 +655,13 @@ function BrandingTab({ settings, canManageBranding }: { settings: StandardSettin
         </div>
         {settings.branding.pdfLogoUrl ? (
           <div className="space-y-3">
-            <img
+            <Image
               src={settings.branding.pdfLogoUrl}
               alt="PDF logo"
+              width={256}
+              height={64}
               className="h-16 w-auto rounded-lg border border-slate-200 bg-white object-contain"
+              unoptimized
             />
             <p className="text-xs text-slate-500">{settings.branding.pdfLogoFileName ?? 'Uploaded logo'}</p>
             <form action={uploadPdfLogoAction} encType="multipart/form-data" className="flex flex-col gap-2 text-sm">
@@ -709,10 +716,13 @@ function BrandingTab({ settings, canManageBranding }: { settings: StandardSettin
         </div>
         {settings.branding.dispatchPdfLogoUrl ? (
           <div className="space-y-3">
-            <img
+            <Image
               src={settings.branding.dispatchPdfLogoUrl}
               alt="Dispatch PDF logo"
+              width={256}
+              height={64}
               className="h-16 w-auto rounded-lg border border-slate-200 bg-white object-contain"
+              unoptimized
             />
             <p className="text-xs text-slate-500">{settings.branding.dispatchPdfLogoFileName ?? 'Uploaded logo'}</p>
             <form action={uploadDispatchPdfLogoAction} encType="multipart/form-data" className="flex flex-col gap-2 text-sm">

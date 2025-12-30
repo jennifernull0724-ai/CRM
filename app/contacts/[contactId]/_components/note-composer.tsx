@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 import { useFormState } from 'react-dom'
 import type { ActionState } from '@/app/contacts/actions'
 
@@ -20,6 +20,18 @@ type NoteComposerProps = {
 
 export function NoteComposer({ action, mentionableUsers }: NoteComposerProps) {
   const [state, formAction] = useFormState(action, INITIAL_STATE)
+  const resetKey = state.resetToken ?? 'note-composer'
+
+  return <NoteComposerForm key={resetKey} mentionableUsers={mentionableUsers} formAction={formAction} state={state} />
+}
+
+type NoteComposerFormProps = {
+  mentionableUsers: MentionableUser[]
+  formAction: (formData: FormData) => void
+  state: ActionState
+}
+
+function NoteComposerForm({ mentionableUsers, formAction, state }: NoteComposerFormProps) {
   const [query, setQuery] = useState('')
   const [selected, setSelected] = useState<MentionableUser[]>([])
   const editorRef = useRef<HTMLDivElement | null>(null)
@@ -61,16 +73,6 @@ export function NoteComposer({ action, mentionableUsers }: NoteComposerProps) {
   const removeMention = useCallback((id: string) => {
     setSelected((prev) => prev.filter((user) => user.id !== id))
   }, [])
-
-  useEffect(() => {
-    if (state.success) {
-      if (editorRef.current) {
-        editorRef.current.innerHTML = ''
-      }
-      setSelected([])
-      setQuery('')
-    }
-  }, [state.success])
 
   return (
     <form action={formAction} className="space-y-4" onSubmit={handleSubmit}>

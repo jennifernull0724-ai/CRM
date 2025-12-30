@@ -57,7 +57,7 @@ export default async function AdminDashboardPage() {
 }
 
 async function fetchAdminDashboard() {
-  const headerList = headers()
+  const headerList = await headers()
   const host = headerList.get('x-forwarded-host') ?? headerList.get('host')
   const protocol = headerList.get('x-forwarded-proto') ?? 'http'
 
@@ -65,7 +65,7 @@ async function fetchAdminDashboard() {
     throw new Error('Missing host header for admin dashboard request')
   }
 
-  const cookieStore = cookies()
+  const cookieStore = await cookies()
   const serializedCookies = cookieStore.getAll().map((cookie) => `${cookie.name}=${cookie.value}`).join('; ')
   const response = await fetch(`${protocol}://${host}/api/dashboard/admin`, {
     method: 'GET',

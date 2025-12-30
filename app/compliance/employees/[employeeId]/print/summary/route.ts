@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
@@ -7,7 +7,11 @@ import { generateEmployeeCompliancePdf } from '@/lib/compliance/pdf'
 import { logComplianceActivity } from '@/lib/compliance/activity'
 import { createComplianceSnapshot } from '@/lib/compliance/snapshots'
 
-export async function GET(_request: Request, { params }: { params: { employeeId: string } }) {
+export async function GET(
+  _request: NextRequest,
+  context: { params: Promise<{ employeeId: string }> }
+) {
+  const { employeeId } = await context.params
   const session = await getServerSession(authOptions)
 
   if (!session?.user?.id || !session.user.companyId) {
@@ -24,7 +28,7 @@ export async function GET(_request: Request, { params }: { params: { employeeId:
   }
 
   const employee = await prisma.complianceEmployee.findFirst({
-    where: { id: params.employeeId, companyId: session.user.companyId },
+    where: { id: employeeId, companyId: session.user.companyId },
     include: {
       company: { select: { name: true } },
       certifications: {
@@ -74,7 +78,7 @@ export async function GET(_request: Request, { params }: { params: { employeeId:
     },
   })
 
-  return new NextResponse(pdfBuffer, {
+  return new NextResponse(pdfBuffer as unknown as BodyInit, {
     headers: {
       'Content-Type': 'application/pdf',
       'Content-Disposition': `attachment; filename="${employee.employeeId}-compliance.pdf"`,

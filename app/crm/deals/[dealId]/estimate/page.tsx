@@ -7,6 +7,13 @@ import { getDownloadUrl } from '@/lib/s3'
 import { loadCrmEstimateReadonly } from '@/lib/crm/estimates'
 import { emailApprovedEstimateFromCrmAction } from '@/app/crm/deals/actions'
 
+function bindEmailEstimateAction(action: typeof emailApprovedEstimateFromCrmAction) {
+  return async (formData: FormData) => {
+    'use server'
+    await action(formData)
+  }
+}
+
 const currency = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' })
 
 export default async function CrmEstimateViewer({ params }: { params: { dealId: string } }) {
@@ -126,7 +133,7 @@ export default async function CrmEstimateViewer({ params }: { params: { dealId: 
               {accounts.length === 0 ? (
                 <p className="mt-2 text-sm text-red-600">Connect an email account before sending.</p>
               ) : (
-                <form action={emailApprovedEstimateFromCrmAction} className="mt-4 space-y-3 text-sm">
+                <form action={bindEmailEstimateAction(emailApprovedEstimateFromCrmAction)} className="mt-4 space-y-3 text-sm">
                   <input type="hidden" name="dealId" value={view.deal.id} />
                   <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                     Email account

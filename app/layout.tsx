@@ -14,7 +14,6 @@ export const metadata: Metadata = {
     follow: false,
   },
   manifest: '/manifest.json',
-  themeColor: '#050d1a',
   icons: {
     icon: [
       { url: '/favicon-32x32.png', sizes: '32x32', type: 'image/png' },
@@ -31,6 +30,10 @@ export const metadata: Metadata = {
     'msapplication-config': '/browserconfig.xml',
     'msapplication-TileColor': '#050d1a',
   },
+}
+
+export const viewport = {
+  themeColor: '#050d1a',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

@@ -1,6 +1,6 @@
 import { subDays } from 'date-fns'
 import { simpleParser, AddressObject } from 'mailparser'
-import type { EmailAccount, EmailDirection, AccessAuditAction } from '@prisma/client'
+import { Prisma, type EmailAccount, type EmailDirection, type AccessAuditAction } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { needsAccessTokenRefresh, refreshAccountAccessToken } from '@/lib/email/accounts'
 import { getGmailMessage, listGmailMessages } from '@/lib/email/providers/gmail'
@@ -21,6 +21,20 @@ type ParserAttachment = {
   content?: Buffer | Uint8Array | string
   size?: number
   contentDisposition?: string
+}
+
+type OutlookMessageSummary = {
+  id: string
+  internetMessageId?: string | null
+}
+
+type GraphAttachment = {
+  '@odata.type': string
+  contentBytes?: string
+  contentType?: string | null
+  name: string
+  size?: number | null
+  isInline?: boolean | null
 }
 
 type SchedulerOptions = { schedulerKey?: string }
@@ -177,8 +191,8 @@ async function ingestGmailAccount(account: EmailAccount) {
         fromAddress: formatAddressDisplay(fromAddress) ?? '',
         replyToAddress: parsed.replyTo?.value?.[0]?.address?.toLowerCase() ?? null,
         toAddresses: toAddresses.length ? toAddresses : [],
-        ccAddresses: ccAddresses.length ? ccAddresses : null,
-        bccAddresses: bccAddresses.length ? bccAddresses : null,
+        ccAddresses: ccAddresses.length ? ccAddresses : Prisma.JsonNull,
+        bccAddresses: bccAddresses.length ? bccAddresses : Prisma.JsonNull,
         threadId: detail.threadId ?? null,
         messageId,
         externalId: id,
@@ -210,8 +224,8 @@ async function ingestOutlookAccount(account: EmailAccount) {
     orderby: 'receivedDateTime desc',
   })
 
-  const messages = response.value ?? []
-  const ids = messages.map((message: any) => message.id)
+  const messages = (response.value ?? []) as OutlookMessageSummary[]
+  const ids = messages.map((message) => message.id)
   if (!ids.length) return
 
   const existing = await prisma.email.findMany({
@@ -271,8 +285,8 @@ async function ingestOutlookAccount(account: EmailAccount) {
         fromAddress: formatAddressDisplay(fromAddress) ?? '',
         replyToAddress: detail.replyTo?.[0]?.emailAddress?.address?.toLowerCase() ?? null,
         toAddresses: toAddresses.length ? toAddresses : [],
-        ccAddresses: ccAddresses.length ? ccAddresses : null,
-        bccAddresses: bccAddresses.length ? bccAddresses : null,
+        ccAddresses: ccAddresses.length ? ccAddresses : Prisma.JsonNull,
+        bccAddresses: bccAddresses.length ? bccAddresses : Prisma.JsonNull,
         threadId: detail.conversationId ?? null,
         messageId: detail.internetMessageId ?? message.id,
         externalId: message.id,
@@ -355,7 +369,7 @@ async function persistInboundAttachments(
 }
 
 async function persistGraphAttachments(
-  attachments: any[],
+  attachments: GraphAttachment[],
   account: EmailAccount,
   contactId: string,
   emailId: string
@@ -366,6 +380,9 @@ async function persistGraphAttachments(
     attachments
       .filter((attachment) => attachment['@odata.type'] === '#microsoft.graph.fileAttachment' && attachment.contentBytes)
       .map(async (attachment) => {
+        if (!attachment.contentBytes) {
+          return
+        }
         const buffer = Buffer.from(attachment.contentBytes, 'base64')
         const upload = await saveEmailAttachment({
           companyId: account.companyId,
@@ -519,7 +536,7 @@ async function logEmailActivity(
   companyId: string,
   contactId: string,
   type: string,
-  metadata: Record<string, unknown>,
+  metadata: Prisma.JsonObject,
   subject: string,
   description: string | null
 ) {
@@ -535,11 +552,12 @@ async function logEmailActivity(
   })
 
   const auditAction = type as AccessAuditAction
+  const auditMetadata: Prisma.JsonObject = { contactId, ...metadata }
   await prisma.accessAuditLog.create({
     data: {
       companyId,
       action: auditAction,
-      metadata: { contactId, ...metadata },
+      metadata: auditMetadata,
     },
   })
 }

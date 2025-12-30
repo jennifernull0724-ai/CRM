@@ -1,8 +1,9 @@
 'use client'
 
+import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { useState } from 'react'
+import { useState, type ReactElement, type ReactNode } from 'react'
 
 export type ShellNavItem = {
   path: string
@@ -28,10 +29,10 @@ type SurfaceShellProps = {
   userName?: string
   userRoleLabel?: string
   navItems: ShellNavItem[]
-  children: React.ReactNode
+  children: ReactNode
 }
 
-const ICONS: Record<ShellIcon, JSX.Element> = {
+const ICONS: Record<ShellIcon, ReactElement> = {
   dashboard: (
     <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden>
       <path d="M4 13h6V4H4v9zm0 7h6v-5H4v5zm10 0h6V11h-6v9zm0-16v4h6V4h-6z" fill="currentColor" />
@@ -139,7 +140,7 @@ export function SurfaceShell({ surfaceName, companyLogoUrl, userName, userRoleLa
       >
         <div className="flex h-16 items-center border-b border-slate-800 px-4" aria-label="Company logo slot">
           {companyLogoUrl ? (
-            <img src={companyLogoUrl} alt="Company logo" className="h-8 w-auto" />
+            <Image src={companyLogoUrl} alt="Company logo" width={160} height={40} className="h-8 w-auto" unoptimized />
           ) : (
             <div className="h-8 w-8 rounded border border-slate-700" />
           )}

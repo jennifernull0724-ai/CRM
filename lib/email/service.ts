@@ -1,5 +1,5 @@
 import crypto from 'crypto'
-import type { EmailAccount, EmailDirection } from '@prisma/client'
+import { Prisma, type EmailAccount, type EmailDirection } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { needsAccessTokenRefresh, refreshAccountAccessToken } from '@/lib/email/accounts'
 import { buildMimeMessage } from '@/lib/email/mime'
@@ -8,6 +8,11 @@ import { OutlookAttachment, OutlookRecipient, sendOutlookMessage } from '@/lib/e
 import { saveEmailAttachment } from '@/lib/email/storage'
 
 export type EmailRecipientInput = { email: string; name?: string }
+
+type GmailHeader = {
+  name?: string | null
+  value?: string | null
+}
 
 export type SendContactEmailInput = {
   accountId: string
@@ -67,8 +72,8 @@ async function storeOutboundEmailRecord(params: {
         ? `${params.account.displayName} <${params.account.emailAddress}>`
         : params.account.emailAddress,
       toAddresses: params.input.to,
-      ccAddresses: params.input.cc ?? null,
-      bccAddresses: params.input.bcc ?? null,
+      ccAddresses: params.input.cc ?? Prisma.JsonNull,
+      bccAddresses: params.input.bcc ?? Prisma.JsonNull,
       threadId: params.threadId ?? null,
       messageId: params.rawMessageId ?? params.providerMessageId,
       externalId: params.providerMessageId,
@@ -136,13 +141,15 @@ export async function sendContactEmail(input: SendContactEmailInput) {
     })
 
     const response = await sendGmailMessage({ accessToken: hydratedAccount.accessToken, raw })
+    const headers = response.payload?.headers as GmailHeader[] | undefined
+    const messageIdHeader = headers?.find((header) => header.name === 'Message-ID')
     const record = await storeOutboundEmailRecord({
       account: hydratedAccount,
       input,
       direction: 'OUTBOUND',
       providerMessageId: response.id as string,
       threadId: response.threadId,
-      rawMessageId: (response.payload?.headers?.find((header: any) => header.name === 'Message-ID')?.value as string | undefined) ?? null,
+      rawMessageId: messageIdHeader?.value ?? null,
     })
 
     if (attachments.length) {

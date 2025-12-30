@@ -1,6 +1,6 @@
 import { labelForBidDocumentCategory, type BidDocumentCategoryOption } from '@/lib/crm/bidDocuments'
 import type { CrmDealDetail } from '@/lib/crm/dealDetail'
-import { uploadBidDocumentsAction, emailBidDocumentsAction } from '../actions'
+import { uploadBidDocumentsAction, emailBidDocumentsAction, type BidDocumentActionState } from '../actions'
 const bytesFormatter = new Intl.NumberFormat('en-US', { maximumFractionDigits: 1 })
 
 type BidDocumentsPanelProps = {
@@ -8,6 +8,14 @@ type BidDocumentsPanelProps = {
   documents: CrmDealDetail['bidDocuments']
   categories: BidDocumentCategoryOption[]
   emailAccounts: Array<{ id: string; provider: string; displayName: string | null; emailAddress: string }>
+}
+
+type BidAction = (prev: BidDocumentActionState, formData: FormData) => Promise<BidDocumentActionState>
+
+function bindBidAction(action: BidAction) {
+  return async (formData: FormData) => {
+    await action({ success: true }, formData)
+  }
 }
 
 function formatBytes(bytes: number) {
@@ -34,7 +42,7 @@ export function BidDocumentsPanel({ dealId, documents, categories, emailAccounts
           <p className="text-sm text-slate-500">Plans, specs, addenda, sub quotes, maps, and customer PDFs live here. Drag-and-drop to upload multiples.</p>
         </header>
 
-        <form action={uploadBidDocumentsAction} encType="multipart/form-data" className="mt-4 space-y-3">
+        <form action={bindBidAction(uploadBidDocumentsAction)} encType="multipart/form-data" className="mt-4 space-y-3">
           <input type="hidden" name="dealId" value={dealId} />
           <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Category</label>
           <select name="category" className="w-full rounded-2xl border border-slate-200 px-3 py-2 text-sm" defaultValue="PLANS">
@@ -105,7 +113,7 @@ export function BidDocumentsPanel({ dealId, documents, categories, emailAccounts
         ) : emailAccounts.length === 0 ? (
           <p className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-600">Connect a Gmail or Outlook account in Settings → Email to send attachments.</p>
         ) : (
-          <form action={emailBidDocumentsAction} className="mt-4 space-y-3">
+          <form action={bindBidAction(emailBidDocumentsAction)} className="mt-4 space-y-3">
             <input type="hidden" name="dealId" value={dealId} />
             <fieldset className="space-y-2">
               <legend className="text-xs font-semibold uppercase tracking-wide text-slate-500">Include documents</legend>

@@ -1,4 +1,5 @@
 import { Resend } from 'resend'
+import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 
 const RECIPIENT_ENVIRONMENT_MAP = {
@@ -19,7 +20,7 @@ export interface SendSystemEmailParams {
   text?: string
   eventType: string
   formType: SystemFormType
-  metadata?: Record<string, unknown>
+  metadata?: Prisma.JsonObject
   tags?: Array<{ name: string; value: string }>
 }
 
@@ -59,7 +60,7 @@ const logSystemEmailAttempt = async (args: {
   formType: SystemFormType
   recipient: string
   sender: string
-  payload?: Record<string, unknown>
+  payload?: Prisma.JsonObject
   success: boolean
   errorMessage?: string
   attemptedAt: Date
@@ -71,7 +72,7 @@ const logSystemEmailAttempt = async (args: {
         formType: args.formType,
         recipient: args.recipient,
         sender: args.sender,
-        payload: args.payload ?? null,
+        payload: args.payload ?? Prisma.JsonNull,
         success: args.success,
         errorMessage: args.errorMessage,
         attemptedAt: args.attemptedAt,

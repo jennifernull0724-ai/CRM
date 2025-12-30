@@ -1,3 +1,4 @@
+import Image from 'next/image'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { getServerSession } from 'next-auth'
@@ -186,7 +187,14 @@ export default async function ComplianceEmployeeDetailPage({ params }: { params:
                 {cert.images.map((image) => (
                   <a key={image.id} href={image.url} target="_blank" className="group flex items-center gap-3 rounded-lg border border-slate-200 p-3">
                     {image.mimeType.startsWith('image/') ? (
-                      <img src={image.url} alt={image.filename} className="h-16 w-16 rounded object-cover" />
+                      <Image
+                        src={image.url}
+                        alt={image.filename}
+                        width={64}
+                        height={64}
+                        className="h-16 w-16 rounded object-cover"
+                        unoptimized
+                      />
                     ) : (
                       <div className="flex h-16 w-16 items-center justify-center rounded bg-slate-100 text-slate-600">PDF</div>
                     )}

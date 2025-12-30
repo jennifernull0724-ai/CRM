@@ -1,5 +1,4 @@
 import crypto from 'crypto'
-import type { Readable } from 'stream'
 import { bucket } from '@/lib/storage/gcs'
 import path from 'path'
 
@@ -11,30 +10,6 @@ export interface UploadResult {
   url: string
   hash: string
   size: number
-}
-
-async function streamToBuffer(stream: Readable | ReadableStream | Blob): Promise<Buffer> {
-  if (stream instanceof Readable) {
-    const chunks: Buffer[] = []
-    for await (const chunk of stream) {
-      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk))
-    }
-    return Buffer.concat(chunks)
-  }
-
-  if ('getReader' in stream) {
-    const reader = (stream as ReadableStream).getReader()
-    const chunks: Uint8Array[] = []
-    while (true) {
-      const { value, done } = await reader.read()
-      if (done) break
-      if (value) chunks.push(value)
-    }
-    return Buffer.concat(chunks.map((chunk) => Buffer.from(chunk)))
-  }
-
-  const arrayBuffer = await (stream as Blob).arrayBuffer()
-  return Buffer.from(arrayBuffer)
 }
 
 /**

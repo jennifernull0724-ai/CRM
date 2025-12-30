@@ -14,6 +14,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const companyId = session.user.companyId!
+  const actorId = session.user.id!
+
   if (!['admin', 'owner'].includes(session.user.role as string)) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
@@ -33,7 +36,7 @@ export async function POST(request: Request) {
   const employees = await prisma.complianceEmployee.findMany({
     where: {
       id: { in: employeeIds },
-      companyId: session.user.companyId,
+      companyId,
     },
     include: {
       company: { select: { name: true } },
@@ -52,7 +55,7 @@ export async function POST(request: Request) {
   for (const employee of employees) {
     const { snapshot } = await createComplianceSnapshot({
       employeeId: employee.id,
-      createdById: session.user.id,
+      createdById: actorId,
       source: 'print',
     })
     snapshotHashes.set(employee.id, snapshot.snapshotHash)
@@ -80,8 +83,8 @@ export async function POST(request: Request) {
   await Promise.all(
     employees.map((employee) =>
       logComplianceActivity({
-        companyId: session.user.companyId,
-        actorId: session.user.id,
+        companyId,
+        actorId,
         employeeId: employee.id,
         type: 'COMPLIANCE_PRINTED',
         metadata: {
@@ -92,7 +95,7 @@ export async function POST(request: Request) {
     )
   )
 
-  return new NextResponse(binderBuffer, {
+  return new NextResponse(binderBuffer as unknown as BodyInit, {
     headers: {
       'Content-Type': 'application/pdf',
       'Content-Disposition': 'attachment; filename="compliance-binder.pdf"',

@@ -6,7 +6,11 @@ import { createWorkOrderPdfVersion } from '@/lib/dispatch/pdfStorage'
 
 const DISPATCH_CAPABLE_ROLES = ['dispatch', 'admin', 'owner']
 
-export async function GET(_request: NextRequest, { params }: { params: { workOrderId: string } }) {
+export async function GET(
+  _request: NextRequest,
+  context: { params: Promise<{ workOrderId: string }> }
+) {
+  const { workOrderId } = await context.params
   const session = await getServerSession(authOptions)
 
   if (!session?.user?.companyId) {
@@ -19,7 +23,7 @@ export async function GET(_request: NextRequest, { params }: { params: { workOrd
     return new Response('Forbidden', { status: 403 })
   }
 
-  const workOrder = await getWorkOrderDetail(params.workOrderId, session.user.companyId)
+  const workOrder = await getWorkOrderDetail(workOrderId, session.user.companyId)
 
   if (!workOrder) {
     return new Response('Work order not found', { status: 404 })
@@ -33,7 +37,7 @@ export async function GET(_request: NextRequest, { params }: { params: { workOrd
       reason: 'manual-download',
     })
 
-    return new Response(pdfBuffer, {
+    return new Response(pdfBuffer as unknown as BodyInit, {
       status: 200,
       headers: {
         'Content-Type': 'application/pdf',

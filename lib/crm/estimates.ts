@@ -39,7 +39,7 @@ export type CrmEstimateReadonly = {
     fileName: string
     storageKey: string
     fileSize: number
-    createdAt: Date
+    generatedAt: Date
     hash: string
   }
 }
@@ -87,8 +87,8 @@ export async function loadCrmEstimateReadonly(companyId: string, userId: string,
 
   const document = await prisma.estimateDocument.findFirst({
     where: { estimateId: deal.estimate.id, revisionId: revision.id, kind: 'QUOTE' },
-    orderBy: { createdAt: 'desc' },
-    select: { id: true, fileName: true, storageKey: true, fileSize: true, createdAt: true, hash: true },
+    orderBy: { generatedAt: 'desc' },
+    select: { id: true, fileName: true, storageKey: true, fileSize: true, generatedAt: true, hash: true },
   })
 
   if (!document) {

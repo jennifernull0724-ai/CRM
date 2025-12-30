@@ -196,10 +196,18 @@ function rowsToCountMap(rows: { ownerId: string; count: bigint }[]): Map<string,
 
 export async function ensureAnalyticsPreconditions(scope: ContactAnalyticsScope): Promise<void> {
   const contactFilter = baseContactWhere(scope)
-  const [missingLastActivity, completedWithoutTimestamp] = await Promise.all([
-    prisma.contact.count({ where: { ...contactFilter, lastActivityAt: null } }),
+  const [missingLastActivityRow, completedWithoutTimestamp] = await Promise.all([
+    prisma.$queryRaw<{ count: bigint }[]>(Prisma.sql`
+      SELECT COUNT(*)::bigint AS count
+      FROM "Contact" c
+      WHERE c."companyId" = ${scope.companyId}
+        AND c."archived" = false
+        ${ownerClause(scope, 'c')}
+        AND c."lastActivityAt" IS NULL
+    `),
     prisma.task.count({ where: { completed: true, completedAt: null, contact: contactFilter } }),
   ])
+  const missingLastActivity = Number(missingLastActivityRow[0]?.count ?? 0)
 
   if (missingLastActivity > 0) {
     throw new AnalyticsPreconditionError('lastActivityAt missing for contacts in scope')

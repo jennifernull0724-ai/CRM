@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
@@ -6,7 +6,11 @@ import { getDownloadUrl } from '@/lib/s3'
 
 const CRM_ALLOWED_ROLES = new Set(['user'])
 
-export async function GET(_request: Request, { params }: { params: { dealId: string; documentId: string } }) {
+export async function GET(
+  _request: NextRequest,
+  context: { params: Promise<{ dealId: string; documentId: string }> }
+) {
+  const { dealId, documentId } = await context.params
   const session = await auth()
 
   if (!session?.user?.companyId || !session.user.id) {
@@ -20,8 +24,8 @@ export async function GET(_request: Request, { params }: { params: { dealId: str
 
   const record = await prisma.dealBidDocument.findFirst({
     where: {
-      id: params.documentId,
-      dealId: params.dealId,
+      id: documentId,
+      dealId,
       companyId: session.user.companyId,
       deal: { createdById: session.user.id },
     },

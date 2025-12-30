@@ -57,7 +57,7 @@ export type WorkOrderPdfPayload = {
   }>
 }
 
-function bufferPdf(doc: PDFDocument): Promise<Buffer> {
+function bufferPdf(doc: InstanceType<typeof PDFDocument>): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = []
     doc.on('data', (chunk) => chunks.push(chunk))

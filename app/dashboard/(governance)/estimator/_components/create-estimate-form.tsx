@@ -1,4 +1,4 @@
-import { createEstimateAction } from '@/app/dashboard/(governance)/estimator/actions'
+import { createEstimateAction } from '@/app/dashboard/estimator/actions'
 import { RichTextInput } from '@/components/rich-text-input'
 import type { ContactOption, DealOption } from '@/lib/estimating/dashboard'
 

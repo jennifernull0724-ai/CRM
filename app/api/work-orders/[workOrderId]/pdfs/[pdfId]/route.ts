@@ -4,7 +4,11 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { getDownloadUrl } from '@/lib/s3'
 
-export async function GET(_request: NextRequest, { params }: { params: { workOrderId: string; pdfId: string } }) {
+export async function GET(
+  _request: NextRequest,
+  context: { params: Promise<{ workOrderId: string; pdfId: string }> }
+) {
+  const { workOrderId, pdfId } = await context.params
   const session = await getServerSession(authOptions)
 
   if (!session?.user?.companyId) {
@@ -13,8 +17,8 @@ export async function GET(_request: NextRequest, { params }: { params: { workOrd
 
   const pdfRecord = await prisma.workOrderPdf.findFirst({
     where: {
-      id: params.pdfId,
-      workOrderId: params.workOrderId,
+      id: pdfId,
+      workOrderId,
       companyId: session.user.companyId,
     },
     select: {

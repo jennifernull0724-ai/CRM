@@ -29,11 +29,6 @@ const createPrismaClient = () => {
     // For build time when DATABASE_URL might not be set
     return new PrismaClient({
       log: ['error', 'warn'],
-      __internal: {
-        engine: {
-          tracing: false,
-        },
-      },
     })
   }
 
@@ -44,11 +39,6 @@ const createPrismaClient = () => {
   return new PrismaClient({
     adapter,
     log: ['error', 'warn'],
-    __internal: {
-      engine: {
-        tracing: false,
-      },
-    },
   })
 }
 

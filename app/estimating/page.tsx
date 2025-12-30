@@ -1,7 +1,8 @@
 import Link from 'next/link'
 import { requireEstimatorContext } from '@/lib/estimating/auth'
 import { loadEstimatingPipeline, PIPELINE_STATUSES } from '@/lib/estimating/pipeline'
-import type { EstimateIndustry, EstimateStatus } from '@prisma/client'
+import { EstimateIndustry as EstimateIndustryEnum } from '@prisma/client'
+import type { EstimateIndustry as EstimateIndustryType, EstimateStatus } from '@prisma/client'
 
 function parseDate(value: string | string[] | undefined): Date | null {
   if (!value || Array.isArray(value)) return null
@@ -11,14 +12,18 @@ function parseDate(value: string | string[] | undefined): Date | null {
 
 function parseEnum<T extends string>(value: string | string[] | undefined, allowed: readonly T[]): T | null {
   if (!value || Array.isArray(value)) return null
-  return (allowed as string[]).includes(value) ? (value as T) : null
+  return allowed.includes(value as T) ? (value as T) : null
 }
 
 export default async function EstimatingPipelinePage({ searchParams }: { searchParams: Record<string, string | string[] | undefined> }) {
   const { companyId } = await requireEstimatorContext()
 
   const status = parseEnum<EstimateStatus>(searchParams.status, PIPELINE_STATUSES)
-  const industry = parseEnum<EstimateIndustry>(searchParams.industry, ['RAILROAD', 'CONSTRUCTION', 'ENVIRONMENTAL'] as const)
+  const industry = parseEnum<EstimateIndustryType>(searchParams.industry, [
+    EstimateIndustryEnum.RAILROAD,
+    EstimateIndustryEnum.CONSTRUCTION,
+    EstimateIndustryEnum.ENVIRONMENTAL,
+  ] as const)
   const contactId = typeof searchParams.contactId === 'string' ? searchParams.contactId : null
   const createdFrom = parseDate(searchParams.createdFrom)
   const createdTo = parseDate(searchParams.createdTo)

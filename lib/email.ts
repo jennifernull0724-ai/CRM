@@ -1,9 +1,19 @@
 import type { ReactElement } from 'react'
 import { Resend } from 'resend'
+import type { CreateEmailOptions } from 'resend'
 import type { SeatLimits } from '@/lib/billing/planTiers'
 import { PostPurchaseWelcomeEmailTemplate, renderPostPurchaseWelcomeText } from '@/lib/email/templates/postPurchaseWelcome'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
+
+type RequireAtLeastOne<T, Keys extends keyof T = keyof T> =
+  Keys extends keyof T ? Partial<Omit<T, Keys>> & Required<Pick<T, Keys>> : never
+
+type EmailRenderableContent = Pick<CreateEmailOptions, 'html' | 'text' | 'react'>
+
+function hasRenderableContent(content: EmailRenderableContent): content is RequireAtLeastOne<EmailRenderableContent> {
+  return Boolean(content.html || content.react || content.text)
+}
 
 export interface SendEmailParams {
   to: string | string[]
@@ -27,22 +37,24 @@ export interface SendEmailParams {
 export async function sendEmail(params: SendEmailParams) {
   const { to, subject, html, text, react, from, cc, bcc, attachments, tags } = params
 
-  if (!html && !react) {
-    throw new Error('Email content (html or react) is required')
+  const renderContent: EmailRenderableContent = { html, react, text }
+
+  if (!hasRenderableContent(renderContent)) {
+    throw new Error('Email content (html, text, or react) is required')
   }
 
-  const result = await resend.emails.send({
+  const payload: CreateEmailOptions = {
     from: from || process.env.EMAIL_FROM!,
     to: Array.isArray(to) ? to : [to],
     subject,
-    ...(html && { html }),
-    ...(text && { text }),
-    ...(react && { react }),
     ...(cc && { cc: Array.isArray(cc) ? cc : [cc] }),
     ...(bcc && { bcc: Array.isArray(bcc) ? bcc : [bcc] }),
     ...(attachments && { attachments }),
     ...(tags && { tags }),
-  })
+    ...renderContent,
+  }
+
+  const result = await resend.emails.send(payload)
 
   return result
 }

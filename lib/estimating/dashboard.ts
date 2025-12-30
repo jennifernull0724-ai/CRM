@@ -1,10 +1,10 @@
 import { prisma } from '@/lib/prisma'
 import { listEstimatingPresets } from '@/lib/estimating/presets'
 import { loadStandardSettings, type StandardSettingsData } from '@/lib/dashboard/standardSettings'
+import { EstimateStatus as EstimateStatusEnum } from '@prisma/client'
 import type {
   Estimate,
   EstimateDocument,
-  EstimateDocumentKind,
   EstimateEmail,
   EstimateIndustry,
   EstimateLineItem,
@@ -72,7 +72,13 @@ export type EstimateWorkspaceData = {
     locked: boolean
     updatedAt: Date
   }
-  lineItems: Array<EstimateLineItem & { quantity: number; unitCost: number; lineTotal: number }>
+  lineItems: Array<
+    Omit<EstimateLineItem, 'quantity' | 'unitCost' | 'lineTotal'> & {
+      quantity: number
+      unitCost: number
+      lineTotal: number
+    }
+  >
   documents: EstimateDocument[]
   emails: EstimateEmail[]
   revisionHistory: Array<{
@@ -109,11 +115,11 @@ export type EstimatingDashboardPayload = {
 }
 
 const PIPELINE_STATUSES: EstimateStatus[] = [
-  'DRAFT',
-  'AWAITING_APPROVAL',
-  'APPROVED',
-  'RETURNED_TO_USER',
-  'SENT_TO_DISPATCH',
+  EstimateStatusEnum.DRAFT,
+  EstimateStatusEnum.AWAITING_APPROVAL,
+  EstimateStatusEnum.APPROVED,
+  EstimateStatusEnum.RETURNED_TO_USER,
+  EstimateStatusEnum.SENT_TO_DISPATCH,
 ]
 
 function decimalToNumber(value: unknown): number {
@@ -291,12 +297,15 @@ async function fetchSelectedEstimate(companyId: string, estimateId: string): Pro
       locked: revision.locked,
       updatedAt: revision.updatedAt,
     },
-    lineItems: revision.lineItems.map((item) => ({
-      ...item,
-      quantity: decimalToNumber(item.quantity),
-      unitCost: decimalToNumber(item.unitCost),
-      lineTotal: decimalToNumber(item.lineTotal),
-    })),
+    lineItems: revision.lineItems.map((item) => {
+      const { quantity, unitCost, lineTotal, ...rest } = item
+      return {
+        ...rest,
+        quantity: decimalToNumber(quantity),
+        unitCost: decimalToNumber(unitCost),
+        lineTotal: decimalToNumber(lineTotal),
+      }
+    }),
     documents: revision.documents,
     emails: revision.emails,
     revisionHistory: record.revisions,
@@ -316,7 +325,7 @@ async function buildAnalytics(
 
   const totalEstimates = pipelineRows.length
   const approvedEstimates = totalsByStatus.APPROVED ?? 0
-  const returnedEstimates = totalsByStatus.RETURNED_TO_USER ?? 0
+  const returnedEstimates = totalsByStatus[EstimateStatusEnum.RETURNED_TO_USER] ?? 0
   const sentToDispatch = totalsByStatus.SENT_TO_DISPATCH ?? 0
   const revisionFrequency = totalEstimates ? pipelineRows.reduce((acc, row) => acc + row.revisionNumber, 0) / totalEstimates : 0
 
@@ -355,7 +364,7 @@ async function buildAnalytics(
   const conversionRate = approvedEstimates ? sentToDispatch / approvedEstimates : 0
 
   const awaitingApprovals = pipelineRows.filter((row) => row.status === 'AWAITING_APPROVAL')
-  const returnedQueue = pipelineRows.filter((row) => row.status === 'RETURNED_TO_USER')
+  const returnedQueue = pipelineRows.filter((row) => row.status === EstimateStatusEnum.RETURNED_TO_USER)
 
   return {
     totalsByStatus,
@@ -400,7 +409,7 @@ export async function loadEstimatingDashboard(params: {
   const pipelines = PIPELINE_STATUSES.reduce<Record<EstimateStatus, PipelineEstimateRow[]>>((acc, status) => {
     acc[status] = pipelineRows.filter((row) => row.status === status)
     return acc
-  }, Object.fromEntries(PIPELINE_STATUSES.map((status) => [status, []])) as Record<EstimateStatus, PipelineEstimateRow[]>)
+  }, {} as Record<EstimateStatus, PipelineEstimateRow[]>)
 
   const analytics = await buildAnalytics(companyId, pipelineRows, scope)
 

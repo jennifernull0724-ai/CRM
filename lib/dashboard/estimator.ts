@@ -1,13 +1,13 @@
-import { Prisma, type EstimateStatus } from '@prisma/client'
+import { Prisma, EstimateStatus } from '@prisma/client'
+import type { EstimateStatus as EstimateStatusValue } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 
-const PIPELINE_STATUSES: EstimateStatus[] = [
-  'DRAFT',
-  'AWAITING_APPROVAL',
-  'APPROVED',
-  'SENT_TO_DISPATCH',
-  'RETURNED_TO_USER',
-  'REVISION_REQUIRED',
+const PIPELINE_STATUSES: EstimateStatusValue[] = [
+  EstimateStatus.DRAFT,
+  EstimateStatus.AWAITING_APPROVAL,
+  EstimateStatus.APPROVED,
+  EstimateStatus.SENT_TO_DISPATCH,
+  EstimateStatus.RETURNED_TO_USER,
 ]
 
 type AllowedEstimatorRole = 'owner' | 'admin' | 'estimator'
@@ -28,7 +28,7 @@ export type EstimatorDashboardMetrics = {
 }
 
 export type EstimatorPipelineSummary = Array<{
-  status: EstimateStatus
+  status: EstimateStatusValue
   count: number
 }>
 
@@ -123,7 +123,7 @@ export async function loadEstimatorDashboard(params: ScopeParams): Promise<Estim
     }),
   ])
 
-  const statusMap = statusGroups.reduce<Record<EstimateStatus, number>>((acc, group) => {
+  const statusMap = statusGroups.reduce<Record<EstimateStatusValue, number>>((acc, group) => {
     acc[group.status] = group._count._all
     return acc
   }, Object.create(null))

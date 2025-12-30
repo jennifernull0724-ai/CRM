@@ -63,7 +63,7 @@ export async function requireCrmUserContext() {
 
 export type ActionResult = { success: boolean; message?: string }
 
-export async function createCrmDealAction(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
+export async function createCrmDealAction(formData: FormData): Promise<ActionResult> {
   try {
     const { userId, companyId } = await requireCrmUserContext()
     const payload = CREATE_DEAL_SCHEMA.parse({
@@ -131,7 +131,7 @@ export async function createCrmDealAction(_prev: ActionResult, formData: FormDat
         data: {
           companyId,
           actorId: userId,
-          action: 'DEAL_CREATED_FROM_CRM',
+            action: 'DEAL_CREATED_FROM_CONTACT',
           metadata: {
             contactId: contact.id,
             dealId: createdDeal.id,
@@ -257,7 +257,7 @@ export async function emailApprovedEstimateFromCrmAction(formData: FormData): Pr
 
     const document = await prisma.estimateDocument.findFirst({
       where: { estimateId: deal.estimate.id, revisionId: revision.id, kind: 'QUOTE' },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { generatedAt: 'desc' },
     })
 
     if (!document) {

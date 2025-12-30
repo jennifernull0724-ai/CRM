@@ -1,6 +1,8 @@
 import PDFDocument from 'pdfkit'
 import type { EstimateIndustry } from '@prisma/client'
 
+type PdfDoc = InstanceType<typeof PDFDocument>
+
 export type PdfLineItem = {
   presetLabel: string
   description: string
@@ -43,7 +45,7 @@ function formatCurrency(value: number) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value)
 }
 
-async function streamToBuffer(doc: PDFDocument): Promise<Buffer> {
+async function streamToBuffer(doc: PdfDoc): Promise<Buffer> {
   return await new Promise<Buffer>((resolve, reject) => {
     const chunks: Buffer[] = []
     doc.on('data', (chunk) => chunks.push(Buffer.from(chunk)))
@@ -53,13 +55,13 @@ async function streamToBuffer(doc: PDFDocument): Promise<Buffer> {
   })
 }
 
-function drawSectionHeading(doc: PDFDocument, label: string) {
+function drawSectionHeading(doc: PdfDoc, label: string) {
   doc.moveDown(0.5)
   doc.fillColor('#111827').font('Helvetica-Bold').fontSize(12).text(label.toUpperCase())
   doc.moveDown(0.2)
 }
 
-function renderParagraph(doc: PDFDocument, htmlContent: string) {
+function renderParagraph(doc: PdfDoc, htmlContent: string) {
   const text = htmlContent
     .replace(/<\/?(strong|b)>/gi, '')
     .replace(/<br\s*\/?>(\r\n)?/gi, '\n')
@@ -70,7 +72,7 @@ function renderParagraph(doc: PDFDocument, htmlContent: string) {
   doc.font('Helvetica').fontSize(10).fillColor('#1F2933').text(text || '—', { align: 'left' })
 }
 
-function renderLineItemTable(doc: PDFDocument, items: PdfLineItem[]) {
+function renderLineItemTable(doc: PdfDoc, items: PdfLineItem[]) {
   const headers = ['Preset', 'Description', 'Qty', 'Unit', 'Unit Cost', 'Line Total']
   const columnWidths = [110, 170, 40, 40, 80, 90]
 
@@ -97,7 +99,7 @@ function renderLineItemTable(doc: PDFDocument, items: PdfLineItem[]) {
   })
 }
 
-function renderTotals(doc: PDFDocument, params: GenerateEstimatePdfParams) {
+function renderTotals(doc: PdfDoc, params: GenerateEstimatePdfParams) {
   const lines: Array<{ label: string; value: string }> = [
     { label: 'Subtotal', value: formatCurrency(params.subtotal) },
   ]

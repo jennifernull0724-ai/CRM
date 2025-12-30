@@ -1,7 +1,10 @@
 "use server"
+import { randomUUID } from 'crypto'
 import { getServerSession } from 'next-auth'
 import { z } from 'zod'
 import {
+	Prisma,
+	AccessAuditAction,
 	ContactActivityState,
 	ContactCallDirection,
 	ContactMeetingType,
@@ -20,7 +23,7 @@ const MAX_ATTACHMENT_BYTES = 15 * 1024 * 1024
 const MAX_TOTAL_ATTACHMENT_BYTES = 25 * 1024 * 1024
 const MAX_ATTACHMENT_COUNT = 5
 
-export type ActionState = { success: boolean; message?: string; contactId?: string }
+export type ActionState = { success: boolean; message?: string; contactId?: string; resetToken?: string }
 
 type WorkspaceContext = {
 	userId: string
@@ -77,7 +80,7 @@ async function logActivity(params: {
 	type: string
 	subject: string
 	description?: string | null
-	metadata?: Record<string, unknown>
+	metadata?: Prisma.InputJsonValue
 }) {
 	await prisma.activity.create({
 		data: {
@@ -86,7 +89,7 @@ async function logActivity(params: {
 			type: params.type,
 			subject: params.subject,
 			description: params.description ?? null,
-			metadata: params.metadata ?? null,
+			metadata: params.metadata ?? Prisma.JsonNull,
 			userId: params.userId,
 		},
 	})
@@ -95,8 +98,8 @@ async function logActivity(params: {
 async function logAuditEvent(params: {
 	companyId: string
 	actorId: string
-	action: string
-	metadata?: Record<string, unknown>
+	action: AccessAuditAction
+	metadata?: Prisma.InputJsonValue
 	targetUserId?: string
 }) {
 	await prisma.accessAuditLog.create({
@@ -105,7 +108,7 @@ async function logAuditEvent(params: {
 			actorId: params.actorId,
 			targetUserId: params.targetUserId,
 			action: params.action,
-			metadata: params.metadata ?? null,
+			metadata: params.metadata ?? Prisma.JsonNull,
 		},
 	})
 }
@@ -131,7 +134,7 @@ const createContactSchema = z.object({
 	source: z.string().optional(),
 })
 
-export async function createContactAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+export async function createContactAction(prev: ActionState, formData: FormData): Promise<ActionState> {
 	try {
 		const { userId, companyId } = await requireWorkspaceContext()
 		const payload = createContactSchema.parse({
@@ -153,10 +156,10 @@ export async function createContactAction(_prev: ActionState, formData: FormData
 
 		revalidateContactSurfaces(contact.id)
 
-		return { success: true, contactId: contact.id }
+		return { success: true, contactId: contact.id, resetToken: randomUUID() }
 	} catch (error) {
 		const message = error instanceof Error ? error.message : 'Unable to create contact'
-		return { success: false, message }
+		return { success: false, message, resetToken: prev.resetToken }
 	}
 }
 
@@ -303,7 +306,7 @@ export async function createContactTaskAction(
 
 		revalidateContactSurfaces(contact.id)
 
-		return { success: true, contactId: contact.id }
+		return { success: true, contactId: contact.id, resetToken: randomUUID() }
 	} catch (error) {
 		const message = error instanceof Error ? error.message : 'Unable to create task'
 		return { success: false, message }
@@ -425,7 +428,7 @@ const noteSchema = z.object({
 
 export async function createContactNoteAction(
 	contactId: string,
-	_prev: ActionState,
+	prev: ActionState,
 	formData: FormData
 ): Promise<ActionState> {
 	try {
@@ -500,7 +503,7 @@ export async function createContactNoteAction(
 		return { success: true, contactId: contact.id }
 	} catch (error) {
 		const message = error instanceof Error ? error.message : 'Unable to add note'
-		return { success: false, message }
+		return { success: false, message, resetToken: prev.resetToken }
 	}
 }
 
@@ -615,7 +618,7 @@ export async function logContactMeetingAction(
 				meetingType: data.meetingType,
 				scheduledFor,
 				durationMinutes,
-				attendees: attendeeList.length ? attendeeList : null,
+				attendees: attendeeList.length ? attendeeList : Prisma.JsonNull,
 				outcome: data.outcome ?? null,
 				notes: data.notes ?? null,
 			},
@@ -778,6 +781,8 @@ export async function sendContactEmailAction(
 	stateOrFormData: ActionState | FormData,
 	maybeFormData?: FormData
 ): Promise<ActionState> {
+	const previousState: ActionState = stateOrFormData instanceof FormData ? { success: false } : stateOrFormData
+
 	try {
 		const formData = resolveFormData(stateOrFormData, maybeFormData)
 		const { userId, companyId } = await requireWorkspaceContext()
@@ -875,10 +880,10 @@ export async function sendContactEmailAction(
 		})
 		revalidateContactSurfaces(contact.id)
 
-		return { success: true, contactId: contact.id, message: 'Email sent' }
+		return { success: true, contactId: contact.id, message: 'Email sent', resetToken: randomUUID() }
 	} catch (error) {
 		const message = error instanceof Error ? error.message : 'Unable to send email'
-		return { success: false, message }
+		return { success: false, message, resetToken: previousState.resetToken }
 	}
 }
 

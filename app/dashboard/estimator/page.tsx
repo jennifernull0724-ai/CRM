@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { EstimateStatus } from '@prisma/client'
 import { requireEstimatorContext } from '@/lib/estimating/auth'
 import { loadEstimatingDashboard, type EstimatingDashboardPayload } from '@/lib/estimating/dashboard'
 import { EstimatingAnalyticsPanel } from './_components/estimating-analytics'
@@ -25,7 +26,7 @@ export default async function EstimatorDashboard({ searchParams }: PageProps) {
 
   const normalizedPipelines: Record<string, EstimatingDashboardPayload['pipelines'][keyof EstimatingDashboardPayload['pipelines']]> = {
     ...payload.pipelines,
-    REVISION_REQUIRED: payload.pipelines.RETURNED_TO_USER ?? [],
+    REVISION_REQUIRED: payload.pipelines[EstimateStatus.RETURNED_TO_USER] ?? [],
   }
 
   const highlightId = selectedEstimateId ?? payload.selectedEstimate?.estimate.id ?? null

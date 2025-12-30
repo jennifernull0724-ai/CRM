@@ -8,7 +8,7 @@ import { PLAN_TIERS, type PlanKey } from '@/lib/billing/planTiers'
 const stripeSecret = process.env.STRIPE_SECRET_KEY
 const stripe = stripeSecret
   ? new Stripe(stripeSecret, {
-      apiVersion: '2024-12-18.acacia',
+      apiVersion: '2025-12-15.clover',
     })
   : null
 

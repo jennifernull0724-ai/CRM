@@ -130,17 +130,18 @@ export default async function ComplianceDashboardPage() {
     return acc
   }, {})
 
-  const staleCutoff = Date.now() - 1000 * 60 * 60 * 24 * 30
+  const now = new Date()
+  const staleCutoff = now.getTime() - 1000 * 60 * 60 * 24 * 30
   const snapshotStaleCount = Object.values(latestSnapshotMap).filter((snap) => snap.createdAt.getTime() < staleCutoff).length
 
   const blockingDispatch = Object.values(latestSnapshotMap).filter((snap) => {
-    const reasons = Array.isArray((snap as any).failureReasons) ? (snap as any).failureReasons : snap.payload?.failureReasons ?? []
+    const reasons = extractFailureReasons(snap)
     return (reasons?.length ?? 0) > 0 || snap.employee.complianceStatus !== 'PASS'
   }).length
 
   const failureReasonBreakdown = Object.values(latestSnapshotMap).reduce<Record<string, number>>((acc, snap) => {
-    const reasons = Array.isArray((snap as any).failureReasons) ? (snap as any).failureReasons : snap.payload?.failureReasons ?? []
-    reasons.forEach((reason: any) => {
+    const reasons = extractFailureReasons(snap)
+    reasons.forEach((reason) => {
       const key = reason?.type ?? 'UNKNOWN'
       acc[key] = (acc[key] ?? 0) + 1
     })
@@ -367,4 +368,37 @@ export default async function ComplianceDashboardPage() {
       </section>
     </div>
   )
+}
+
+type FailureReason = { type?: string | null }
+
+type SnapshotFailureSource = {
+  failureReasons?: unknown
+  payload?: Prisma.JsonValue | null
+}
+
+function extractFailureReasons(snapshot: SnapshotFailureSource): FailureReason[] {
+  if (Array.isArray(snapshot.failureReasons)) {
+    return snapshot.failureReasons.filter(isFailureReason)
+  }
+  if (isFailureReasonPayload(snapshot.payload)) {
+    const candidate = snapshot.payload.failureReasons
+    if (Array.isArray(candidate)) {
+      return candidate.filter(isFailureReason)
+    }
+  }
+  return []
+}
+
+function isFailureReasonPayload(
+  value: Prisma.JsonValue | null | undefined
+): value is Prisma.JsonObject & { failureReasons?: Prisma.JsonValue } {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return false
+  }
+  return 'failureReasons' in value
+}
+
+function isFailureReason(value: unknown): value is FailureReason {
+  return typeof value === 'object' && value !== null
 }

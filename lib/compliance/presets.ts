@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/prisma'
-import { ComplianceCategory, CompliancePreset } from '@prisma/client'
+import { ComplianceCategory, CompliancePreset, Prisma } from '@prisma/client'
 
 export type CompliancePresetDefinition = {
   key: string
@@ -89,7 +89,7 @@ export const COMPLIANCE_PRESET_DEFINITIONS: PresetGroup = {
 export async function ensureCompliancePresets(companyId: string): Promise<CompliancePreset[]> {
   const existing = await prisma.compliancePreset.findMany({ where: { companyId } })
   const existingMap = new Map(existing.map((preset) => [`${preset.category}:${preset.baseKey}`, preset]))
-  const createPayload: Parameters<typeof prisma.compliancePreset.createMany>[0]['data'] = []
+  const createPayload: Prisma.CompliancePresetCreateManyInput[] = []
 
   for (const [category, definitions] of Object.entries(COMPLIANCE_PRESET_DEFINITIONS) as [
     ComplianceCategory,

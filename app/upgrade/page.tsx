@@ -23,9 +23,12 @@ export default async function UpgradePage({
     redirect('/login?from=/upgrade')
   }
 
-  const paidPlans: PlanKey[] = ['growth', 'pro', 'enterprise']
+  const paidPlans = ['growth', 'pro', 'enterprise'] as const
+  type PaidPlanKey = (typeof paidPlans)[number]
   const requestedPlan = searchParams.plan
-  const selectedPlan = paidPlans.includes(requestedPlan as PlanKey) ? (requestedPlan as PlanKey) : 'growth'
+  const selectedPlan: PaidPlanKey = paidPlans.includes(requestedPlan as PaidPlanKey)
+    ? (requestedPlan as PaidPlanKey)
+    : 'growth'
   const plan = PLAN_TIERS[selectedPlan]
 
   const totalSeats = getTotalSeats(plan.seatLimits)

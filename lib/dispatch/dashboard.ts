@@ -221,7 +221,7 @@ export function mapIndustryToDiscipline(industry: EstimateIndustry | null | unde
   }
 
   switch (industry) {
-    case 'RAILROAD':
+    case 'RAIL':
       return 'RAILROAD'
     case 'ENVIRONMENTAL':
       return 'ENVIRONMENTAL'

@@ -7,13 +7,13 @@ import { prisma } from '@/lib/prisma'
 import { GOVERNANCE_ROLES, type GovernanceRole } from '@/lib/dashboard/governance'
 import { getInviteToggle, setInviteToggle, updateCompliancePolicies, type CompliancePolicies } from '@/lib/system/settings'
 import { enforceCanUseEmailIntegration } from '@/lib/billing/enforcement'
-import type { AccessAuditAction, EmailProvider, EmailTemplateScope, WorkOrderStatus } from '@prisma/client'
+import { Prisma, type AccessAuditAction, type EmailProvider, type EmailTemplateScope, type WorkOrderStatus } from '@prisma/client'
 import { randomUUID } from 'crypto'
 import { transitionWorkOrderStatus, assertWorkOrderMutable } from '@/lib/dispatch/workOrderLifecycle'
 import { recordWorkOrderActivity } from '@/lib/dispatch/workOrderActivity'
 
 const DAY = 24 * 60 * 60 * 1000
-const EMAIL_PROVIDERS: EmailProvider[] = ['gmail', 'outlook', 'custom']
+const EMAIL_PROVIDERS: EmailProvider[] = ['gmail', 'outlook']
 const EMAIL_TEMPLATE_SCOPES: EmailTemplateScope[] = ['crm', 'estimating', 'dispatch', 'work_orders', 'global']
 const WORK_ORDER_STATUS_VALUES: WorkOrderStatus[] = ['DRAFT', 'SCHEDULED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED']
 
@@ -47,7 +47,7 @@ async function logAccessAction(
   companyId: string,
   actorId: string,
   action: AccessAuditAction,
-  extras?: { targetUserId?: string; targetInviteId?: string; metadata?: Record<string, unknown> }
+  extras?: { targetUserId?: string; targetInviteId?: string; metadata?: Prisma.InputJsonValue }
 ) {
   await prisma.accessAuditLog.create({
     data: {
@@ -56,7 +56,7 @@ async function logAccessAction(
       action,
       targetUserId: extras?.targetUserId,
       targetInviteId: extras?.targetInviteId,
-      metadata: extras?.metadata,
+      metadata: extras?.metadata ?? Prisma.JsonNull,
     },
   })
 }
@@ -73,15 +73,15 @@ function assertTemplateScope(scope: string): asserts scope is EmailTemplateScope
   }
 }
 
-function parseMetadataInput(value?: string): Record<string, unknown> | undefined {
+function parseMetadataInput(value?: string): Prisma.InputJsonValue | undefined {
   if (!value) {
     return undefined
   }
 
   try {
-    return JSON.parse(value)
+    return JSON.parse(value) as Prisma.InputJsonValue
   } catch {
-    return { note: value }
+    return { note: value } as Prisma.InputJsonValue
   }
 }
 
@@ -97,7 +97,8 @@ export async function inviteUserAction(formData: FormData) {
 
   assertRole(roleRaw)
 
-  const allowedRoles: GovernanceRole[] = role === 'owner' ? GOVERNANCE_ROLES : ['estimator', 'user', 'dispatch']
+  const allowedRoles: readonly GovernanceRole[] =
+    role === 'owner' ? GOVERNANCE_ROLES : (['estimator', 'user', 'dispatch'] as readonly GovernanceRole[])
   if (!allowedRoles.includes(roleRaw as GovernanceRole)) {
     throw new Error('You are not allowed to invite that role')
   }
