@@ -161,65 +161,67 @@ export default function LandingPage() {
             </header>
             <div className="grid gap-8 md:grid-cols-3">
               {industrySections.map((industry) => (
-                <article key={industry.title} className="flex h-full flex-col rounded-2xl border border-slate-800 bg-slate-900/60 p-8 shadow-xl shadow-slate-900/50">
+                <article key={industry.title} className="flex h-full flex-col rounded-2xl border border-white/5 bg-slate-950/40 p-8 shadow-xl shadow-black/20">
                   <div className="text-sm font-bold uppercase tracking-[0.25em] text-orange-400">{industry.title}</div>
                   <p className="mt-6 text-lg font-semibold leading-snug text-white">{industry.challenge}</p>
-                  <p className="mt-4 text-base leading-relaxed text-slate-300">{industry.response}</p>
-                  <div className="mt-6 h-1 w-16 bg-orange-500" />
+                  <p className="mt-4 text-base leading-relaxed text-slate-400">{industry.response}</p>
+                  <div className="mt-6 h-1 w-16 bg-orange-500/90" />
                 </article>
               ))}
             </div>
           </div>
         </section>
 
-        <section className="bg-slate-900/40 py-24">
+        <section className="bg-slate-950/60 py-24">
           <div className="mx-auto max-w-7xl space-y-16 px-6">
-            <header className="max-w-4xl space-y-5">
-              <p className="text-sm font-semibold uppercase tracking-[0.3em] text-orange-400">Operational Coverage</p>
-              <h2 className="text-4xl font-bold leading-tight text-white md:text-5xl">One operating record spans CRM, estimating, dispatch, and compliance.</h2>
-              <p className="text-lg leading-relaxed text-slate-300">Each module uses the same enforcement logic, so field teams move from bid to proof without duplicating data or losing audit context.</p>
-            </header>
-            <div className="grid gap-10 md:grid-cols-2 lg:grid-cols-4">
-              {operationalCoverage.map((area) => (
-                <article key={area.name} className="space-y-4 border-b-2 border-slate-800 pb-8">
-                  <h3 className="text-2xl font-bold text-orange-400">{area.name}</h3>
-                  {area.lines.map((line) => (
-                    <p key={line} className="text-base leading-relaxed text-slate-200">
-                      {line}
-                    </p>
-                  ))}
-                </article>
-              ))}
-            </div>
-            <div className="border-t-2 border-slate-800 pt-12">
-              <p className="text-sm font-semibold uppercase tracking-[0.3em] text-orange-400">Operational Flow</p>
-              <div className="mt-6 flex flex-wrap items-center gap-4 text-lg font-semibold text-slate-100">
-                {flowSteps.map((step, index) => (
-                  <div key={step} className="flex items-center gap-4">
-                    <span>{step}</span>
-                    {index < flowSteps.length - 1 && (
-                      <span aria-hidden className="text-orange-500">
-                        →
-                      </span>
-                    )}
-                  </div>
+            <div className="rounded-3xl bg-slate-900/30 p-10 backdrop-blur-sm">
+              <header className="max-w-4xl space-y-5">
+                <p className="text-sm font-semibold uppercase tracking-[0.3em] text-orange-400">Operational Coverage</p>
+                <h2 className="text-4xl font-bold leading-tight text-white md:text-5xl">One operating record spans CRM, estimating, dispatch, and compliance.</h2>
+                <p className="text-lg leading-relaxed text-slate-400">Each module uses the same enforcement logic, so field teams move from bid to proof without duplicating data or losing audit context.</p>
+              </header>
+              <div className="mt-16 grid gap-10 md:grid-cols-2 lg:grid-cols-4">
+                {operationalCoverage.map((area) => (
+                  <article key={area.name} className="space-y-4 border-b border-white/8 pb-8">
+                    <h3 className="text-2xl font-bold text-orange-400">{area.name}</h3>
+                    {area.lines.map((line) => (
+                      <p key={line} className="text-base leading-relaxed text-slate-300">
+                        {line}
+                      </p>
+                    ))}
+                  </article>
                 ))}
+              </div>
+              <div className="mt-16 border-t border-white/8 pt-12">
+                <p className="text-sm font-semibold uppercase tracking-[0.3em] text-orange-400">Operational Flow</p>
+                <div className="mt-6 flex flex-wrap items-center gap-4 text-lg font-semibold text-slate-200">
+                  {flowSteps.map((step, index) => (
+                    <div key={step} className="flex items-center gap-4">
+                      <span>{step}</span>
+                      {index < flowSteps.length - 1 && (
+                        <span aria-hidden className="text-orange-500">
+                          →
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           </div>
         </section>
 
-        <section className="bg-slate-900/80 py-20 text-white">
+        <section className="bg-slate-950/80 py-20 text-white">
           <div className="mx-auto flex max-w-7xl flex-col gap-8 px-6 md:flex-row md:items-center md:justify-between">
-            <div className="space-y-4">
+            <div className="space-y-4 rounded-2xl bg-slate-900/20 p-8 md:flex-1">
               <p className="text-sm font-semibold uppercase tracking-[0.3em] text-orange-400">Security & Governance</p>
-              <p className="text-xl leading-relaxed text-slate-200 md:max-w-3xl">
+              <p className="text-xl leading-relaxed text-slate-300 md:max-w-3xl">
                 Access controls, audit logs, signed PDFs, and compliance snapshots are enforced server-side so leadership can prove every operational decision without assembling evidence after the fact.
               </p>
             </div>
             <Link
               href="/security"
-              className="rounded-full border-2 border-slate-600 px-8 py-4 text-center text-base font-semibold text-white transition hover:border-orange-500 hover:bg-slate-900/50"
+              className="rounded-full border-2 border-slate-700/60 px-8 py-4 text-center text-base font-semibold text-white transition hover:border-orange-500 hover:bg-slate-900/50"
             >
               View Security & Governance
             </Link>
@@ -228,14 +230,16 @@ export default function LandingPage() {
 
         <section className="bg-slate-950 py-24">
           <div className="mx-auto flex max-w-5xl flex-col items-center gap-6 px-6 text-center">
-            <p className="text-sm font-semibold uppercase tracking-[0.3em] text-orange-400">Pricing</p>
-            <p className="text-2xl font-semibold text-slate-200">Pick the enforcement level your crews need—no per-seat surprises.</p>
-            <Link
-              href="/pricing"
-              className="mt-4 rounded-full bg-orange-500 px-10 py-5 text-lg font-semibold text-white shadow-lg shadow-orange-500/20 transition hover:bg-orange-600 hover:shadow-xl"
-            >
-              View Pricing
-            </Link>
+            <div className="space-y-6 rounded-3xl bg-slate-950/40 p-12">
+              <p className="text-sm font-semibold uppercase tracking-[0.3em] text-orange-400">Pricing</p>
+              <p className="text-2xl font-semibold text-slate-300">Pick the enforcement level your crews need—no per-seat surprises.</p>
+              <Link
+                href="/pricing"
+                className="mt-4 inline-block rounded-full bg-orange-500 px-10 py-5 text-lg font-semibold text-white shadow-lg shadow-orange-500/20 transition hover:bg-orange-600 hover:shadow-xl"
+              >
+                View Pricing
+              </Link>
+            </div>
           </div>
         </section>
       </main>

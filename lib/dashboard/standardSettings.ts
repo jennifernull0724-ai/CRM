@@ -163,18 +163,19 @@ export async function loadStandardSettings(companyId: string): Promise<StandardS
     // EmailRecipientPreference table does not exist in this environment — skip safely
   }
 
-  const brandingSettings = await prisma.systemSetting.findMany({
+  const brandingSettings = await prisma.systemSetting
+    .findMany({
       where: {
         companyId,
         key: { in: [BRANDING_UI_LOGO_KEY, BRANDING_PDF_LOGO_KEY, BRANDING_DISPATCH_PDF_LOGO_KEY] },
       },
       include: {
         updatedBy: {
-          select: { name: true }
+          select: { name: true },
         },
       },
-    }).catch(() => []), // ✅ Return empty array if query fails on fresh account
-  ])
+    })
+    .catch(() => []) // ✅ Return empty array if query fails on fresh account
 
   const brandingMap = brandingSettings.reduce<
     Record<string, { value: BrandingAssetValue | string | null; updatedAt: Date | null; updatedByName: string | null }>
