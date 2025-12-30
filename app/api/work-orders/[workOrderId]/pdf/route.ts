@@ -4,6 +4,8 @@ import { authOptions } from '@/lib/auth'
 import { getWorkOrderDetail } from '@/lib/dispatch/workOrders'
 import { createWorkOrderPdfVersion } from '@/lib/dispatch/pdfStorage'
 
+export const runtime = 'nodejs'
+
 const DISPATCH_CAPABLE_ROLES = ['dispatch', 'admin', 'owner']
 
 export async function GET(

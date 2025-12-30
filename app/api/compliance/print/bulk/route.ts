@@ -7,6 +7,8 @@ import { generateComplianceBinder } from '@/lib/compliance/pdf'
 import { logComplianceActivity } from '@/lib/compliance/activity'
 import { createComplianceSnapshot } from '@/lib/compliance/snapshots'
 
+export const runtime = 'nodejs'
+
 export async function POST(request: Request) {
   const session = await getServerSession(authOptions)
 

@@ -7,6 +7,8 @@ import { generateEmployeeCompliancePdf } from '@/lib/compliance/pdf'
 import { logComplianceActivity } from '@/lib/compliance/activity'
 import { createComplianceSnapshot } from '@/lib/compliance/snapshots'
 
+export const runtime = 'nodejs'
+
 export async function GET(
   _request: NextRequest,
   context: { params: Promise<{ employeeId: string }> }
