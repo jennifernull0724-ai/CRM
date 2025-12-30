@@ -18,6 +18,7 @@
     "@prisma/adapter-neon": "^7.2.0",
     "@prisma/client": "^7.2.0",
     "@react-pdf/renderer": "^4.3.1",
+    "@swc/helpers": "0.4.14",
     "bcryptjs": "^3.0.3",
     "date-fns": "^4.1.0",
     "jose": "^6.1.3",

@@ -20,6 +20,8 @@
       }
     ],
     "paths": {
+      "@/lib/auth": ["./lib/auth/index.ts"],
+      "@/lib/auth/*": ["./lib/auth/*"],
       "@/*": ["./*"]
     }
   },
