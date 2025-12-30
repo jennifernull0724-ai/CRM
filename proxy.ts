@@ -15,10 +15,12 @@ const PUBLIC_PATHS = [
   '/favicon.ico',
   '/robots.txt',
   '/sitemap.xml',
+  '/browserconfig.xml',
 
   '/login',
   '/signup',
   '/forgot-password',
+  '/verify',
 
   '/pricing',
   '/request-demo',
@@ -29,7 +31,12 @@ const PUBLIC_PATHS = [
   '/legal',
   '/support',
 
-  '/api/auth',
+  '/api/auth/signup',
+  '/api/auth/signin',
+  '/api/auth/callback',
+  '/api/auth/session',
+  '/api/auth/csrf',
+  '/api/auth/providers',
   '/api/forms',
   '/api/stripe/checkout',
 ]
@@ -177,6 +184,6 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|.*\\..*).*)',
+    '/((?!_next/static|_next/image|favicon\\.ico|.*\\.(?:png|jpg|jpeg|gif|svg|webp|ico|json|xml|txt)).*)',
   ],
 }

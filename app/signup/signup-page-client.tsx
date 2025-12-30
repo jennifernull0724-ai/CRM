@@ -50,7 +50,22 @@ export function SignupPageClient() {
         return
       }
 
-      router.push('/login?registered=true')
+      // Auto-login after signup
+      const { signIn } = await import('next-auth/react')
+      const signInResult = await signIn('credentials', {
+        email: formData.email,
+        password: formData.password,
+        redirect: false,
+      })
+
+      if (signInResult?.error) {
+        setError('Account created but login failed. Please try logging in.')
+        router.push('/login')
+        return
+      }
+
+      // Redirect to app router which will send to correct dashboard
+      router.push('/app')
     } catch (submitError) {
       console.error('Signup error', submitError)
       setError('An error occurred. Please try again.')
