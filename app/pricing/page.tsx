@@ -157,7 +157,7 @@ export default function PricingPage() {
       <main>
         <section className="px-6 py-20 text-center">
           <div className="mx-auto max-w-3xl space-y-6">
-            <p className="text-xs uppercase tracking-[0.5em] text-emerald-300">Simple, Transparent Pricing</p>
+            <p className="text-xs uppercase tracking-[0.5em] text-orange-400">Simple, Transparent Pricing</p>
             <h1 className="text-4xl font-semibold text-white sm:text-5xl">Choose the plan that matches your operations</h1>
             <p className="text-base text-slate-300">
               Every tier is backed by the same enforcement engine inside T-REX AI OS. No hidden toggles, no surprise add-ons—just the features you need, clearly scoped by role and seat.
@@ -171,12 +171,12 @@ export default function PricingPage() {
               <article key={tier.name} className="flex h-full flex-col rounded-3xl border border-slate-800 bg-slate-900/60 p-6 shadow-xl shadow-slate-900/20">
                 <header className="mb-6 space-y-2">
                   {tier.badge ? (
-                    <span className="inline-flex rounded-full bg-emerald-500/20 px-3 py-1 text-xs font-semibold text-emerald-200">
+                    <span className="inline-flex rounded-full bg-orange-500/20 px-3 py-1 text-xs font-semibold text-orange-300">
                       {tier.badge}
                     </span>
                   ) : null}
                   <h2 className="text-xl font-semibold text-white">{tier.name}</h2>
-                  <p className="text-3xl font-bold text-emerald-300">{tier.price}</p>
+                  <p className="text-3xl font-bold text-orange-400">{tier.price}</p>
                   {tier.subtext ? <p className="text-sm text-slate-400">{tier.subtext}</p> : null}
                   <p className="text-sm font-medium text-slate-200">{tier.seats}</p>
                 </header>
@@ -186,7 +186,7 @@ export default function PricingPage() {
                   <ul className="space-y-2">
                     {tier.included.map((item) => (
                       <li key={item} className="flex items-start gap-2">
-                        <span className="text-emerald-300">✓</span>
+                        <span className="text-orange-400">✓</span>
                         <span>{item}</span>
                       </li>
                     ))}
@@ -212,7 +212,7 @@ export default function PricingPage() {
                     href={tier.ctaHref}
                     className={
                       tier.ctaVariant === 'primary'
-                        ? 'block rounded-full bg-emerald-400 px-4 py-3 text-center text-sm font-semibold text-slate-900 hover:bg-emerald-300'
+                        ? 'block rounded-full bg-orange-500 px-4 py-3 text-center text-sm font-semibold text-white hover:bg-orange-600'
                         : 'block rounded-full border border-slate-600 px-4 py-3 text-center text-sm font-semibold text-white hover:border-white'
                     }
                   >
@@ -266,7 +266,7 @@ export default function PricingPage() {
             <ul className="mt-6 space-y-3 text-sm text-slate-200">
               {enforcementNotes.map((note) => (
                 <li key={note} className="flex items-start gap-2">
-                  <span className="text-emerald-300">•</span>
+                  <span className="text-orange-400">•</span>
                   <span>{note}</span>
                 </li>
               ))}
@@ -275,11 +275,11 @@ export default function PricingPage() {
         </section>
 
         <section className="px-6 pb-24">
-          <div className="mx-auto max-w-5xl rounded-3xl border border-emerald-500/30 bg-gradient-to-r from-emerald-500/10 to-transparent p-10 text-center">
+          <div className="mx-auto max-w-5xl rounded-3xl border border-orange-500/30 bg-gradient-to-r from-orange-500/10 to-transparent p-10 text-center">
             <h4 className="text-3xl font-semibold text-white">Ready to see T-REX AI OS in action?</h4>
             <p className="mt-3 text-base text-slate-200">Launch the Starter trial for instant CRM access or request a guided walkthrough for Growth, Pro, or Enterprise.</p>
             <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center">
-              <Link href="/signup" className="rounded-full bg-emerald-400 px-6 py-3 text-sm font-semibold text-slate-900 hover:bg-emerald-300">
+              <Link href="/signup" className="rounded-full bg-orange-500 px-6 py-3 text-sm font-semibold text-white hover:bg-orange-600">
                 Start free trial
               </Link>
               <Link href="/request-demo" className="rounded-full border border-slate-600 px-6 py-3 text-sm font-semibold text-white hover:border-white">
