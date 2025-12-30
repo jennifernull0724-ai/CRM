@@ -9,7 +9,31 @@ import {
 } from '@/lib/billing/planTiers'
 import { resolveRoleDestination, isUserRole, isOwnerOrAdmin } from '@/lib/auth/roleDestinations'
 
-const PUBLIC_PATHS = ['/', '/login', '/signup', '/pricing', '/request-demo', '/security', '/privacy', '/verify']
+const PUBLIC_PATHS = [
+  '/',
+  '/manifest.json',
+  '/favicon.ico',
+  '/robots.txt',
+  '/sitemap.xml',
+
+  '/login',
+  '/signup',
+  '/forgot-password',
+
+  '/pricing',
+  '/request-demo',
+  '/contact-sales',
+  '/privacy',
+  '/terms',
+  '/security',
+  '/legal',
+  '/support',
+
+  '/api/auth',
+  '/api/forms',
+  '/api/stripe/checkout',
+]
+
 const PLAN_BYPASS_PATHS = ['/upgrade', '/upgrade/success', '/upgrade/cancel']
 const API_BYPASS_PATTERNS = [/^\/api\/auth\//, /^\/api\/stripe\//]
 const STRIPE_RETURN_PATHS = ['/checkout/success', '/checkout/cancel']
@@ -28,7 +52,7 @@ const RESTRICTION_ROUTE_MAP: Record<PlanRestrictionKey, RegExp[]> = {
 const WRITE_METHODS = ['POST', 'PUT', 'PATCH', 'DELETE']
 
 function isPublicPath(pathname: string): boolean {
-  return PUBLIC_PATHS.some((path) => pathname === path || pathname.startsWith(`${path}/`))
+  return PUBLIC_PATHS.some((path) => pathname === path || pathname.startsWith(path))
 }
 
 function shouldBypassPlan(pathname: string): boolean {
@@ -64,11 +88,8 @@ export async function proxy(request: NextRequest) {
   const method = request.method.toUpperCase()
   const isWrite = WRITE_METHODS.includes(method)
 
+  // Allow all public paths to bypass authentication
   if (isPublicPath(pathname)) {
-    const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET })
-    if (token) {
-      return NextResponse.redirect(new URL('/app', request.url))
-    }
     return NextResponse.next()
   }
 
