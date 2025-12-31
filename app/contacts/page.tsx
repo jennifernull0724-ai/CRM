@@ -63,41 +63,41 @@ export default async function ContactsPage({ searchParams }: { searchParams: Sea
   })
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-50">
+    <div className="min-h-screen bg-slate-50">
       <div className="mx-auto max-w-7xl px-4 py-10">
-        <section className="rounded-3xl border border-slate-800 bg-slate-900 p-8 shadow-2xl">
+        <section className="rounded-lg border border-slate-200 bg-white p-8 shadow-sm">
           <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
             <div className="space-y-2">
-              <p className="text-xs uppercase tracking-[0.5em] text-slate-400">Contacts</p>
-              <h1 className="text-4xl font-semibold leading-tight">Company contacts</h1>
-              <p className="text-sm text-slate-400">Shared contact list for the workspace. Filters and searches apply server-side.</p>
+              <p className="text-xs uppercase tracking-[0.5em] text-slate-500">Contacts</p>
+              <h1 className="text-4xl font-semibold leading-tight text-slate-900">Company contacts</h1>
+              <p className="text-sm text-slate-600">Shared contact list for the workspace. Filters and searches apply server-side.</p>
             </div>
-            <div className="space-y-2 rounded-2xl border border-slate-800 bg-slate-950/60 p-5">
+            <div className="space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-5">
               <p className="text-xs uppercase tracking-[0.5em] text-slate-500">Create</p>
               <ContactCreateSheet triggerLabel="New contact" source="contacts:index" variant="solid" />
-              <p className="text-xs text-slate-500">Ownership defaults to creator; audit logging is enforced.</p>
+              <p className="text-xs text-slate-600">Ownership defaults to creator; audit logging is enforced.</p>
             </div>
           </div>
         </section>
 
         <section className="mt-10 grid gap-6 lg:grid-cols-[2fr,1fr]">
-          <form className="rounded-3xl border border-slate-800 bg-slate-900/80 p-5 text-sm text-slate-100" method="GET">
+          <form className="rounded-lg border border-slate-200 bg-white p-5 text-sm" method="GET">
             <div className="grid gap-4 md:grid-cols-2">
-              <label className="text-xs uppercase tracking-wide text-slate-400">
+              <label className="text-xs uppercase tracking-wide text-slate-700">
                 Search (name · email · company)
                 <input
                   name="search"
                   defaultValue={toStringValue(searchParams.search)}
                   placeholder="ex: bridge, @rrco.com"
-                  className="mt-2 w-full rounded-2xl border border-slate-700 bg-slate-950/60 px-3 py-2 text-sm focus:border-emerald-400 focus:outline-none"
+                  className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                 />
               </label>
-              <label className="text-xs uppercase tracking-wide text-slate-400">
+              <label className="text-xs uppercase tracking-wide text-slate-700">
                 Last activity
                 <select
                   name="lastActivityDays"
                   defaultValue={toStringValue(searchParams.lastActivityDays)}
-                  className="mt-2 w-full rounded-2xl border border-slate-700 bg-slate-950/60 px-3 py-2 text-sm focus:border-emerald-400 focus:outline-none"
+                  className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                 >
                   {LAST_ACTIVITY_WINDOWS.map((window) => (
                     <option key={window.value} value={window.value}>
@@ -117,31 +117,31 @@ export default async function ContactsPage({ searchParams }: { searchParams: Sea
             </div>
 
             <div className="mt-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-              <label className="text-xs uppercase tracking-wide text-slate-400">
+              <label className="text-xs uppercase tracking-wide text-slate-700">
                 Sort
                 <select
                   name="sort"
                   defaultValue={toStringValue(searchParams.sort) || 'attention'}
-                  className="mt-2 w-full rounded-2xl border border-slate-700 bg-slate-950/60 px-3 py-2 text-sm focus:border-emerald-400 focus:outline-none"
+                  className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                 >
                   <option value="attention">Needs attention</option>
                   <option value="activity">Last activity</option>
                 </select>
               </label>
-              <div className="flex flex-col gap-2 text-xs text-slate-500 md:text-right">
+              <div className="flex flex-col gap-2 text-xs text-slate-600 md:text-right">
                 <p>
                   {pagination.total} contacts · page {pagination.page} of {pagination.pages}
                 </p>
                 <div className="flex gap-2">
                   <button
                     type="submit"
-                    className="rounded-2xl bg-emerald-400 px-6 py-2 text-sm font-semibold text-slate-900 hover:bg-emerald-300"
+                    className="rounded-lg bg-blue-600 px-6 py-2 text-sm font-semibold text-white hover:bg-blue-700"
                   >
                     Apply filters
                   </button>
                   <Link
                     href="/contacts"
-                    className="rounded-2xl border border-slate-700 px-6 py-2 text-sm font-semibold text-slate-200 hover:border-slate-200"
+                    className="rounded-lg border border-slate-300 px-6 py-2 text-sm font-semibold text-slate-700 hover:border-slate-400 hover:bg-slate-50"
                   >
                     Reset
                   </Link>
@@ -153,9 +153,9 @@ export default async function ContactsPage({ searchParams }: { searchParams: Sea
           <BulkImportPanel />
         </section>
 
-        <section className="mt-8 overflow-hidden rounded-3xl border border-slate-800 bg-slate-900/80">
-          <table className="min-w-full divide-y divide-slate-800 text-sm">
-            <thead className="bg-slate-900/70 text-xs uppercase tracking-wide text-slate-400">
+        <section className="mt-8 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+          <table className="min-w-full divide-y divide-slate-200 text-sm">
+            <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-600">
               <tr>
                 <th className="px-4 py-3 text-left">Name</th>
                 <th className="px-4 py-3 text-left">Company</th>
@@ -174,9 +174,9 @@ export default async function ContactsPage({ searchParams }: { searchParams: Sea
                 </tr>
               ) : (
                 contacts.map((contact) => (
-                  <tr key={contact.id} className="border-b border-slate-800/70 text-slate-200 hover:bg-slate-900">
+                  <tr key={contact.id} className="border-b border-slate-200 text-slate-700 hover:bg-slate-50">
                     <td className="px-4 py-4">
-                      <div className="font-semibold text-white">
+                      <div className="font-semibold text-slate-900">
                         <Link href={`/contacts/${contact.id}`} className="hover:underline">
                           {contact.firstName} {contact.lastName}
                         </Link>

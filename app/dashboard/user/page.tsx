@@ -182,11 +182,11 @@ async function loadUserDashboardMetrics(userId: string, companyId: string) {
     recentActivities,
   ] = await Promise.all([
     // Tasks due today
-    prisma.contactTask.count({
+    prisma.task.count({
       where: {
-        companyId,
         assignedToId: userId,
-        status: { not: 'COMPLETED' },
+        completed: false,
+        contact: { companyId },
         dueDate: {
           gte: today,
           lt: new Date(today.getTime() + 24 * 60 * 60 * 1000),
@@ -194,20 +194,20 @@ async function loadUserDashboardMetrics(userId: string, companyId: string) {
       },
     }),
     // Overdue tasks
-    prisma.contactTask.count({
+    prisma.task.count({
       where: {
-        companyId,
         assignedToId: userId,
-        status: { not: 'COMPLETED' },
+        completed: false,
+        contact: { companyId },
         dueDate: { lt: today },
       },
     }),
     // Tasks due this week
-    prisma.contactTask.count({
+    prisma.task.count({
       where: {
-        companyId,
         assignedToId: userId,
-        status: { not: 'COMPLETED' },
+        completed: false,
+        contact: { companyId },
         dueDate: {
           gte: today,
           lt: weekFromNow,
@@ -215,10 +215,11 @@ async function loadUserDashboardMetrics(userId: string, companyId: string) {
       },
     }),
     // Emails sent (last 7 days)
-    prisma.emailLog.count({
+    prisma.email.count({
       where: {
         companyId,
-        sentById: userId,
+        authorId: userId,
+        direction: 'OUTBOUND',
         sentAt: { gte: sevenDaysAgo },
       },
     }),
@@ -227,12 +228,12 @@ async function loadUserDashboardMetrics(userId: string, companyId: string) {
       where: {
         companyId,
         createdById: userId,
-        status: 'DRAFT',
+        stage: 'New',
       },
       select: {
         id: true,
-        dealName: true,
-        contact: { select: { name: true } },
+        name: true,
+        contact: { select: { firstName: true, lastName: true } },
       },
       take: 5,
     }),
@@ -241,12 +242,12 @@ async function loadUserDashboardMetrics(userId: string, companyId: string) {
       where: {
         companyId,
         createdById: userId,
-        status: 'AWAITING_APPROVAL',
+        sentToEstimatingAt: { not: null },
       },
       select: {
         id: true,
-        dealName: true,
-        contact: { select: { name: true } },
+        name: true,
+        contact: { select: { firstName: true, lastName: true } },
       },
       take: 5,
     }),
@@ -255,12 +256,12 @@ async function loadUserDashboardMetrics(userId: string, companyId: string) {
       where: {
         companyId,
         createdById: userId,
-        status: 'APPROVED',
+        isApproved: true,
       },
       select: {
         id: true,
-        dealName: true,
-        contact: { select: { name: true } },
+        name: true,
+        contact: { select: { firstName: true, lastName: true } },
       },
       take: 5,
     }),
@@ -269,26 +270,27 @@ async function loadUserDashboardMetrics(userId: string, companyId: string) {
       where: {
         companyId,
         createdById: userId,
-        status: 'RETURNED',
+        stage: 'Lost',
       },
       select: {
         id: true,
-        dealName: true,
-        contact: { select: { name: true } },
+        name: true,
+        contact: { select: { firstName: true, lastName: true } },
       },
       take: 5,
     }),
     // Recent activities
-    prisma.contactActivity.findMany({
+    prisma.activity.findMany({
       where: {
         companyId,
-        createdById: userId,
+        userId,
       },
       select: {
         id: true,
         type: true,
+        subject: true,
         createdAt: true,
-        contact: { select: { id: true, name: true } },
+        contact: { select: { id: true, firstName: true, lastName: true } },
       },
       orderBy: { createdAt: 'desc' },
       take: 10,

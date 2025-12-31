@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import * as XLSX from 'xlsx'
 import { createContactRecord } from '@/lib/contacts/mutations'
+import type { PlanKey } from '@/lib/billing/planTiers'
 
 const REQUIRED_HEADERS = ['company', 'first name', 'last name', 'email', 'phone']
 
@@ -25,6 +26,14 @@ export async function POST(req: NextRequest) {
     const session = await getServerSession(authOptions)
     if (!session?.user?.companyId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const planKey = (session.user.planKey as PlanKey) ?? 'starter'
+    if (planKey === 'starter') {
+      return NextResponse.json(
+        { error: 'Bulk upload requires paid plan' },
+        { status: 403 }
+      )
     }
 
     const formData = await req.formData()

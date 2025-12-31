@@ -8,7 +8,11 @@ const TRIAL_SETTINGS = [
   { title: 'Profile & Email', href: '/settings/profile', description: 'Update your profile and configure email integration.' },
 ]
 
-const PAID_SETTINGS = [
+const USER_SETTINGS = [
+  { title: 'Profile & Email', href: '/settings/profile', description: 'Personal info, email integration, signature block.' },
+]
+
+const OWNER_ADMIN_SETTINGS = [
   { title: 'Profile & Email', href: '/settings/profile', description: 'Personal info, email integration, signature block.' },
   { title: 'Branding', href: '/settings/branding', description: 'Owner/Admin logo management for the shell and PDFs.' },
   { title: 'Estimating', href: '/estimating/settings', description: 'Templates, presets, and branding for estimating.' },
@@ -23,8 +27,18 @@ export default async function SettingsHubPage() {
   }
 
   const planKey = (session.user.planKey as PlanKey) ?? 'starter'
+  const role = (session.user.role ?? 'user').toLowerCase()
   const isTrial = planKey === 'starter'
-  const settingsGroups = isTrial ? TRIAL_SETTINGS : PAID_SETTINGS
+  const isOwnerOrAdmin = role === 'owner' || role === 'admin'
+
+  let settingsGroups
+  if (isTrial) {
+    settingsGroups = TRIAL_SETTINGS
+  } else if (isOwnerOrAdmin) {
+    settingsGroups = OWNER_ADMIN_SETTINGS
+  } else {
+    settingsGroups = USER_SETTINGS
+  }
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -32,7 +46,7 @@ export default async function SettingsHubPage() {
         <header>
           <p className="text-sm uppercase tracking-wide text-slate-500">Settings</p>
           <h1 className="text-3xl font-bold text-slate-900">{isTrial ? 'Your settings' : 'Workspace settings'}</h1>
-          <p className="text-slate-600">{isTrial ? 'Update your profile and email preferences.' : 'Single entry point for profile, estimating, and billing controls.'}</p>
+          <p className="text-slate-600">{isTrial ? 'Update your profile and email preferences.' : isOwnerOrAdmin ? 'Single entry point for profile, estimating, and billing controls.' : 'Update your profile and email preferences.'}</p>
         </header>
 
         <div className="grid gap-4 md:grid-cols-3">
