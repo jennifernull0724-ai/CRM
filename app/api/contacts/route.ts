@@ -26,7 +26,6 @@ function parseNumber(value: string | null): number | undefined {
 function parseFilters(searchParams: URLSearchParams): ContactListFilters {
   return {
     search: searchParams.get('search') ?? undefined,
-    ownerId: searchParams.get('ownerId') ?? undefined,
     archived: searchParams.get('archived') === 'true',
     hasOpenTasks: searchParams.get('hasOpenTasks') === 'true',
     hasOverdueTasks: searchParams.get('hasOverdueTasks') === 'true',

@@ -4,7 +4,6 @@ import { evaluateContactAttention, type AttentionResult } from '@/lib/contacts/a
 
 export type ContactListFilters = {
   search?: string
-  ownerId?: string
   archived?: boolean
   lastActivityWindowDays?: number | null
   hasOpenTasks?: boolean
@@ -55,9 +54,6 @@ function buildContactWhere(
   const where: Prisma.ContactWhereInput = {
     companyId,
     archived: filters.archived ?? false,
-  }
-  if (filters.ownerId) {
-    where.ownerId = filters.ownerId
   }
 
   const andList: Prisma.ContactWhereInput[] = []

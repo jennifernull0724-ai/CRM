@@ -22,6 +22,10 @@ export type ShellIcon =
   | 'dispatch'
   | 'shield'
   | 'home'
+  | 'activity'
+  | 'email'
+  | 'files'
+  | 'reports'
 
 type SurfaceShellProps = {
   surfaceName: string
@@ -89,6 +93,29 @@ const ICONS: Record<ShellIcon, ReactElement> = {
   home: (
     <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden>
       <path d="m12 5.69 5 4.5V19h-3v-4H10v4H7v-8.81l5-4.5m0-2.19L2 12h3v8h6v-4h2v4h6v-8h3Z" fill="currentColor" />
+    </svg>
+  ),
+  activity: (
+    <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden>
+      <path d="M3 13h3l2-6 4 12 2-6h5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  ),
+  email: (
+    <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden>
+      <path d="M4 6h16v12H4z" fill="none" stroke="currentColor" strokeWidth="2" />
+      <path d="m4 8 8 5 8-5" fill="none" stroke="currentColor" strokeWidth="2" />
+    </svg>
+  ),
+  files: (
+    <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden>
+      <path d="M6 4h7l5 5v11H6z" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
+      <path d="M13 4v5h5" fill="none" stroke="currentColor" strokeWidth="2" />
+    </svg>
+  ),
+  reports: (
+    <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden>
+      <path d="M4 20h16V4H4z" fill="none" stroke="currentColor" strokeWidth="2" />
+      <path d="M8 14h2v3H8zm4-4h2v7h-2zm4-3h2v10h-2z" fill="currentColor" />
     </svg>
   ),
 }

@@ -34,6 +34,7 @@ export default async function UpgradePage({
   const totalSeats = getTotalSeats(plan.seatLimits)
   const currentPlan = session.user.planKey
   const alreadyOnPlan = currentPlan === selectedPlan
+  const seatSelectorEnabled = selectedPlan === 'pro'
 
   return (
     <div className="min-h-screen bg-slate-950 text-white">
@@ -67,7 +68,7 @@ export default async function UpgradePage({
           <div>
             <p className="text-sm uppercase text-slate-400">Selected plan</p>
             <h2 className="text-3xl font-semibold mt-2">{plan.name}</h2>
-            <p className="text-xl text-blue-300 mt-2">{plan.priceLabel}</p>
+            <p className="text-xl text-blue-300 mt-2">{plan.priceLabel} (yearly)</p>
             <p className="text-sm text-slate-400 mt-4">
               {Number.isFinite(totalSeats) ? `${totalSeats} total seats` : 'Unlimited seats'} • owner {formatSeatLimit(plan.seatLimits.owner)} / admin {formatSeatLimit(plan.seatLimits.admin)} /
               estimator {formatSeatLimit(plan.seatLimits.estimator)}
@@ -75,6 +76,9 @@ export default async function UpgradePage({
             <p className="text-sm text-slate-400">
               user {formatSeatLimit(plan.seatLimits.user)} / field {formatSeatLimit(plan.seatLimits.field)}
             </p>
+            {seatSelectorEnabled && (
+              <p className="text-sm text-emerald-300 mt-2">Pro seats expand at $250/seat/year. Billing remains yearly.</p>
+            )}
 
             <div className="mt-6 space-y-4">
               <div>
@@ -115,10 +119,15 @@ export default async function UpgradePage({
               ) : (
                 <>
                   <p className="text-sm text-slate-400 mt-2">
-                    Stripe Checkout launches in a new tab with promotion codes enabled. Starter workspaces never hit Stripe.
+                    Stripe Checkout launches in a new tab with promotion codes enabled. Starter workspaces never hit Stripe. All pricing is yearly.
                   </p>
                   <div className="mt-4">
-                    <CheckoutButton planKey={selectedPlan} />
+                    <CheckoutButton
+                      planKey={selectedPlan}
+                      seatSelectable={seatSelectorEnabled}
+                      defaultSeatCount={Number.isFinite(totalSeats) ? totalSeats : 15}
+                      minSeatCount={1}
+                    />
                   </div>
                 </>
               )}

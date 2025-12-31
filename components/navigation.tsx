@@ -39,7 +39,7 @@ const NAVIGATION_MAP: Record<PersonaKey, PersonaNav> = {
     homeHref: '/crm',
     items: [
       { href: '/crm', label: 'CRM Home' },
-      { href: '/crm/contacts', label: 'Contacts' },
+      { href: '/contacts', label: 'Contacts' },
       { href: '/crm/deals', label: 'Deals' },
     ],
   },

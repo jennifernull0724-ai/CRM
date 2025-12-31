@@ -1,7 +1,7 @@
 import Link from 'next/link'
 
 const WORKSPACE_LINKS = [
-  { href: '/crm/contacts', label: 'Contacts', helper: 'Only your owned records render or load.' },
+  { href: '/contacts', label: 'Contacts', helper: 'All company contacts visible to all roles.' },
   { href: '/crm/deals', label: 'Deals', helper: 'Table view scoped to deals you created.' },
   { href: '/crm/tasks', label: 'Tasks', helper: 'Due + overdue work from your pipeline.' },
 ]

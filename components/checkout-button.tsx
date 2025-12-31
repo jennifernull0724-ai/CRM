@@ -5,11 +5,15 @@ import type { PlanKey } from '@/lib/billing/planTiers'
 
 interface CheckoutButtonProps {
   planKey: Exclude<PlanKey, 'starter'>
+  seatSelectable?: boolean
+  defaultSeatCount?: number
+  minSeatCount?: number
 }
 
-export function CheckoutButton({ planKey }: CheckoutButtonProps) {
+export function CheckoutButton({ planKey, seatSelectable = false, defaultSeatCount = 1, minSeatCount = 1 }: CheckoutButtonProps) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [seatCount, setSeatCount] = useState<number>(Math.max(minSeatCount, defaultSeatCount))
 
   const launchCheckout = async () => {
     setLoading(true)
@@ -19,7 +23,7 @@ export function CheckoutButton({ planKey }: CheckoutButtonProps) {
       const response = await fetch('/api/stripe/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ planKey }),
+        body: JSON.stringify({ planKey, seatCount }),
       })
 
       const payload = await response.json()
@@ -46,6 +50,21 @@ export function CheckoutButton({ planKey }: CheckoutButtonProps) {
 
   return (
     <div>
+      {seatSelectable && (
+        <div className="mb-3">
+          <label className="text-sm font-medium text-slate-200">
+            Seat quantity (yearly)
+            <input
+              type="number"
+              min={minSeatCount}
+              value={seatCount}
+              onChange={(e) => setSeatCount(Math.max(minSeatCount, Number(e.target.value) || minSeatCount))}
+              className="mt-2 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white focus:border-blue-500 focus:outline-none"
+            />
+          </label>
+          <p className="mt-1 text-xs text-slate-400">Pro seats bill yearly. Additional seats: $250/seat/year.</p>
+        </div>
+      )}
       <button
         type="button"
         onClick={launchCheckout}

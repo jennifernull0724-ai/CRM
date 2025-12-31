@@ -25,10 +25,10 @@ export function UpgradePrompt({ currentPlan, feature, message }: UpgradePromptPr
       <div className="text-sm uppercase tracking-wide text-yellow-600 mb-1">{featureLabel}</div>
       <p className="text-gray-700 mb-4">{upgradeMessage}</p>
       <Link
-        href="/pricing"
+        href="/upgrade"
         className="inline-block bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 font-medium"
       >
-        View Plans
+        Upgrade Now
       </Link>
     </div>
   )
@@ -43,7 +43,7 @@ export function ReadOnlyBanner() {
           <span className="text-red-700">Your trial has expired. Upgrade to continue making changes.</span>
         </div>
         <Link
-          href="/pricing"
+          href="/upgrade"
           className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 font-medium text-sm"
         >
           Upgrade Now

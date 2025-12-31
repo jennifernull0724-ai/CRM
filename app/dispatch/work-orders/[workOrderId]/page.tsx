@@ -52,12 +52,22 @@ export default async function DispatchWorkOrderDetailPage({ params }: { params: 
         <Link href="/dispatch/work-orders" className="text-sm font-semibold text-slate-600 hover:text-slate-900">
           ← Back to work orders
         </Link>
-        <Link
-          href={`/api/work-orders/${workOrder.id}/pdf`}
-          className="rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:border-slate-400"
-        >
-          Generate PDF
-        </Link>
+        <div className="flex gap-2">
+          <Link
+            href={`/api/work-orders/${workOrder.id}/pdf`}
+            className="rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:border-slate-400"
+          >
+            Generate PDF
+          </Link>
+          <Link
+            href={`/api/work-orders/${workOrder.id}/print`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="rounded-full border border-blue-500 bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-100"
+          >
+            Print Work Order
+          </Link>
+        </div>
       </div>
 
       <WorkOrderOverview workOrder={workOrder} />

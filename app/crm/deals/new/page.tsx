@@ -24,7 +24,7 @@ export default async function CrmCreateDealPage() {
   }
 
   const contacts = await prisma.contact.findMany({
-    where: { companyId: session.user.companyId, ownerId: session.user.id, archived: false },
+    where: { companyId: session.user.companyId, archived: false },
     orderBy: [{ firstName: 'asc' }, { lastName: 'asc' }],
     select: { id: true, firstName: true, lastName: true, email: true },
   })
@@ -35,7 +35,7 @@ export default async function CrmCreateDealPage() {
         <div>
           <p className="text-xs uppercase tracking-[0.35em] text-slate-400">CRM Deals</p>
           <h1 className="mt-2 text-3xl font-semibold text-slate-900">Create deal</h1>
-          <p className="mt-2 text-sm text-slate-500">Contacts are limited to records you own. Estimating takes over after submission.</p>
+          <p className="mt-2 text-sm text-slate-500">Select from any contact in your company. Estimating takes over after submission.</p>
         </div>
         <form action={bindCreateDealAction(createCrmDealAction)} className="space-y-4">
           <label className="block text-sm font-medium text-slate-600">

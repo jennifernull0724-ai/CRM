@@ -75,6 +75,9 @@ async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice, templateVe
   const metadata = subscription.metadata || {}
   const companyId = metadata.companyId
   const planKey = metadata.planKey as PlanKey | undefined
+  const seatCountFromMetadata = metadata.seatCount ? Number(metadata.seatCount) : null
+  const subscriptionItem = subscription.items.data[0]
+  const resolvedSeatCount = Number.isFinite(seatCountFromMetadata) && seatCountFromMetadata !== 0 ? seatCountFromMetadata : subscriptionItem?.quantity || null
 
   if (!companyId || !planKey || !PLAN_TIERS[planKey]) {
     console.warn('Stripe webhook missing companyId or planKey metadata', { invoiceId: invoice.id, metadata })
@@ -103,6 +106,9 @@ async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice, templateVe
       planKey,
       starterStartedAt: null,
       starterExpiresAt: null,
+      stripeSeatQuantity: resolvedSeatCount ?? undefined,
+      stripeSubscriptionId: subscription.id,
+      stripeSeatItemId: subscriptionItem?.id ?? null,
     },
   })
 

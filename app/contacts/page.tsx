@@ -38,7 +38,6 @@ function toNumberValue(param?: string | string[]) {
 function buildFilters(searchParams: SearchParams): ContactListFilters {
   return {
     search: toStringValue(searchParams.search) || undefined,
-    ownerId: toStringValue(searchParams.ownerId) || undefined,
     archived: searchParams.archived === 'true' ? true : false,
     hasOpenTasks: toBoolean(searchParams.hasOpenTasks),
     hasOverdueTasks: toBoolean(searchParams.hasOverdueTasks),
@@ -58,17 +57,10 @@ export default async function ContactsPage({ searchParams }: { searchParams: Sea
   }
 
   const filters = buildFilters(searchParams)
-  const [{ contacts, pagination }, owners] = await Promise.all([
-    listContactsForCompany(session.user.companyId, filters, {
-      userId: session.user.id,
-      role: session.user.role ?? 'user',
-    }),
-    prisma.user.findMany({
-      where: { companyId: session.user.companyId },
-      select: { id: true, name: true },
-      orderBy: { name: 'asc' },
-    }),
-  ])
+  const { contacts, pagination } = await listContactsForCompany(session.user.companyId, filters, {
+    userId: session.user.id,
+    role: session.user.role ?? 'user',
+  })
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-50">
@@ -90,7 +82,7 @@ export default async function ContactsPage({ searchParams }: { searchParams: Sea
 
         <section className="mt-10 grid gap-6 lg:grid-cols-[2fr,1fr]">
           <form className="rounded-3xl border border-slate-800 bg-slate-900/80 p-5 text-sm text-slate-100" method="GET">
-            <div className="grid gap-4 md:grid-cols-3">
+            <div className="grid gap-4 md:grid-cols-2">
               <label className="text-xs uppercase tracking-wide text-slate-400">
                 Search (name · email · company)
                 <input
@@ -99,21 +91,6 @@ export default async function ContactsPage({ searchParams }: { searchParams: Sea
                   placeholder="ex: bridge, @rrco.com"
                   className="mt-2 w-full rounded-2xl border border-slate-700 bg-slate-950/60 px-3 py-2 text-sm focus:border-emerald-400 focus:outline-none"
                 />
-              </label>
-              <label className="text-xs uppercase tracking-wide text-slate-400">
-                Owner
-                <select
-                  name="ownerId"
-                  defaultValue={toStringValue(searchParams.ownerId)}
-                  className="mt-2 w-full rounded-2xl border border-slate-700 bg-slate-950/60 px-3 py-2 text-sm focus:border-emerald-400 focus:outline-none"
-                >
-                  <option value="">Any owner</option>
-                  {owners.map((owner) => (
-                    <option key={owner.id} value={owner.id}>
-                      {owner.name}
-                    </option>
-                  ))}
-                </select>
               </label>
               <label className="text-xs uppercase tracking-wide text-slate-400">
                 Last activity

@@ -269,7 +269,7 @@ function ContactEmailComposerForm({
           </label>
         </div>
         <div className="mt-4 rounded-2xl border border-slate-800 bg-slate-950/60 p-3">
-          <div className="flex flex-wrap items-center gap-3 text-xs text-slate-400">
+          <div className="flex flex-wrap items-center gap-2 text-xs text-slate-400">
             <span>Body</span>
             <button
               type="button"
@@ -281,10 +281,66 @@ function ContactEmailComposerForm({
             <button
               type="button"
               className="rounded-full border border-slate-700 px-3 py-1 text-[11px] uppercase tracking-wide"
+              onClick={() => runEditorCommand('italic')}
+            >
+              Italic
+            </button>
+            <button
+              type="button"
+              className="rounded-full border border-slate-700 px-3 py-1 text-[11px] uppercase tracking-wide"
+              onClick={() => runEditorCommand('underline')}
+            >
+              Underline
+            </button>
+            <button
+              type="button"
+              className="rounded-full border border-slate-700 px-3 py-1 text-[11px] uppercase tracking-wide"
               onClick={() => runEditorCommand('insertUnorderedList')}
             >
               Bullet
             </button>
+            <button
+              type="button"
+              className="rounded-full border border-slate-700 px-3 py-1 text-[11px] uppercase tracking-wide"
+              onClick={() => {
+                const url = prompt('Enter URL:')
+                if (url) {
+                  document.execCommand('createLink', false, url)
+                }
+              }}
+            >
+              Link
+            </button>
+            <select
+              className="rounded-full border border-slate-700 bg-slate-900/80 px-3 py-1 text-[11px] uppercase tracking-wide"
+              onChange={(e) => {
+                if (e.target.value) {
+                  document.execCommand('fontName', false, e.target.value)
+                }
+              }}
+              defaultValue=""
+            >
+              <option value="">Font</option>
+              <option value="Arial">Arial</option>
+              <option value="Georgia">Georgia</option>
+              <option value="Times New Roman">Times New Roman</option>
+              <option value="Verdana">Verdana</option>
+            </select>
+            <select
+              className="rounded-full border border-slate-700 bg-slate-900/80 px-3 py-1 text-[11px] uppercase tracking-wide"
+              onChange={(e) => {
+                if (e.target.value) {
+                  document.execCommand('fontSize', false, e.target.value)
+                }
+              }}
+              defaultValue=""
+            >
+              <option value="">Size</option>
+              <option value="1">Small</option>
+              <option value="3">Normal</option>
+              <option value="5">Large</option>
+              <option value="7">Huge</option>
+            </select>
             {signature ? (
               <label className="ml-auto inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide">
                 <input

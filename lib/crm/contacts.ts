@@ -12,13 +12,13 @@ export type CrmContactRow = {
   status: ContactActivityState
   updatedAt: Date
   lastActivityAt: Date | null
+  ownerName: string
 }
 
-export async function getCrmContacts(companyId: string, userId: string): Promise<CrmContactRow[]> {
+export async function getCrmContacts(companyId: string): Promise<CrmContactRow[]> {
   const contacts = await prisma.contact.findMany({
     where: {
       companyId,
-      ownerId: userId,
       archived: false,
     },
     select: {
@@ -33,6 +33,11 @@ export async function getCrmContacts(companyId: string, userId: string): Promise
       activityState: true,
       updatedAt: true,
       lastActivityAt: true,
+      owner: {
+        select: {
+          name: true,
+        },
+      },
     },
     orderBy: { updatedAt: 'desc' },
     take: 200,
@@ -48,5 +53,6 @@ export async function getCrmContacts(companyId: string, userId: string): Promise
     status: contact.activityState,
     updatedAt: contact.updatedAt,
     lastActivityAt: contact.lastActivityAt,
+    ownerName: contact.owner.name ?? 'Unassigned',
   }))
 }

@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth'
 import Stripe from 'stripe'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { PLAN_TIERS, type PlanKey } from '@/lib/billing/planTiers'
+import { PLAN_TIERS, getTotalSeats, type PlanKey } from '@/lib/billing/planTiers'
 
 const stripeSecret = process.env.STRIPE_SECRET_KEY
 const stripe = stripeSecret
@@ -35,6 +35,7 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
     const requestedPlan = body.planKey as PlanKey
+    const seatCountInput = Number(body.seatCount)
 
     if (!requestedPlan || requestedPlan === 'starter') {
       return NextResponse.json({ error: 'Starter plan does not use Stripe checkout' }, { status: 400 })
@@ -50,6 +51,12 @@ export async function POST(req: NextRequest) {
     if (!priceId) {
       return NextResponse.json({ error: 'Stripe price ID missing for plan' }, { status: 500 })
     }
+
+    const defaultSeats = getTotalSeats(plan.seatLimits)
+    const baseSeats = Number.isFinite(defaultSeats) ? defaultSeats : 1
+    const seatCount = Number.isFinite(seatCountInput) && seatCountInput > 0 ? seatCountInput : baseSeats
+    const quantity = requestedPlan === 'pro' ? seatCount : 1
+    const metadataSeatCount = requestedPlan === 'pro' ? seatCount : baseSeats
 
     const company = await prisma.company.findUnique({
       where: { id: session.user.companyId },
@@ -102,7 +109,9 @@ export async function POST(req: NextRequest) {
         metadata: {
           companyId: company.id,
           planKey: requestedPlan,
+          seatCount: metadataSeatCount,
           requestedBy: session.user.id,
+          ownerUserId: session.user.id,
           companyName: company.name,
           billingEmail: company.email || session.user.email || '',
         },
@@ -110,7 +119,7 @@ export async function POST(req: NextRequest) {
       line_items: [
         {
           price: priceId,
-          quantity: 1,
+          quantity,
         },
       ],
       success_url: successUrl,
@@ -119,6 +128,8 @@ export async function POST(req: NextRequest) {
         companyId: company.id,
         planKey: requestedPlan,
         requestedBy: session.user.id,
+        ownerUserId: session.user.id,
+        seatCount: metadataSeatCount,
       },
     })
 

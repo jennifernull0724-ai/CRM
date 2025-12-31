@@ -73,12 +73,12 @@ export async function createCrmDealAction(formData: FormData): Promise<ActionRes
     })
 
     const contact = await prisma.contact.findFirst({
-      where: { id: payload.contactId, companyId, ownerId: userId },
+      where: { id: payload.contactId, companyId },
       select: { id: true, firstName: true, lastName: true },
     })
 
     if (!contact) {
-      throw new Error('Contact not found or outside your ownership scope')
+      throw new Error('Contact not found')
     }
 
     const now = new Date()

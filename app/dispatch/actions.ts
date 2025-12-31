@@ -1282,17 +1282,34 @@ export async function addPresetToWorkOrderAction(formData: FormData) {
     },
   })
 
-  await recordWorkOrderActivity({
-    companyId,
-    workOrderId,
-    actorId: userId,
-    type: 'DISPATCH_PRESET_ADDED',
-    metadata: {
-      presetId,
-      presetName: preset.name,
-      scope: preset.scope,
-    },
-  })
+  // Log both activity and audit event
+  await Promise.all([
+    recordWorkOrderActivity({
+      companyId,
+      workOrderId,
+      actorId: userId,
+      type: 'DISPATCH_PRESET_ADDED',
+      metadata: {
+        presetId,
+        presetName: preset.name,
+        scope: preset.scope,
+      },
+    }),
+    prisma.accessAuditLog.create({
+      data: {
+        companyId,
+        actorId: userId,
+        action: 'DISPATCH_PRESET_APPLIED',
+        metadata: {
+          workOrderId,
+          presetId,
+          presetName: preset.name,
+          scope: preset.scope,
+          defaultNotes: preset.defaultNotes,
+        },
+      },
+    }),
+  ])
 
   revalidateDispatchSurfaces()
 }

@@ -6,6 +6,9 @@ import { ContactAnalyticsCommand } from '@/app/dashboard/_components/contact-ana
 import { AssetSummaryPanel } from '@/app/dashboard/_components/asset-summary-panel'
 import { ControlPlaneDashboard } from '@/app/dashboard/_components/control-plane-dashboard'
 import { StandardSettingsQuickLinks } from '@/app/dashboard/_components/standard-settings-quick-links'
+import { TrialDashboard } from '@/app/dashboard/_components/trial-dashboard'
+import { loadTrialDashboardData } from '@/lib/dashboard/trialDashboard'
+import type { PlanKey } from '@/lib/billing/planTiers'
 
 export default async function OwnerDashboardPage() {
   const session = await getServerSession(authOptions)
@@ -22,6 +25,12 @@ export default async function OwnerDashboardPage() {
 
   if (role !== 'owner') {
     redirect('/dashboard/admin')
+  }
+
+  const planKey = (session.user.planKey as PlanKey) ?? 'starter'
+
+  if (planKey === 'starter') {
+    redirect('/dashboard/trial')
   }
 
   const payload = await fetchOwnerDashboard()

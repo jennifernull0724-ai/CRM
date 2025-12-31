@@ -47,7 +47,7 @@ const tiers: Tier[] = [
     badge: 'Free trial',
     price: '$0',
     subtext: 'Launch-ready CRM for small crews',
-    seats: 'Up to 3 internal seats',
+    seats: '1 owner seat (trial)',
     included: [
       'Operational CRM workspace',
       'Contact enrichment + attention scoring',
@@ -62,9 +62,9 @@ const tiers: Tier[] = [
   {
     name: 'Growth',
     badge: 'Most popular',
-    price: '$1,200/mo',
-    subtext: 'Scaling teams that need estimating handoff',
-    seats: '10 seats · add more anytime',
+    price: '$2,999/year',
+    subtext: 'Scaling teams that need estimating handoff (yearly only)',
+    seats: 'Includes 7 seats (yearly)',
     included: [
       'Everything in Starter',
       'Estimator workspace + presets',
@@ -80,9 +80,9 @@ const tiers: Tier[] = [
   },
   {
     name: 'Pro',
-    price: '$2,800/mo',
-    subtext: 'Multi-division contractors with heavy compliance',
-    seats: '25 seats · advanced controls',
+    price: '$4,999/year',
+    subtext: 'Multi-division contractors with heavy compliance (yearly only)',
+    seats: 'Includes 15 seats · add seats at $250/seat/year',
     included: [
       'Everything in Growth',
       'Compliance locker + QR verification',
@@ -116,11 +116,11 @@ const tiers: Tier[] = [
 ]
 
 const comparisonRows: ComparisonRow[] = [
-  { tier: 'Starter', price: '$0', seats: '3', crm: 'Full', estimating: 'View only', compliance: 'Dashboard', dispatch: 'Not included', analytics: 'Standard' },
+  { tier: 'Starter', price: '$0', seats: '1', crm: 'Full', estimating: 'View only', compliance: 'Dashboard', dispatch: 'Not included', analytics: 'Standard' },
   {
     tier: 'Growth',
-    price: '$1,200/mo',
-    seats: '10',
+    price: '$2,999/yr',
+    seats: '7',
     crm: 'Full',
     estimating: 'Included',
     compliance: 'Snapshots',
@@ -129,8 +129,8 @@ const comparisonRows: ComparisonRow[] = [
   },
   {
     tier: 'Pro',
-    price: '$2,800/mo',
-    seats: '25',
+    price: '$4,999/yr',
+    seats: '15 (add seats $250/yr)',
     crm: 'Full',
     estimating: 'Included',
     compliance: 'Locker + QR',
