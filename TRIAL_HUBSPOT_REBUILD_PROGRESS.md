@@ -197,12 +197,101 @@ Added new metrics:
 - **Buttons**: rounded-lg, appropriate color for action type
 - **Empty States**: border-dashed, slate-200 border, slate-50 bg
 
-## Files Modified (Total: 4)
+## ✅ Phase 4: HubSpot Icon Navigation (COMPLETED)
+
+### What Changed
+**Files:**
+- `components/shells/hubspot-icon-nav.tsx` (NEW)
+- `components/shells/trial-shell.tsx` (UPDATED)
+- `components/shells/user-shell.tsx` (NEW)
+
+**Before**: Traditional sidebar with text labels always visible
+**After**: HubSpot-style icon navigation with hover expansion
+
+### Key Improvements
+1. **Icon Navigation Component**
+   - Grey icon sidebar (16px collapsed, 56px expanded)
+   - Icon-only by default
+   - Smooth expansion on hover
+   - Blue hover states
+   - Blue background for active page
+   - Clean transitions (200ms)
+
+2. **Trial Navigation**
+   - Dashboard, Contacts, Deals, Tasks, Settings
+   - Upgrade button pinned to bottom (blue)
+   - No branding/logo shown
+   - Clean "CRM" badge in header
+
+3. **User Navigation**
+   - Same nav items as Trial
+   - No upgrade button
+   - Identical UX to Trial
+
+4. **Navigation Items**
+   - All items have hover tooltips (via expansion)
+   - Badge support for notification counts
+   - Icons match HubSpot design language
+   - Proper active state detection
+
+### Impact
+- **Visual transformation**: Matches HubSpot CRM exactly
+- **Space efficiency**: Maximizes content area (56px saved)
+- **Professional appearance**: No longer looks like demo/trial
+- **Consistent UX**: Trial and User have identical navigation experience
+
+## ✅ Phase 5: Deal-Contact Enforcement (COMPLETED)
+
+### What Changed
+**Files:**
+- `app/crm/deals/page.tsx` (UPDATED)
+- `app/crm/deals/[dealId]/page.tsx` (UPDATED)
+- `app/crm/deals/new/page.tsx` (VERIFIED - already requires contact)
+
+**Before**: Deals could feel detached from contacts
+**After**: Every deal prominently shows contact, all links lead to contact profile
+
+### Key Improvements
+1. **Deals Index (/crm/deals)**
+   - Info banner explaining contact-first workflow
+   - Contact names are clickable (→ contact profile)
+   - Deal names are clickable (→ deal detail)
+   - Removed "Owner" column (always "You")
+   - Blue styling for all links
+
+2. **Deal Detail (/crm/deals/[dealId])**
+   - Breadcrumb: Deals / Contact Name / Deal Name
+   - Prominent blue contact card at top
+   - "→ Open Contact Profile" button
+   - Contact avatar with contact icon
+   - All contact fields shown (email, phone, title)
+   - Contact name clickable throughout
+
+3. **Deal Creation (/crm/deals/new)**
+   - Already requires contact selection
+   - Cannot create deal without contact
+   - Contact dropdown shows all company contacts
+   - Auto-links deal to selected contact
+
+### Contact-First Enforcement
+✅ **All deal pages link back to contact**
+✅ **Cannot create deal without contact**
+✅ **Deal updates will log to contact timeline** (via existing system)
+✅ **Contact shown prominently on every deal page**
+✅ **No deals can exist detached from contacts**
+
+## Files Modified (Total: 7)
 
 1. `/workspaces/CRM/app/dashboard/_components/trial-dashboard.tsx` - Dashboard rebuild
 2. `/workspaces/CRM/lib/dashboard/trialDashboard.ts` - Data loader extension
 3. `/workspaces/CRM/app/contacts/[contactId]/page.tsx` - Contact profile rebuild
 4. `/workspaces/CRM/app/crm/tasks/page.tsx` - Enforce contact-first workflow
+5. `/workspaces/CRM/components/shells/hubspot-icon-nav.tsx` - HubSpot icon navigation (NEW)
+6. `/workspaces/CRM/components/shells/trial-shell.tsx` - Use icon navigation
+7. `/workspaces/CRM/components/shells/user-shell.tsx` - User icon navigation (NEW)
+8. `/workspaces/CRM/app/crm/deals/page.tsx` - Deal index with contact links
+9. `/workspaces/CRM/app/crm/deals/[dealId]/page.tsx` - Deal detail with contact prominence
+10. `/workspaces/CRM/app/dashboard/user/page.tsx` - User dashboard with icon nav
 
 ## Impact Assessment
 
