@@ -74,9 +74,9 @@ function ContactCreateSheetForm({
     <div className={cardClasses}>
       <div className="flex items-start justify-between">
         <div>
-          <p className="text-xs uppercase tracking-[0.3em] text-slate-500">Create contact</p>
-          <h3 className="text-2xl font-semibold">Universal intake</h3>
-          <p className="text-sm text-slate-400">Email is mandatory. Owner defaults to you, company is derived from the domain.</p>
+          <p className="text-xs uppercase tracking-[0.3em] text-slate-500">New contact</p>
+          <h3 className="text-2xl font-semibold">Add contact</h3>
+          <p className="text-sm text-slate-400">Email is required. Company is derived from the domain automatically.</p>
         </div>
         {!isPanel ? (
           <button onClick={() => setOpen(false)} className="rounded-full border border-slate-600 px-2 py-1 text-xs text-slate-300 hover:border-slate-200">

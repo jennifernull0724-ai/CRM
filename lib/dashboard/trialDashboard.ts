@@ -6,6 +6,8 @@ import { prisma } from '@/lib/prisma'
 export type TrialDashboardData = {
   tasks: {
     open: number
+    todayCount: number
+    overdueCount: number
     snapshot: MyTaskSnapshot
   }
   quick: {
@@ -22,6 +24,7 @@ export type TrialDashboardData = {
     excerpt: string
   }>
   emailsSent: number
+  emailsSent7d: number
   activity: Array<{
     id: string
     subject: string
@@ -42,7 +45,7 @@ export async function loadTrialDashboardData(params: { userId: string; companyId
   const scope = { userId, companyId, role: 'user' as const }
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
 
-  const [radar, openTasks, notes, timeline, emailMetrics, latestContact, contactCount, dealCount, taskCount, emails7d] = await Promise.all([
+  const [radar, openTasks, notes, timeline, emailMetrics, latestContact, contactCount, dealCount, taskCount, emails7d, todayTasks, overdueTasks] = await Promise.all([
     loadMyContactRadarSnapshot(scope),
     prisma.task.count({
       where: { assignedToId: userId, completed: false, contact: { companyId } },
@@ -75,11 +78,32 @@ export async function loadTrialDashboardData(params: { userId: string; companyId
         sentAt: { gte: sevenDaysAgo },
       },
     }),
+    prisma.task.count({
+      where: {
+        assignedToId: userId,
+        contact: { companyId },
+        completed: false,
+        dueDate: {
+          gte: new Date(new Date().setHours(0, 0, 0, 0)),
+          lt: new Date(new Date().setHours(23, 59, 59, 999)),
+        },
+      },
+    }),
+    prisma.task.count({
+      where: {
+        assignedToId: userId,
+        contact: { companyId },
+        completed: false,
+        dueDate: { lt: new Date() },
+      },
+    }),
   ])
 
   return {
     tasks: {
       open: openTasks,
+      todayCount: todayTasks,
+      overdueCount: overdueTasks,
       snapshot: radar.tasks,
     },
     quick: {
@@ -96,7 +120,8 @@ export async function loadTrialDashboardData(params: { userId: string; companyId
       excerpt: toPlainText(note.content).slice(0, 180),
     })),
     emailsSent: emailMetrics.emailsSent,
-    activity: timeline.slice(0, 6).map((event) => ({
+    emailsSent7d: emails7d,
+    activity: timeline.slice(0, 10).map((event) => ({
       id: event.id,
       subject: event.subject,
       type: event.type,

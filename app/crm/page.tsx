@@ -17,18 +17,18 @@ export default function CrmHomePage() {
   return (
     <div className="space-y-10 px-6 pb-12 pt-8">
       <header className="space-y-2">
-        <p className="text-xs uppercase tracking-[0.3em] text-slate-400">CRM Home</p>
-        <h1 className="text-3xl font-semibold text-slate-900">Work your records only</h1>
+        <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Workspace</p>
+        <h1 className="text-3xl font-semibold text-slate-900">Your contacts and deals</h1>
         <p className="text-sm text-slate-600">
-          This surface is isolation-first. No dashboards, no cross-company analytics — just the contacts, deals, and tasks you own.
+          Quick access to the records you own. Jump directly to contacts, deals, or tasks from here.
         </p>
       </header>
 
       <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Workspace shortcuts</p>
-            <p className="mt-1 text-2xl font-semibold text-slate-900">Go straight to scoped grids</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Quick links</p>
+            <p className="mt-1 text-2xl font-semibold text-slate-900">Jump to your work</p>
           </div>
         </div>
         <div className="mt-6 grid gap-4 md:grid-cols-2">

@@ -1,6 +1,7 @@
 import React from 'react'
 import { redirect } from 'next/navigation'
 import Image from 'next/image'
+import Link from 'next/link'
 import { getServerSession } from 'next-auth'
 import {
   uploadUiLogoAction,
@@ -12,6 +13,7 @@ import {
 } from '@/app/dashboard/settings/actions'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import type { PlanKey } from '@/lib/billing/planTiers'
 
 const BRANDING_UI_LOGO_KEY = 'branding_ui_logo'
 const BRANDING_PDF_LOGO_KEY = 'branding_pdf_logo'
@@ -24,6 +26,71 @@ function Guard({ children, role }: { children: React.ReactNode; role: string }) 
   return <>{children}</>
 }
 
+function TrialBrandingLock() {
+  return (
+    <div className="min-h-screen bg-slate-50">
+      <div className="mx-auto max-w-4xl px-6 py-10 space-y-6">
+        <header>
+          <p className="text-sm uppercase tracking-wide text-slate-500">Settings</p>
+          <h1 className="text-3xl font-bold text-slate-900">Branding</h1>
+          <p className="text-slate-600">Custom branding is available on paid plans.</p>
+        </header>
+
+        <section className="space-y-4 rounded-2xl border border-slate-300 bg-white p-8 shadow-sm">
+          <div className="flex items-center gap-4">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-100">
+              <svg className="h-6 w-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+              </svg>
+            </div>
+            <div>
+              <h2 className="text-xl font-semibold text-slate-900">Upgrade to customize branding</h2>
+              <p className="text-sm text-slate-600">Upload your logo for the dashboard and PDFs on Growth, Pro, or Enterprise plans.</p>
+            </div>
+          </div>
+
+          <div className="mt-6 rounded-xl border border-slate-200 bg-slate-50 p-6">
+            <p className="text-sm font-semibold text-slate-700">What you'll get:</p>
+            <ul className="mt-3 space-y-2 text-sm text-slate-600">
+              <li className="flex items-start gap-2">
+                <span className="text-emerald-600">✓</span>
+                <span>Custom logo in dashboard sidebar</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-emerald-600">✓</span>
+                <span>Logo on estimate PDFs</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-emerald-600">✓</span>
+                <span>Logo on dispatch work order PDFs</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-emerald-600">✓</span>
+                <span>Professional client-facing documents</span>
+              </li>
+            </ul>
+          </div>
+
+          <div className="mt-6 flex gap-3">
+            <Link
+              href="/upgrade"
+              className="rounded-xl bg-slate-900 px-6 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
+            >
+              View upgrade options
+            </Link>
+            <Link
+              href="/settings"
+              className="rounded-xl border border-slate-300 bg-white px-6 py-3 text-sm font-semibold text-slate-900 transition hover:bg-slate-50"
+            >
+              Back to settings
+            </Link>
+          </div>
+        </section>
+      </div>
+    </div>
+  )
+}
+
 export default async function BrandingSettingsPage() {
   const session = await getServerSession(authOptions)
 
@@ -33,8 +100,15 @@ export default async function BrandingSettingsPage() {
 
   const role = session.user.role as string
   const companyId = session.user.companyId
+  const planKey = (session.user.planKey as PlanKey) ?? 'starter'
+
   if (!companyId) {
     redirect('/login?from=/settings/branding')
+  }
+
+  // Show lock screen for Trial users
+  if (planKey === 'starter') {
+    return <TrialBrandingLock />
   }
 
   const [uiLogoSetting, pdfLogoSetting, dispatchPdfLogoSetting] = await Promise.all([

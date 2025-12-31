@@ -124,40 +124,88 @@ export default async function ContactDetailPage({ params, searchParams }: PagePr
     : 'Never'
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-50">
-      <div className="mx-auto max-w-7xl space-y-8 px-4 py-10">
-        <section className="rounded-3xl border border-slate-800 bg-gradient-to-br from-slate-900/90 via-slate-900 to-slate-950 p-8 shadow-2xl">
-          <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
-            <div className="space-y-3">
-              <p className="text-xs uppercase tracking-[0.4em] text-slate-500">Contact</p>
-              <h1 className="text-3xl font-semibold text-white">
+    <div className="min-h-screen bg-slate-50">
+      {/* HubSpot-Style Quick Actions Bar - Contact-Anchored */}
+      <div className="sticky top-0 z-20 border-b border-slate-200 bg-white shadow-sm">
+        <div className="mx-auto max-w-7xl px-6 py-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Link href="/contacts" className="text-sm text-slate-600 hover:text-slate-900">
+                ← Contacts
+              </Link>
+              <span className="text-slate-300">/</span>
+              <span className="text-sm font-semibold text-slate-900">
+                {contact.firstName} {contact.lastName}
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <button className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-900 hover:bg-slate-50">
+                📧 Email
+              </button>
+              <button className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-900 hover:bg-slate-50">
+                ✓ Task
+              </button>
+              <button className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-900 hover:bg-slate-50">
+                📝 Note
+              </button>
+              <button className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-900 hover:bg-slate-50">
+                📞 Call
+              </button>
+              <button className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-900 hover:bg-slate-50">
+                🗓️ Meeting
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="mx-auto max-w-7xl px-6 py-8">
+        {/* Contact Header - Clean HubSpot Style */}
+        <div className="mb-8 rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="flex items-start justify-between">
+            <div className="space-y-2">
+              <h1 className="text-2xl font-semibold text-slate-900">
                 {contact.firstName} {contact.lastName}
               </h1>
-              <p className="text-sm text-slate-400">
-                {contact.jobTitle ?? 'No title'} · {companyLabel || 'Unknown company'}
+              <p className="text-sm text-slate-600">
+                {contact.jobTitle ?? 'No title'} {companyLabel && `at ${companyLabel}`}
               </p>
-              <div className="flex flex-wrap gap-4 text-sm text-slate-300">
+              <div className="flex items-center gap-4 text-sm text-slate-600">
                 {contact.email && (
-                  <a href={`mailto:${contact.email}`} className="hover:text-emerald-300">
+                  <a href={`mailto:${contact.email}`} className="hover:text-blue-600">
                     {contact.email}
                   </a>
                 )}
                 {contact.phone && (
-                  <a href={`tel:${contact.phone}`} className="hover:text-emerald-300">
+                  <a href={`tel:${contact.phone}`} className="hover:text-blue-600">
                     {contact.phone}
                   </a>
                 )}
-                <span>Owner · {ownerName}</span>
-                <span>Status · {contact.activityState}</span>
               </div>
             </div>
-            <div className="grid gap-4 sm:grid-cols-3">
-              <Metric label="Open tasks" value={workspace.stats.openTasks} helper="Assigned to this contact" tone="emerald" />
-              <Metric label="Overdue" value={workspace.stats.overdueTasks} helper="Tasks past due" tone="amber" />
-              <Metric label="Last activity" value={lastActivityLabel} helper="Timeline touch" tone="violet" />
+            <div className="flex gap-3">
+              <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-center">
+                <p className="text-xl font-semibold text-slate-900">{workspace.stats.openTasks}</p>
+                <p className="text-xs text-slate-600">Open tasks</p>
+              </div>
+              <div className={`rounded-lg border ${workspace.stats.overdueTasks > 0 ? 'border-red-200 bg-red-50' : 'border-slate-200 bg-slate-50'} px-4 py-3 text-center`}>
+                <p className={`text-xl font-semibold ${workspace.stats.overdueTasks > 0 ? 'text-red-600' : 'text-slate-900'}`}>
+                  {workspace.stats.overdueTasks}
+                </p>
+                <p className="text-xs text-slate-600">Overdue</p>
+              </div>
+              <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
+                <p className="text-xs text-slate-600">Last activity</p>
+                <p className="text-xs font-semibold text-slate-900">{lastActivityLabel}</p>
+              </div>
             </div>
           </div>
-        </section>
+          <div className="mt-4 flex items-center gap-4 border-t border-slate-100 pt-4 text-sm text-slate-600">
+            <span>Owner: {ownerName}</span>
+            <span className="text-slate-300">·</span>
+            <span>Status: {contact.activityState}</span>
+          </div>
+        </div>
 
         <div className="grid gap-6 lg:grid-cols-[2fr,1fr]">
           <div className="space-y-6">
@@ -224,26 +272,29 @@ type NotesPanelProps = {
 
 function NotesPanel({ notes, mentionableUsers, mentionLookup, action }: NotesPanelProps) {
   return (
-    <section className="rounded-3xl border border-slate-800 bg-slate-900/80 p-5">
-      <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+    <section className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+      <div className="flex items-center justify-between">
         <div>
-          <p className="text-xs uppercase tracking-[0.4em] text-slate-500">Notes</p>
-          <h2 className="text-2xl font-semibold text-white">Shared context</h2>
+          <h2 className="text-base font-semibold text-slate-900">Notes</h2>
+          <p className="text-sm text-slate-600">Shared context across your team</p>
         </div>
       </div>
-      <div className="mt-6 grid gap-6 lg:grid-cols-[1.1fr,1fr]">
-        <div className="space-y-4">
-          {notes.length === 0 ? (
-            <p className="rounded-2xl border border-dashed border-slate-800 p-4 text-sm text-slate-500">No notes yet.</p>
-          ) : (
-            notes.map((note) => {
+      <div className="mt-6 space-y-4">
+        <NoteComposer action={action} mentionableUsers={mentionableUsers} />
+        {notes.length === 0 ? (
+          <p className="rounded-lg border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+            No notes yet. Add your first note above.
+          </p>
+        ) : (
+          <div className="space-y-3">
+            {notes.map((note) => {
               const mentionIds = parseMentionIds(note.mentions)
               const mentionedUsers = mentionIds.map((id) => mentionLookup.get(id)).filter(Boolean)
 
               return (
-                <article key={note.id} className="rounded-2xl border border-slate-800 bg-slate-950/40 p-4">
+                <article key={note.id} className="rounded-lg border border-slate-200 bg-slate-50 p-4">
                   <div
-                    className="prose prose-invert max-w-none text-sm"
+                    className="prose prose-sm max-w-none text-slate-700"
                     dangerouslySetInnerHTML={{ __html: sanitizeNoteBody(note.content) }}
                   />
                   <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-slate-500">
@@ -253,7 +304,7 @@ function NotesPanel({ notes, mentionableUsers, mentionLookup, action }: NotesPan
                     {mentionedUsers.length > 0 && (
                       <span className="inline-flex flex-wrap gap-2">
                         {mentionedUsers.map((user) => (
-                          <span key={user!.id} className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-emerald-200">
+                          <span key={user!.id} className="rounded bg-blue-50 px-2 py-0.5 text-blue-700">
                             @{user!.name}
                           </span>
                         ))}
@@ -262,15 +313,9 @@ function NotesPanel({ notes, mentionableUsers, mentionLookup, action }: NotesPan
                   </div>
                 </article>
               )
-            })
-          )}
-        </div>
-        <div className="rounded-2xl border border-slate-800 bg-slate-950/40 p-4">
-          <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-500">Compose</p>
-          <div className="mt-3">
-            <NoteComposer action={action} mentionableUsers={mentionableUsers} />
+            })}
           </div>
-        </div>
+        )}
       </div>
     </section>
   )
@@ -303,35 +348,36 @@ function TasksPanel({ tasks, completedTasks, overdueTasks, users, createAction, 
   }
 
   return (
-    <section className="rounded-3xl border border-slate-800 bg-slate-900/80 p-5">
-      <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+    <section className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+      <div className="flex items-center justify-between">
         <div>
-          <p className="text-xs uppercase tracking-[0.4em] text-slate-500">Tasks</p>
-          <h2 className="text-2xl font-semibold text-white">Execution queue</h2>
+          <h2 className="text-base font-semibold text-slate-900">Tasks</h2>
+          <p className="text-sm text-slate-600">
+            {tasks.length} open {overdueTasks > 0 && <span className="text-red-600">· {overdueTasks} overdue</span>}
+          </p>
         </div>
-        <div className="text-xs text-rose-300">{overdueTasks} overdue</div>
       </div>
-      <div className="mt-6 grid gap-6 lg:grid-cols-[1.1fr,1fr]">
-        <form action={bindAction(createAction)} className="space-y-3 rounded-2xl border border-slate-800 bg-slate-950/40 p-4">
-          <p className="text-xs uppercase tracking-[0.4em] text-slate-500">Create task</p>
-          <input name="title" placeholder="Task title" className="w-full rounded-2xl border border-slate-800 bg-slate-900/70 px-3 py-2 text-sm text-slate-100" required />
+      <div className="mt-6 space-y-4">
+        <form action={bindAction(createAction)} className="space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-4">
+          <p className="text-xs font-semibold text-slate-900">Create new task</p>
+          <input name="title" placeholder="Task title" className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400" required />
           <div className="grid gap-3 md:grid-cols-2">
-            <label className="text-xs text-slate-400">
+            <label className="text-xs text-slate-600">
               Due date
-              <input type="date" name="dueDate" className="mt-1 w-full rounded-2xl border border-slate-800 bg-slate-900/70 px-3 py-2 text-sm text-slate-100" />
+              <input type="date" name="dueDate" className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900" />
             </label>
-            <label className="text-xs text-slate-400">
+            <label className="text-xs text-slate-600">
               Priority
-              <select name="priority" className="mt-1 w-full rounded-2xl border border-slate-800 bg-slate-900/70 px-3 py-2 text-sm text-slate-100">
+              <select name="priority" className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900">
                 <option value="medium">Medium</option>
                 <option value="high">High</option>
                 <option value="low">Low</option>
               </select>
             </label>
           </div>
-          <label className="text-xs text-slate-400">
+          <label className="text-xs text-slate-600">
             Assign owner
-            <select name="ownerId" className="mt-1 w-full rounded-2xl border border-slate-800 bg-slate-900/70 px-3 py-2 text-sm text-slate-100">
+            <select name="ownerId" className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900">
               <option value="">Me</option>
               {users.map((user) => (
                 <option key={user.id} value={user.id}>
@@ -343,69 +389,51 @@ function TasksPanel({ tasks, completedTasks, overdueTasks, users, createAction, 
           <textarea
             name="notes"
             placeholder="Internal notes"
-            className="h-24 w-full rounded-2xl border border-slate-800 bg-slate-900/70 px-3 py-2 text-sm text-slate-100"
+            className="h-20 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400"
           />
-          <button type="submit" className="w-full rounded-2xl bg-emerald-400 px-4 py-3 text-sm font-semibold text-slate-900">
-            Save task
+          <button type="submit" className="w-full rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">
+            Create task
           </button>
         </form>
-        <div className="space-y-3">
-          {tasks.length === 0 ? (
-            <p className="rounded-2xl border border-dashed border-slate-800 p-4 text-sm text-slate-500">No open tasks.</p>
-          ) : (
-            tasks.map((task) => (
-              <article key={task.id} className="rounded-2xl border border-slate-800 bg-slate-950/50 p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-base font-semibold text-white">{task.title}</p>
-                    <p className="text-xs text-slate-500">Due {task.dueDate ? formatRelativeSafe(task.dueDate) : 'No due date'} · {task.priority}</p>
+        {tasks.length === 0 ? (
+          <p className="rounded-lg border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+            No open tasks. Create one above.
+          </p>
+        ) : (
+          <div className="space-y-2">
+            {tasks.map((task) => (
+              <article key={task.id} className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-slate-900">{task.title}</p>
+                    <p className="mt-1 text-xs text-slate-600">
+                      {task.dueDate ? `Due ${formatRelativeSafe(task.dueDate)}` : 'No due date'} · {task.priority} priority
+                    </p>
+                    {task.assignedTo && (
+                      <p className="mt-1 text-xs text-slate-600">Assigned to {task.assignedTo.name}</p>
+                    )}
+                    {task.notes && <p className="mt-2 text-sm text-slate-700">{task.notes}</p>}
                   </div>
                   <form action={bindAction(completeAction(task.id))}>
-                    <button className="rounded-full border border-emerald-300/50 px-3 py-1 text-xs text-emerald-200 hover:bg-emerald-400/10">
-                      Mark complete
+                    <button className="rounded-lg border border-green-600 bg-green-50 px-3 py-1 text-xs font-medium text-green-700 hover:bg-green-100">
+                      Complete
                     </button>
                   </form>
                 </div>
-                {task.notes && <p className="mt-2 text-sm text-slate-400">{task.notes}</p>}
-                <details className="mt-3 rounded-2xl border border-slate-800">
-                  <summary className="cursor-pointer px-3 py-2 text-xs text-slate-400">Edit task</summary>
-                  <form action={bindAction(updateAction(task.id))} className="space-y-2 px-3 py-2 text-sm">
-                    <input name="title" defaultValue={task.title} className="w-full rounded-2xl border border-slate-800 bg-slate-900/70 px-2 py-1" />
-                    <div className="grid gap-2 md:grid-cols-2">
-                      <input type="date" name="dueDate" defaultValue={task.dueDate ? new Date(task.dueDate).toISOString().slice(0, 10) : ''} className="rounded-2xl border border-slate-800 bg-slate-900/70 px-2 py-1" />
-                      <select name="priority" defaultValue={task.priority} className="rounded-2xl border border-slate-800 bg-slate-900/70 px-2 py-1">
-                        <option value="high">High</option>
-                        <option value="medium">Medium</option>
-                        <option value="low">Low</option>
-                      </select>
-                    </div>
-                    <select name="ownerId" defaultValue={task.assignedTo?.id ?? ''} className="w-full rounded-2xl border border-slate-800 bg-slate-900/70 px-2 py-1">
-                      <option value="">Keep current owner</option>
-                      {users.map((user) => (
-                        <option key={user.id} value={user.id}>
-                          {user.name}
-                        </option>
-                      ))}
-                    </select>
-                    <textarea name="notes" defaultValue={task.notes ?? ''} className="w-full rounded-2xl border border-slate-800 bg-slate-900/70 px-2 py-1" />
-                    <button className="w-full rounded-2xl bg-slate-800/70 px-3 py-2 text-xs uppercase tracking-wide text-slate-200">
-                      Update task
-                    </button>
-                  </form>
-                </details>
               </article>
-            ))
-          )}
-          {completedTasks.length > 0 && (
-            <div className="rounded-2xl border border-slate-800 bg-slate-950/40 p-3 text-xs text-slate-400">
-              <p className="mb-2 font-semibold text-slate-200">Recently completed</p>
-              <ul className="space-y-1">
-                {completedTasks.map((task) => (
-                  <li key={task.id}>{task.title}</li>
-                ))}
-              </ul>
-            </div>
-          )}
+            ))}
+          </div>
+        )}
+        {completedTasks.length > 0 && (
+          <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-4">
+            <p className="mb-2 text-xs font-semibold text-slate-900">Recently completed</p>
+            <ul className="space-y-1.5">
+              {completedTasks.map((task) => (
+                <li key={task.id} className="text-sm text-slate-600">{task.title}</li>
+              ))}
+            </ul>
+          </div>
+        )}
         </div>
       </div>
     </section>

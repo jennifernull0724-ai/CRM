@@ -13,128 +13,193 @@ export function TrialDashboard({ data, trialEndsAt }: TrialDashboardProps) {
   const accessContactHref = data.latestContact.id ? `/contacts/${data.latestContact.id}` : '/contacts'
 
   return (
-    <div className="space-y-8 px-6 pb-12 pt-8">
-      <section className="flex flex-wrap items-center justify-between gap-4 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-        <div className="space-y-2">
-          <p className="text-xs uppercase tracking-[0.25em] text-slate-500">Starter (Trial)</p>
-          <h1 className="text-3xl font-bold text-slate-900">Build your CRM</h1>
-          <p className="max-w-3xl text-sm text-slate-600">
-            Everything starts with a contact. Add contacts, log tasks and notes, send emails, and create deals today. Upgrading keeps every record intact.
-          </p>
-          <p className="text-sm font-semibold text-slate-800">
-            {trialEndsAt ? `Trial access ends ${dateFormatter.format(trialEndsAt)}` : 'Trial access active — no expiry set'}
-          </p>
-        </div>
-        <div className="flex items-center gap-3">
-          <Link className="rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800" href="/upgrade">
-            Upgrade — no data loss
-          </Link>
-        </div>
-      </section>
-
-      <PrimaryActionStrip accessContactHref={accessContactHref} />
-
-      <QuickAccessSection accessContactHref={accessContactHref} data={data} />
-
-      <PersonalSnapshot data={data} accessContactHref={accessContactHref} />
-
-      <RecentActivity events={data.activity} />
-
-      <LockedInsights />
-    </div>
-  )
-}
-
-function PrimaryActionStrip({ accessContactHref }: { accessContactHref: string }) {
-  return (
-    <section className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
-      <div className="grid gap-3 md:grid-cols-[1fr_1fr_auto] lg:grid-cols-[1fr_1fr_auto] items-center">
-        <div className="flex flex-wrap gap-2">
-          <ActionButton label="Add contact" href="/contacts/new" tone="primary" helper="Start every workflow" />
-          <ActionButton label="Create task" href={accessContactHref} helper="Attach to a contact" />
-          <ActionButton label="Create deal / estimate" href="/crm/deals/new" helper="Keep pipeline moving" />
-        </div>
-        <div className="flex justify-end">
-          <ActionButton label="Upgrade to Pro (Yearly)" href="/upgrade" tone="ghost" helper="No data will be lost" />
+    <div className="min-h-screen bg-slate-50">
+      {/* HubSpot-style Action Strip - Always Visible */}
+      <div className="sticky top-0 z-10 border-b border-slate-200 bg-white px-6 py-3 shadow-sm">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <ActionButton label="Add Contact" href="/contacts/new" icon="plus" />
+            <ActionButton label="Create Task" href={accessContactHref} icon="task" />
+            <ActionButton label="Create Note" href={accessContactHref} icon="note" />
+            <ActionButton label="Send Email" href={accessContactHref} icon="email" />
+          </div>
+          <div className="flex items-center gap-3">
+            {trialEndsAt && (
+              <span className="text-xs text-slate-500">Trial ends {dateFormatter.format(trialEndsAt)}</span>
+            )}
+            <Link 
+              href="/upgrade"
+              className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+            >
+              Upgrade
+            </Link>
+          </div>
         </div>
       </div>
-    </section>
-  )
-}
 
-function MetricCard({ label, value, helper }: { label: string; value: number; helper: string }) {
-  return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-      <p className="text-xs uppercase tracking-wide text-slate-600">{label}</p>
-      <p className="mt-2 text-3xl font-semibold text-slate-900">{formatNumber(value)}</p>
-      <p className="text-xs text-slate-600">{helper}</p>
+      <div className="mx-auto max-w-7xl px-6 py-8 space-y-6">
+        {/* Personal Work Snapshot - HubSpot Productivity Dashboard */}
+        <div className="grid gap-6 md:grid-cols-4">
+          <MetricCard 
+            label="Tasks due today" 
+            value={data.tasks.todayCount} 
+            color="blue"
+            href="/crm/tasks"
+          />
+          <MetricCard 
+            label="Overdue tasks" 
+            value={data.tasks.overdueCount} 
+            color={data.tasks.overdueCount > 0 ? "red" : "slate"}
+            href="/crm/tasks"
+          />
+          <MetricCard 
+            label="Emails sent (7d)" 
+            value={data.emailsSent7d} 
+            color="slate"
+          />
+          <MetricCard 
+            label="Recent notes" 
+            value={data.recentNotes.length} 
+            color="slate"
+            href={accessContactHref}
+          />
+        </div>
+
+        {/* Recent Activity Feed */}
+        <div className="rounded-lg border border-slate-200 bg-white shadow-sm">
+          <div className="border-b border-slate-200 px-6 py-4">
+            <h2 className="text-base font-semibold text-slate-900">Recent Activity</h2>
+            <p className="text-sm text-slate-600">Your work from the last 7 days</p>
+          </div>
+          <ActivityFeed events={data.activity} />
+        </div>
+
+        {/* Locked Insights - Upgrade Preview */}
+        <LockedInsightsGrid />
+      </div>
     </div>
   )
 }
 
-function QuickAccessSection({ accessContactHref, data }: { accessContactHref: string; data: TrialDashboardData }) {
-  const tiles = [
-    { label: 'Contacts', count: data.quick.contacts, helper: 'Company-wide list', href: '/contacts', primary: true },
-    { label: 'Latest contact', count: data.latestContact.name ? null : 0, helper: data.latestContact.name ?? 'None yet', href: accessContactHref },
-    { label: 'Deals / Estimates', count: data.quick.deals, helper: 'Your pipeline', href: '/crm/deals' },
-    { label: 'Tasks', count: data.quick.tasks, helper: 'Assigned to you', href: '/crm/tasks' },
-    { label: 'Emails (7d)', count: data.quick.emails7d, helper: 'Outbound only', href: accessContactHref },
+function ActionButton({ label, href, icon }: { label: string; href: string; icon: string }) {
+  return (
+    <Link
+      href={href}
+      className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 hover:border-slate-300"
+    >
+      {icon === 'plus' && <span className="text-slate-500">+</span>}
+      {icon === 'task' && <span className="text-slate-500">✓</span>}
+      {icon === 'note' && <span className="text-slate-500">📝</span>}
+      {icon === 'email' && <span className="text-slate-500">✉</span>}
+      {label}
+    </Link>
+  )
+}
+
+function MetricCard({ label, value, color, href }: { label: string; value: number; color: 'blue' | 'red' | 'slate'; href?: string }) {
+  const colorClasses = {
+    blue: 'bg-blue-50 border-blue-200',
+    red: 'bg-red-50 border-red-200',
+    slate: 'bg-slate-50 border-slate-200',
+  }
+  
+  const textClasses = {
+    blue: 'text-blue-900',
+    red: 'text-red-900',
+    slate: 'text-slate-900',
+  }
+
+  const content = (
+    <>
+      <p className="text-xs font-medium uppercase tracking-wide text-slate-600">{label}</p>
+      <p className={`mt-2 text-3xl font-bold ${textClasses[color]}`}>{value}</p>
+    </>
+  )
+
+  if (href) {
+    return (
+      <Link href={href} className={`rounded-lg border p-4 hover:shadow-md transition ${colorClasses[color]}`}>
+        {content}
+      </Link>
+    )
+  }
+
+  return (
+    <div className={`rounded-lg border p-4 ${colorClasses[color]}`}>
+      {content}
+    </div>
+  )
+}
+
+function ActivityFeed({ events }: { events: TrialDashboardData['activity'] }) {
+  if (events.length === 0) {
+    return (
+      <div className="px-6 py-12 text-center">
+        <p className="text-sm text-slate-500">No activity yet</p>
+        <p className="text-xs text-slate-400">Start by adding a contact</p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="divide-y divide-slate-100">
+      {events.slice(0, 10).map((event) => (
+        <div key={event.id} className="px-6 py-4 hover:bg-slate-50">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex-1">
+              <div className="flex items-center gap-2">
+                <span className="rounded bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700">
+                  {event.type}
+                </span>
+                <p className="text-sm font-medium text-slate-900">{event.subject}</p>
+              </div>
+              {event.contactName && (
+                <Link 
+                  href={`/contacts/${event.contactId}`}
+                  className="text-sm text-blue-600 hover:text-blue-700 hover:underline"
+                >
+                  {event.contactName}
+                </Link>
+              )}
+            </div>
+            <time className="text-xs text-slate-500">
+              {timeFormatter.format(new Date(event.createdAt))}
+            </time>
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function LockedInsightsGrid() {
+  const insights = [
+    { title: 'Pipeline Analytics', description: 'Deal velocity, conversion rates, and forecasting' },
+    { title: 'Team Performance', description: 'Activity metrics, leaderboards, and benchmarks' },
+    { title: 'Export Reports', description: 'CSV exports, custom reports, and scheduled sends' },
+    { title: 'Advanced Automation', description: 'Workflows, triggers, and integration rules' },
   ]
 
   return (
-    <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">CRM quick access</p>
-          <p className="mt-1 text-2xl font-semibold text-slate-900">Contact-first navigation</p>
-          <p className="text-sm text-slate-600">Everything starts with a contact. Jump to your most recent and keep working.</p>
-        </div>
-        <Link className="text-sm font-semibold text-blue-600 hover:text-blue-700" href="/contacts">
-          View all contacts
-        </Link>
-      </div>
-      <div className="mt-6 grid gap-4 lg:grid-cols-3">
-        {tiles.map((tile) => (
-          <Link
-            key={tile.label}
-            href={tile.href}
-            className={`rounded-2xl border ${tile.primary ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-200 bg-white'} p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md`}
-          >
-            <div className="flex items-center justify-between">
-              <p className={`text-sm font-semibold ${tile.primary ? 'text-white' : 'text-slate-900'}`}>{tile.label}</p>
-              {tile.count !== null ? <span className={`text-xs font-mono ${tile.primary ? 'text-slate-200' : 'text-slate-700'}`}>{tile.count}</span> : null}
-            </div>
-            <p className={`text-sm ${tile.primary ? 'text-slate-100' : 'text-slate-700'}`}>{tile.helper}</p>
-          </Link>
+    <div className="relative">
+      <div className="absolute inset-0 bg-gradient-to-b from-transparent to-slate-100 z-10 pointer-events-none" />
+      <div className="grid gap-4 md:grid-cols-2 opacity-50 blur-sm">
+        {insights.map((insight) => (
+          <div key={insight.title} className="rounded-lg border border-slate-200 bg-white p-6">
+            <h3 className="font-semibold text-slate-900">{insight.title}</h3>
+            <p className="text-sm text-slate-600">{insight.description}</p>
+          </div>
         ))}
       </div>
-    </section>
-  )
-}
-
-function PersonalSnapshot({ data, accessContactHref }: { data: TrialDashboardData; accessContactHref: string }) {
-  return (
-    <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Personal activity snapshot</p>
-          <p className="mt-1 text-2xl font-semibold text-slate-900">Only your work, server-scoped</p>
-        </div>
-        <span className="text-xs text-slate-500">Server loaders · user scoped</span>
+      <div className="absolute inset-0 flex items-center justify-center z-20">
+        <Link
+          href="/upgrade"
+          className="rounded-lg bg-blue-600 px-6 py-3 text-sm font-semibold text-white shadow-lg hover:bg-blue-700"
+        >
+          Unlock with Upgrade
+        </Link>
       </div>
-
-      <div className="mt-6 grid gap-4 md:grid-cols-4">
-        <MetricCard label="Open tasks" value={data.tasks.open} helper="Assigned to you" />
-        <MetricCard label="Overdue tasks" value={data.tasks.snapshot.tasksOverdue} helper="Past due" />
-        <MetricCard label="Recent notes" value={data.recentNotes.length} helper="Latest saved" />
-        <MetricCard label="Emails sent (7d)" value={data.quick.emails7d} helper="Outbound only" />
-      </div>
-
-      <div className="mt-6 grid gap-6 lg:grid-cols-[1.5fr_1fr]">
-        <NotesTable notes={data.recentNotes} fallbackHref={accessContactHref} />
-        <ActivityAside events={data.activity} />
-      </div>
-    </section>
+    </div>
   )
 }
 
@@ -148,7 +213,13 @@ function NotesTable({ notes, fallbackHref }: { notes: TrialDashboardData['recent
         </Link>
       </div>
       {notes.length === 0 ? (
-        <EmptyState label="No notes yet" actionLabel="Add contact" href="/contacts/new" helper="Log your first note on a contact." />
+        <div className="mt-3 rounded-xl border border-dashed border-slate-200 bg-white p-4 text-sm text-slate-600">
+          <p className="font-semibold text-slate-800">No notes yet</p>
+          <p className="text-slate-600">Log your first note on a contact.</p>
+          <Link className="mt-2 inline-flex text-xs font-semibold text-blue-600 hover:text-blue-700" href="/contacts/new">
+            Add contact
+          </Link>
+        </div>
       ) : (
         <div className="mt-3 overflow-hidden rounded-xl border border-slate-200 bg-white">
           <table className="min-w-full text-sm">
@@ -180,160 +251,6 @@ function NotesTable({ notes, fallbackHref }: { notes: TrialDashboardData['recent
         </div>
       )}
     </div>
-  )
-}
-
-function ActivityAside({ events }: { events: TrialDashboardData['activity'] }) {
-  return (
-    <div className="rounded-2xl border border-slate-100 bg-slate-50/70 p-4">
-      <div className="flex items-center justify-between">
-        <p className="text-sm font-semibold text-slate-900">Today&apos;s activity</p>
-        <span className="text-xs text-slate-500">Live, user-only</span>
-      </div>
-      {events.length === 0 ? (
-        <EmptyState label="No activity yet" actionLabel="Add contact" href="/contacts/new" helper="Start with a contact, then log a note or task." />
-      ) : (
-        <ul className="mt-3 space-y-3">
-          {events.map((event) => (
-            <li key={event.id} className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
-              <div className="flex items-center justify-between">
-                <p className="text-sm font-semibold text-slate-900">{event.subject}</p>
-                <span className="text-xs text-slate-500">{timeFormatter.format(event.createdAt)}</span>
-              </div>
-              <p className="text-xs uppercase tracking-wide text-slate-500">{event.type}</p>
-              {event.contactId ? (
-                <Link className="text-xs text-blue-600 underline decoration-dotted" href={`/contacts/${event.contactId}`}>
-                  {event.contactName ?? 'Contact'}
-                </Link>
-              ) : null}
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
-  )
-}
-
-function RecentActivity({ events }: { events: TrialDashboardData['activity'] }) {
-  return (
-    <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Recent activity</p>
-          <p className="mt-1 text-2xl font-semibold text-slate-900">Notes, tasks, emails, contact touches</p>
-        </div>
-        <Link className="text-sm font-semibold text-blue-600 hover:text-blue-700" href="/activity">
-          View all activity
-        </Link>
-      </div>
-      {events.length === 0 ? (
-        <EmptyState label="No activity yet" actionLabel="Add contact" href="/contacts/new" helper="Add a contact and start logging work." />
-      ) : (
-        <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200">
-          <table className="min-w-full text-sm">
-            <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
-              <tr>
-                <th className="px-4 py-3">Type</th>
-                <th className="px-4 py-3">Subject</th>
-                <th className="px-4 py-3">Contact</th>
-                <th className="px-4 py-3">When</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 bg-white">
-              {events.map((event) => (
-                <tr key={event.id} className="hover:bg-slate-50">
-                  <td className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-600">{event.type}</td>
-                  <td className="px-4 py-3 font-semibold text-slate-900">{event.subject}</td>
-                  <td className="px-4 py-3 text-slate-700">
-                    {event.contactId ? (
-                      <Link className="text-blue-700 hover:underline" href={`/contacts/${event.contactId}`}>
-                        {event.contactName ?? 'Contact'}
-                      </Link>
-                    ) : (
-                      'N/A'
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-xs text-slate-500">{timeFormatter.format(event.createdAt)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </section>
-  )
-}
-
-function LockedInsights() {
-  const items = [
-    {
-      title: 'Advanced analytics',
-      body: 'Rollups across contacts, deals, and pipeline forecasting stay locked. Unlock in Growth/Pro.',
-    },
-    {
-      title: 'Exports & automations',
-      body: 'Data exports, bulk automations, and advanced filters are gated. All data persists when you upgrade.',
-    },
-    {
-      title: 'Multi-user access',
-      body: 'Invite teammates and split ownership with Pro. Trial remains single-seat but keeps everything you create.',
-    },
-  ]
-
-  return (
-    <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Locked insights</p>
-          <p className="mt-1 text-2xl font-semibold text-slate-900">Upgrade to unlock analytics</p>
-          <p className="text-sm text-slate-600">These are muted in trial. Upgrading keeps every record and setting.</p>
-        </div>
-        <Link className="rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800" href="/upgrade">
-          Upgrade — keep all data
-        </Link>
-      </div>
-      <div className="mt-6 grid gap-4 md:grid-cols-3">
-        {items.map((item) => (
-          <div key={item.title} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-            <p className="text-base font-semibold text-slate-900">{item.title}</p>
-            <p className="text-sm text-slate-700">{item.body}</p>
-            <Link className="mt-3 inline-flex text-sm font-semibold text-slate-900 hover:text-slate-700" href="/upgrade">
-              Unlock with Growth/Pro →
-            </Link>
-          </div>
-        ))}
-      </div>
-    </section>
-  )
-}
-
-function EmptyState({ label, helper, actionLabel, href }: { label: string; helper: string; actionLabel: string; href: string }) {
-  return (
-    <div className="mt-3 rounded-xl border border-dashed border-slate-200 bg-white p-4 text-sm text-slate-600">
-      <p className="font-semibold text-slate-800">{label}</p>
-      <p className="text-slate-600">{helper}</p>
-      <Link className="mt-2 inline-flex text-xs font-semibold text-blue-600 hover:text-blue-700" href={href}>
-        {actionLabel}
-      </Link>
-    </div>
-  )
-}
-
-function ActionButton({ label, href, helper, tone = 'default' }: { label: string; href: string; helper: string; tone?: 'primary' | 'ghost' | 'default' }) {
-  const styles = {
-    primary: 'bg-slate-900 text-white shadow-sm hover:bg-slate-800',
-    ghost: 'border border-slate-200 bg-white text-slate-900 hover:bg-slate-50',
-    default: 'border border-slate-200 bg-white text-slate-900 hover:bg-slate-50',
-  }
-
-  return (
-    <Link
-      href={href}
-      className={`flex flex-col rounded-2xl px-4 py-3 text-left transition ${styles[tone]}`}
-    >
-      <span className="text-sm font-semibold">{label}</span>
-      <span className="text-xs text-slate-600">{helper}</span>
-    </Link>
   )
 }
 

@@ -45,8 +45,7 @@ export default async function UpgradePage({
           </Link>
           <h1 className="text-4xl font-bold mt-4">Upgrade your workspace</h1>
           <p className="text-slate-300 mt-2">
-            Tiers, seat limits, and restrictions are enforced in middleware, API routes, and Stripe checkout.
-            Promotion codes are always enabled for paid plans.
+            All your contacts, deals, tasks, and notes are preserved. No data will be lost when upgrading.
           </p>
         </div>
 

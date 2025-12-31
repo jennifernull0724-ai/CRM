@@ -12,6 +12,7 @@ import {
   type UserActivityTimelineEntry,
   type UserDashboardData,
 } from '@/lib/dashboard/userOverview'
+import { UserShell } from '@/components/shells/user-shell'
 import { StandardSettingsQuickLinks } from '@/app/dashboard/_components/standard-settings-quick-links'
 import { MyContactDashboard } from '@/app/dashboard/_components/my-contact-dashboard'
 
@@ -61,22 +62,22 @@ export default async function UserDashboardPage() {
   const dispatchEstimates = dashboard.estimates.filter((est) => est.status === 'SENT_TO_DISPATCH')
 
   return (
-    <div className="space-y-8 px-6 pb-12 pt-8">
-      <header className="space-y-2">
-        <p className="text-xs uppercase tracking-[0.25em] text-slate-400">User Dashboard</p>
-        <h1 className="text-3xl font-bold text-slate-900">Sales operator control</h1>
-        <p className="text-slate-600">Owned contacts, personal pipeline, and read-only dispatch visibility. No cross-user data.</p>
-      </header>
+    <UserShell companyLogoUrl={null} userName={session.user.name ?? session.user.email ?? undefined}>
+      <div className="space-y-8 px-6 pb-12 pt-8">
+        <header className="space-y-2">
+          <h1 className="text-2xl font-semibold text-slate-900">Your Dashboard</h1>
+          <p className="text-sm text-slate-600">Personal execution workspace for your contacts and deals</p>
+        </header>
 
-      <StandardSettingsQuickLinks snapshot={standardSettings} role="user" />
+        <StandardSettingsQuickLinks snapshot={standardSettings} role="user" />
 
-      <section className="grid gap-6 lg:grid-cols-[2fr_1fr]">
-        <ActivityTimelineCard events={timelineEvents} />
-        <div className="space-y-6">
-          <TaskPressureCard tasks={contactRadar.tasks} />
-          <InactiveContactsCard contacts={inactiveContacts} count={contactRadar.summary.myContactsWithNoActivity} />
-        </div>
-      </section>
+        <section className="grid gap-6 lg:grid-cols-[2fr_1fr]">
+          <ActivityTimelineCard events={timelineEvents} />
+          <div className="space-y-6">
+            <TaskPressureCard tasks={contactRadar.tasks} />
+            <InactiveContactsCard contacts={inactiveContacts} count={contactRadar.summary.myContactsWithNoActivity} />
+          </div>
+        </section>
 
       <RecentMentionsCard mentions={mentionEntries} totalMentions={contactRadar.summary.myRecentMentions} />
 

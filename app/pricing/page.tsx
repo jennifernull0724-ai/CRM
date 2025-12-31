@@ -46,7 +46,7 @@ const tiers: Tier[] = [
     name: 'Starter',
     badge: 'Free trial',
     price: '$0',
-    subtext: 'Launch-ready CRM for small crews',
+    subtext: '14-day trial · All data preserved on upgrade',
     seats: '1 owner seat (trial)',
     included: [
       'Operational CRM workspace',

@@ -16,11 +16,10 @@ export default async function NewContactPage() {
     <div className="min-h-screen bg-slate-950 text-slate-50">
       <div className="mx-auto max-w-4xl px-4 py-12">
         <div className="rounded-3xl border border-slate-800 bg-slate-900/70 p-8 shadow-xl">
-          <p className="text-xs uppercase tracking-[0.4em] text-slate-500">Contacts</p>
-          <h1 className="mt-3 text-3xl font-semibold">Universal intake</h1>
+          <p className="text-xs uppercase tracking-[0.4em] text-slate-500">New contact</p>
+          <h1 className="mt-3 text-3xl font-semibold">Add contact</h1>
           <p className="mt-3 text-sm text-slate-400">
-            This form is the authoritative path for new records. Email is required, ownership defaults to the creator, company labels are derived from the domain,
-            and creation activity is logged server-side.
+            Email is required. Company is derived automatically from the domain. You can bulk import contacts from the contacts page.
           </p>
           <div className="mt-8">
             <ContactCreateSheet presentation="panel" source="contacts:new" />
