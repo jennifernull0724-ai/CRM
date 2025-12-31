@@ -72,7 +72,7 @@ export async function loadTrialDashboardData(params: { userId: string; companyId
       where: {
         contact: { companyId },
         direction: 'OUTBOUND',
-        createdAt: { gte: sevenDaysAgo },
+        sentAt: { gte: sevenDaysAgo },
       },
     }),
   ])
