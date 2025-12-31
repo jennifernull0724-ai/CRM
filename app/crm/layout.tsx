@@ -3,7 +3,6 @@ import { getServerSession } from 'next-auth'
 import { redirect } from 'next/navigation'
 import { CrmShell } from '@/components/shells/crm-shell'
 import { authOptions } from '@/lib/auth'
-import { resolveRoleDestination } from '@/lib/auth/roleDestinations'
 import { loadStandardSettings } from '@/lib/dashboard/standardSettings'
 
 export default async function CrmLayout({ children }: { children: ReactNode }) {
@@ -15,11 +14,6 @@ export default async function CrmLayout({ children }: { children: ReactNode }) {
 
   if (!session.user.companyId) {
     redirect('/signup')
-  }
-
-  const normalizedRole = (session.user.role as string).toLowerCase()
-  if (normalizedRole !== 'user') {
-    redirect(resolveRoleDestination(normalizedRole))
   }
 
   const standardSettings = await loadStandardSettings(session.user.companyId)

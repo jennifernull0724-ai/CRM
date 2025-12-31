@@ -41,16 +41,112 @@ export default async function EstimatorDashboard({ searchParams }: PageProps) {
         </p>
       </header>
 
+      <nav className="flex flex-wrap gap-2 rounded-2xl border border-slate-200 bg-white/90 p-2 shadow-sm">
+        <Link
+          href="/dashboard/estimator"
+          className="rounded-full bg-slate-900 text-white shadow px-4 py-2 text-sm font-semibold"
+        >
+          Dashboard
+        </Link>
+        <Link
+          href="/estimating"
+          className="rounded-full px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100"
+        >
+          Create Estimate
+        </Link>
+        <Link
+          href="/crm"
+          className="rounded-full px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100"
+        >
+          CRM (Contacts)
+        </Link>
+        <Link
+          href="/estimating/settings?tab=rate-sheets"
+          className="rounded-full px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100"
+        >
+          Rate Sheets
+        </Link>
+        <Link
+          href="/estimating/settings"
+          className="rounded-full px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100"
+        >
+          Settings
+        </Link>
+      </nav>
+
       <EstimatingAnalyticsPanel analytics={payload.analytics} />
 
       <section className="grid gap-6 lg:grid-cols-[2fr_1fr]">
         <PipelineBoard pipelines={normalizedPipelines} selectedEstimateId={highlightId} />
         <div className="space-y-6">
           <CreateEstimateForm contacts={payload.contacts} deals={payload.deals} />
+          <TasksNotesPreview />
           <DispatchVisibilityCard selected={payload.selectedEstimate} />
         </div>
       </section>
     </div>
+  )
+}
+
+function TasksNotesPreview() {
+  return (
+    <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm space-y-4">
+      <div className="flex items-center justify-between">
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Tasks & Notes</p>
+        <Link href="/crm?view=tasks" className="text-xs font-semibold text-blue-600 hover:text-blue-700">
+          View more →
+        </Link>
+      </div>
+      
+      <div className="space-y-3">
+        <div>
+          <h4 className="text-sm font-semibold text-slate-700 mb-2">Recent tasks (latest 5)</h4>
+          <div className="space-y-2">
+            <div className="rounded-lg border border-slate-100 bg-slate-50 p-3 text-sm">
+              <p className="text-slate-600">Create task directly on dashboard</p>
+              <form className="mt-2 flex gap-2">
+                <input
+                  name="title"
+                  placeholder="Task title..."
+                  className="flex-1 rounded-lg border border-slate-200 px-3 py-1.5 text-sm"
+                />
+                <button
+                  type="submit"
+                  className="rounded-lg bg-slate-900 px-4 py-1.5 text-xs font-semibold text-white"
+                >
+                  Add
+                </button>
+              </form>
+            </div>
+            <p className="text-xs text-slate-500 px-3">No tasks yet · Completion logs activity + updates contact timeline</p>
+          </div>
+        </div>
+
+        <div>
+          <h4 className="text-sm font-semibold text-slate-700 mb-2">Recent notes (latest 5)</h4>
+          <div className="space-y-2">
+            <div className="rounded-lg border border-slate-100 bg-slate-50 p-3 text-sm">
+              <p className="text-slate-600">Create note directly on dashboard</p>
+              <form className="mt-2 flex gap-2">
+                <textarea
+                  name="content"
+                  placeholder="Note content... (@mentions enabled)"
+                  className="flex-1 rounded-lg border border-slate-200 px-3 py-1.5 text-sm"
+                  rows={2}
+                />
+                <button
+                  type="submit"
+                  className="rounded-lg bg-slate-900 px-4 py-1.5 text-xs font-semibold text-white"
+                >
+                  Add
+                </button>
+              </form>
+            </div>
+            <p className="text-xs text-slate-500 px-3">No notes yet · All notes anchor to contactId</p>
+          </div>
+        </div>
+      </div>
+    </section>
   )
 }
 

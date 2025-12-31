@@ -17,14 +17,10 @@ export async function getContactWorkspace(
   filters: TimelineFilters = {},
   context?: ContactWorkspaceContext
 ) {
-  const normalizedRole = context?.role ? context.role.toLowerCase() : null
-  const shouldScopeToOwner = normalizedRole === 'user' && Boolean(context?.userId)
-
   const contact = await prisma.contact.findFirst({
     where: {
       id: contactId,
       companyId,
-      ...(shouldScopeToOwner ? { ownerId: context!.userId } : {}),
     },
     include: {
       owner: { select: { id: true, name: true, role: true, email: true } },
@@ -81,7 +77,6 @@ export async function getContactWorkspace(
       where: {
         contactId: contact.id,
         companyId,
-        ...(shouldScopeToOwner ? { createdById: context!.userId } : {}),
       },
       orderBy: { createdAt: 'desc' },
       take: 8,
@@ -91,7 +86,6 @@ export async function getContactWorkspace(
       where: {
         contactId: contact.id,
         companyId,
-        ...(shouldScopeToOwner ? { createdById: context!.userId } : {}),
       },
       orderBy: { createdAt: 'desc' },
       take: 8,

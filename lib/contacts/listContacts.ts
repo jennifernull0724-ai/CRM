@@ -56,13 +56,7 @@ function buildContactWhere(
     companyId,
     archived: filters.archived ?? false,
   }
-
-  const normalizedRole = context.role?.toLowerCase?.() ?? 'user'
-  const isLimitedRole = normalizedRole === 'user' || normalizedRole === 'estimator'
-
-  if (isLimitedRole) {
-    where.ownerId = context.userId
-  } else if (filters.ownerId) {
+  if (filters.ownerId) {
     where.ownerId = filters.ownerId
   }
 

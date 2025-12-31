@@ -34,6 +34,12 @@ const TAB_OPTIONS = [
   { value: 'templates', label: 'Templates' },
   { value: 'presets', label: 'Presets' },
   { value: 'branding', label: 'Branding' },
+  { value: 'rate-sheets', label: 'Rate Sheets' },
+  { value: 'numbering', label: 'Numbering' },
+  { value: 'pdf-config', label: 'PDF Config' },
+  { value: 'approval-rules', label: 'Approval Rules' },
+  { value: 'revision-rules', label: 'Revision Rules' },
+  { value: 'handoff-rules', label: 'Handoff Rules' },
 ] as const
 
 const EMAIL_PROVIDERS = [
@@ -121,6 +127,12 @@ export default async function EstimatingSettingsPage({ searchParams }: { searchP
         {activeTab === 'branding' ? (
           <BrandingTab settings={standardSettings} canManageBranding={canManageBranding} />
         ) : null}
+        {activeTab === 'rate-sheets' ? <RateSheetsTab companyId={companyId} /> : null}
+        {activeTab === 'numbering' ? <NumberingFormattingTab companyId={companyId} /> : null}
+        {activeTab === 'pdf-config' ? <PdfConfigTab companyId={companyId} settings={standardSettings} /> : null}
+        {activeTab === 'approval-rules' ? <ApprovalRulesTab companyId={companyId} role={role} /> : null}
+        {activeTab === 'revision-rules' ? <ReturnRevisionRulesTab companyId={companyId} /> : null}
+        {activeTab === 'handoff-rules' ? <HandoffRulesTab companyId={companyId} /> : null}
       </div>
     </div>
   )
@@ -760,6 +772,301 @@ function BrandingTab({ settings, canManageBranding }: { settings: StandardSettin
           </form>
         )}
         <p className="text-xs text-slate-500">Dispatch PDFs sync instantly; removing this logo reverts back to the estimating branding slot.</p>
+      </section>
+    </div>
+  )
+}
+
+function RateSheetsTab({ companyId }: { companyId: string }) {
+  return (
+    <div className="space-y-6">
+      <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-xl font-semibold text-slate-900">Rate sheets</h2>
+            <p className="text-sm text-slate-500">Upload Excel (.xlsx) files for manual reference during estimating</p>
+          </div>
+        </div>
+        <div className="mt-6 space-y-4">
+          <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center">
+            <p className="text-sm font-semibold text-slate-700">Upload .xlsx rate sheet</p>
+            <p className="text-xs text-slate-500 mt-1">Labor, equipment, units, rates — manual reference only</p>
+            <form className="mt-4 space-y-3">
+              <input type="hidden" name="companyId" value={companyId} />
+              <input
+                type="file"
+                accept=".xlsx,.xls"
+                className="mx-auto block w-full max-w-sm rounded-lg border border-slate-200 px-3 py-2 text-sm"
+              />
+              <input
+                name="description"
+                placeholder="Description (optional)"
+                className="mx-auto block w-full max-w-sm rounded-lg border border-slate-200 px-3 py-2 text-sm"
+              />
+              <button
+                type="submit"
+                className="rounded-lg bg-slate-900 px-6 py-2 text-sm font-semibold text-white"
+              >
+                Upload rate sheet
+              </button>
+            </form>
+            <p className="mt-4 text-xs text-slate-500">❌ No automation · ❌ No background pricing · Versioned · Audit logged</p>
+          </div>
+          <div className="rounded-xl border border-slate-200 bg-white p-4">
+            <p className="text-sm font-semibold text-slate-700">No rate sheets uploaded</p>
+            <p className="text-xs text-slate-500 mt-1">Rate sheets will appear here once uploaded</p>
+          </div>
+        </div>
+      </section>
+    </div>
+  )
+}
+
+function NumberingFormattingTab({ companyId }: { companyId: string }) {
+  return (
+    <div className="space-y-6">
+      <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-xl font-semibold text-slate-900">Numbering & formatting</h2>
+            <p className="text-sm text-slate-500">Quote prefix, sequential numbering, currency, decimal precision</p>
+          </div>
+        </div>
+        <form className="mt-6 space-y-4">
+          <input type="hidden" name="companyId" value={companyId} />
+          <div className="grid gap-4 md:grid-cols-2">
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-2">Quote prefix</label>
+              <input
+                name="quotePrefix"
+                defaultValue="EST"
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                placeholder="EST"
+              />
+              <p className="text-xs text-slate-500 mt-1">Example: EST-2025-001</p>
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-2">Numbering format</label>
+              <select
+                name="numberingFormat"
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+              >
+                <option value="sequential">Sequential (001, 002, 003)</option>
+                <option value="industry-based">Industry-based (RR-001, CON-001)</option>
+                <option value="date-sequential">Date + sequential (2025-001)</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-2">Currency</label>
+              <select
+                name="currency"
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+              >
+                <option value="USD">USD ($)</option>
+                <option value="CAD">CAD ($)</option>
+                <option value="EUR">EUR (€)</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-2">Decimal precision</label>
+              <select
+                name="decimalPrecision"
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+              >
+                <option value="0">No decimals ($1,000)</option>
+                <option value="2">Two decimals ($1,000.00)</option>
+                <option value="4">Four decimals ($1,000.0000)</option>
+              </select>
+            </div>
+          </div>
+          <button type="submit" className="w-full rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white">
+            Save numbering settings
+          </button>
+          <p className="text-xs text-slate-500">Applied on creation · Locked after approval</p>
+        </form>
+      </section>
+    </div>
+  )
+}
+
+function PdfConfigTab({ companyId, settings }: { companyId: string; settings: StandardSettingsData }) {
+  return (
+    <div className="space-y-6">
+      <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-xl font-semibold text-slate-900">Estimating PDF configuration</h2>
+            <p className="text-sm text-slate-500">Logo inheritance, section toggles, footer text, page numbering</p>
+          </div>
+        </div>
+        <div className="mt-6 space-y-6">
+          <div className="rounded-xl border border-slate-100 bg-slate-50 p-4">
+            <p className="text-sm font-semibold text-slate-700">Logo inheritance</p>
+            <p className="text-xs text-slate-500 mt-1">
+              {settings.branding.pdfLogoUrl
+                ? 'Estimating PDFs inherit logo from Standard Settings → Branding'
+                : 'No PDF logo configured'}
+            </p>
+          </div>
+          <form className="space-y-4">
+            <input type="hidden" name="companyId" value={companyId} />
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-2">Section toggles</label>
+              <div className="space-y-2">
+                {['Scope', 'Assumptions', 'Exclusions', 'Line items', 'Terms'].map((section) => (
+                  <label key={section} className="flex items-center gap-2 text-sm">
+                    <input type="checkbox" name={`show${section}`} defaultChecked className="rounded" />
+                    <span className="text-slate-700">Show {section}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-2">Footer text</label>
+              <textarea
+                name="footerText"
+                rows={3}
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                placeholder="Custom footer text for estimate PDFs..."
+              />
+            </div>
+            <div>
+              <label className="flex items-center gap-2 text-sm">
+                <input type="checkbox" name="showPageNumbers" defaultChecked className="rounded" />
+                <span className="text-slate-700 font-semibold">Show page numbering</span>
+              </label>
+            </div>
+            <button type="submit" className="w-full rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white">
+              Save PDF configuration
+            </button>
+            <p className="text-xs text-slate-500">Estimating PDFs only · Dispatch PDFs unaffected · Estimator customizes pre-approval</p>
+          </form>
+        </div>
+      </section>
+    </div>
+  )
+}
+
+function ApprovalRulesTab({ companyId, role }: { companyId: string; role: string }) {
+  const isAdminOrOwner = role === 'owner' || role === 'admin'
+  return (
+    <div className="space-y-6">
+      <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-xl font-semibold text-slate-900">Approval rules</h2>
+            <p className="text-sm text-slate-500">Estimator is primary approver · Owner/Admin are secondary approvers</p>
+          </div>
+          {!isAdminOrOwner && <p className="text-xs font-semibold text-slate-500">Owner/Admin config only</p>}
+        </div>
+        <form className="mt-6 space-y-4">
+          <input type="hidden" name="companyId" value={companyId} />
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50/50 p-4">
+            <p className="text-sm font-semibold text-emerald-900">✅ Estimator IS PRIMARY APPROVER</p>
+            <p className="text-xs text-emerald-700 mt-1">Owner/Admin are secondary approvers only</p>
+          </div>
+          <div>
+            <label className="block text-sm font-semibold text-slate-700 mb-2">Optional approval thresholds</label>
+            <input
+              name="approvalThreshold"
+              type="number"
+              step="0.01"
+              placeholder="Require secondary approval above $X"
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+              disabled={!isAdminOrOwner}
+            />
+            <p className="text-xs text-slate-500 mt-1">Leave blank for no threshold</p>
+          </div>
+          <div>
+            <label className="flex items-center gap-2 text-sm">
+              <input type="checkbox" name="approvalNotesRequired" className="rounded" disabled={!isAdminOrOwner} />
+              <span className="text-slate-700 font-semibold">Require approval notes</span>
+            </label>
+          </div>
+          <button
+            type="submit"
+            className="w-full rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white"
+            disabled={!isAdminOrOwner}
+          >
+            Save approval rules
+          </button>
+          <p className="text-xs text-slate-500">Approval locks pricing · Approval logged immutably</p>
+        </form>
+      </section>
+    </div>
+  )
+}
+
+function ReturnRevisionRulesTab({ companyId }: { companyId: string }) {
+  return (
+    <div className="space-y-6">
+      <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-xl font-semibold text-slate-900">Return & revision rules</h2>
+            <p className="text-sm text-slate-500">Return reason required, auto revision increment, full revision history</p>
+          </div>
+        </div>
+        <form className="mt-6 space-y-4">
+          <input type="hidden" name="companyId" value={companyId} />
+          <div>
+            <label className="flex items-center gap-2 text-sm">
+              <input type="checkbox" name="returnReasonRequired" defaultChecked className="rounded" />
+              <span className="text-slate-700 font-semibold">Return reason required</span>
+            </label>
+            <p className="text-xs text-slate-500 mt-1">Enforces notes when returning estimate to estimator</p>
+          </div>
+          <div>
+            <label className="flex items-center gap-2 text-sm">
+              <input type="checkbox" name="autoRevisionIncrement" defaultChecked className="rounded" />
+              <span className="text-slate-700 font-semibold">Auto revision increment</span>
+            </label>
+            <p className="text-xs text-slate-500 mt-1">Automatically creates new revision on changes after approval</p>
+          </div>
+          <div className="rounded-xl border border-slate-100 bg-slate-50 p-4">
+            <p className="text-sm font-semibold text-slate-700">Revision history</p>
+            <p className="text-xs text-slate-500 mt-1">Previous revisions read-only · Full revision history preserved</p>
+          </div>
+          <button type="submit" className="w-full rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white">
+            Save revision rules
+          </button>
+        </form>
+      </section>
+    </div>
+  )
+}
+
+function HandoffRulesTab({ companyId }: { companyId: string }) {
+  return (
+    <div className="space-y-6">
+      <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-xl font-semibold text-slate-900">Handoff rules</h2>
+            <p className="text-sm text-slate-500">Approval required before dispatch, handoff timestamps immutable</p>
+          </div>
+        </div>
+        <form className="mt-6 space-y-4">
+          <input type="hidden" name="companyId" value={companyId} />
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50/50 p-4">
+            <p className="text-sm font-semibold text-emerald-900">✅ Approval required before dispatch</p>
+            <p className="text-xs text-emerald-700 mt-1">Estimator can send to dispatch · Dispatch remains read-only</p>
+          </div>
+          <div>
+            <label className="flex items-center gap-2 text-sm">
+              <input type="checkbox" name="requireApprovalBeforeDispatch" defaultChecked disabled className="rounded" />
+              <span className="text-slate-700 font-semibold">Require approval before handoff (locked)</span>
+            </label>
+            <p className="text-xs text-slate-500 mt-1">Cannot be disabled — ensures pricing integrity</p>
+          </div>
+          <div className="rounded-xl border border-slate-100 bg-slate-50 p-4">
+            <p className="text-sm font-semibold text-slate-700">Handoff timestamps</p>
+            <p className="text-xs text-slate-500 mt-1">sentToDispatchAt · Immutable · Audit logged</p>
+          </div>
+          <button type="submit" className="w-full rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white">
+            Save handoff rules
+          </button>
+        </form>
       </section>
     </div>
   )

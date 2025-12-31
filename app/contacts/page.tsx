@@ -70,66 +70,22 @@ export default async function ContactsPage({ searchParams }: { searchParams: Sea
     }),
   ])
 
-  const attentionLeaders = [...contacts].sort((a, b) => b.attention.score - a.attention.score).slice(0, 3)
-  const urgentCount = contacts.filter((contact) => contact.attention.level === 'urgent').length
-  const watchCount = contacts.filter((contact) => contact.attention.level === 'watch').length
-  const stableCount = contacts.filter((contact) => contact.attention.level === 'stable').length
-
   return (
     <div className="min-h-screen bg-slate-950 text-slate-50">
       <div className="mx-auto max-w-7xl px-4 py-10">
-        <section className="rounded-3xl border border-slate-800 bg-gradient-to-br from-slate-900 via-slate-900 to-slate-950 p-8 shadow-2xl">
-          <div className="flex flex-col gap-8 lg:flex-row lg:items-start lg:justify-between">
-            <div className="space-y-4">
-              <p className="text-xs uppercase tracking-[0.5em] text-slate-400">Attention radar</p>
-              <h1 className="text-4xl font-semibold leading-tight">Who needs attention right now?</h1>
-              <p className="text-base text-slate-300">
-                Dynamic filters, sentiment scoring, and last-touch telemetry keep every role aligned on the next conversation. Columnar data is still here—but the
-                runway starts with signal.
-              </p>
-              <div className="grid gap-4 sm:grid-cols-3">
-                <StatCard label="Urgent" value={urgentCount} tone="rose" helper="Overdue tasks or silent for 14+ days" />
-                <StatCard label="Watch" value={watchCount} tone="amber" helper="Needs a touch soon" />
-                <StatCard label="Stable" value={stableCount} tone="emerald" helper="Healthy cadence" />
-              </div>
+        <section className="rounded-3xl border border-slate-800 bg-slate-900 p-8 shadow-2xl">
+          <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+            <div className="space-y-2">
+              <p className="text-xs uppercase tracking-[0.5em] text-slate-400">Contacts</p>
+              <h1 className="text-4xl font-semibold leading-tight">Company contacts</h1>
+              <p className="text-sm text-slate-400">Shared contact list for the workspace. Filters and searches apply server-side.</p>
             </div>
-            <div className="space-y-4 rounded-2xl border border-slate-800 bg-slate-950/60 p-5">
+            <div className="space-y-2 rounded-2xl border border-slate-800 bg-slate-950/60 p-5">
               <p className="text-xs uppercase tracking-[0.5em] text-slate-500">Create</p>
               <ContactCreateSheet triggerLabel="New contact" source="contacts:index" variant="solid" />
-              <p className="text-xs text-slate-500">
-                Owners, estimators, dispatchers, and admins hit the same intake. Ownership defaults to creator, company derivation is automatic, and audit logging is forced.
-              </p>
-              <div className="text-xs text-slate-500">
-                <p>Entry points wired:</p>
-                <ul className="mt-1 list-inside list-disc space-y-0.5">
-                  <li>Deal creation drawer</li>
-                  <li>Estimate composer</li>
-                  <li>Email launchpad</li>
-                  <li>Dispatch blank work order</li>
-                </ul>
-              </div>
+              <p className="text-xs text-slate-500">Ownership defaults to creator; audit logging is enforced.</p>
             </div>
           </div>
-
-          {attentionLeaders.length ? (
-            <div className="mt-8 grid gap-4 md:grid-cols-3">
-              {attentionLeaders.map((contact) => (
-                <article key={contact.id} className="rounded-2xl border border-slate-800 bg-slate-950/60 p-4">
-                  <p className="text-xs uppercase tracking-[0.3em] text-slate-500">Needs attention</p>
-                  <h3 className="text-lg font-semibold text-white">
-                    <a href={`/contacts/${contact.id}`} className="hover:underline">
-                      {contact.firstName} {contact.lastName}
-                    </a>
-                  </h3>
-                  <p className="text-sm text-slate-400">{contact.companyLabel}</p>
-                  <p className="mt-3 text-sm text-amber-300">{contact.attention.primaryReason}</p>
-                  <p className="text-xs text-slate-500">
-                    Last touch {contact.lastActivityAt ? formatDistanceToNow(new Date(contact.lastActivityAt), { addSuffix: true }) : 'never'}
-                  </p>
-                </article>
-              ))}
-            </div>
-          ) : null}
         </section>
 
         <section className="mt-10 grid gap-6 lg:grid-cols-[2fr,1fr]">
@@ -283,22 +239,6 @@ export default async function ContactsPage({ searchParams }: { searchParams: Sea
           </table>
         </section>
       </div>
-    </div>
-  )
-}
-
-function StatCard({ label, value, helper, tone }: { label: string; value: number; helper: string; tone: 'rose' | 'amber' | 'emerald' }) {
-  const toneClass =
-    tone === 'rose'
-      ? 'from-rose-500/30 to-rose-600/10 border-rose-500/40 text-rose-100'
-      : tone === 'amber'
-        ? 'from-amber-400/30 to-amber-500/10 border-amber-400/40 text-amber-100'
-        : 'from-emerald-400/30 to-emerald-500/10 border-emerald-400/40 text-emerald-100'
-  return (
-    <div className={`rounded-2xl border bg-gradient-to-br ${toneClass} p-4`}>
-      <p className="text-xs uppercase tracking-[0.3em]">{label}</p>
-      <p className="text-3xl font-semibold">{value}</p>
-      <p className="text-xs text-white/70">{helper}</p>
     </div>
   )
 }

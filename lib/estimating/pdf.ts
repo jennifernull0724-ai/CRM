@@ -185,3 +185,145 @@ export async function generateEstimatePdf(params: GenerateEstimatePdfParams): Pr
 
   return streamToBuffer(doc)
 }
+
+/**
+ * ADDITIONAL PDF MANAGEMENT FUNCTIONS
+ * 
+ * AUDIT REQUIREMENTS:
+ * - PDF_GENERATED
+ * - PDF_REGENERATED
+ * - PDF_APPROVED
+ * - PDF_EMAILED
+ * - PDF_SENT_TO_DISPATCH
+ */
+
+import { prisma } from '@/lib/prisma'
+
+export type EstimatePdfRecord = {
+  id: string
+  companyId: string
+  estimateId: string
+  revisionNumber: number
+  pdfUrl: string | null
+  hash: string
+  createdAt: Date
+  createdById: string
+  approved: boolean
+  approvedAt: Date | null
+}
+
+/**
+ * Audit log: PDF_GENERATED
+ */
+export async function auditPdfGenerated(
+  estimateId: string,
+  revisionNumber: number,
+  companyId: string,
+  userId: string,
+  hash: string
+): Promise<void> {
+  await prisma.accessAuditLog.create({
+    data: {
+      companyId,
+      actorId: userId,
+      action: 'PDF_GENERATED',
+      metadata: {
+        estimateId,
+        revisionNumber,
+        hash,
+      },
+    },
+  })
+}
+
+/**
+ * Audit log: PDF_REGENERATED
+ */
+export async function auditPdfRegenerated(
+  estimateId: string,
+  revisionNumber: number,
+  companyId: string,
+  userId: string,
+  hash: string
+): Promise<void> {
+  await prisma.accessAuditLog.create({
+    data: {
+      companyId,
+      actorId: userId,
+      action: 'PDF_REGENERATED',
+      metadata: {
+        estimateId,
+        revisionNumber,
+        hash,
+      },
+    },
+  })
+}
+
+/**
+ * Audit log: PDF_APPROVED
+ */
+export async function auditPdfApproved(
+  estimateId: string,
+  revisionNumber: number,
+  companyId: string,
+  userId: string,
+  hash: string
+): Promise<void> {
+  await prisma.accessAuditLog.create({
+    data: {
+      companyId,
+      actorId: userId,
+      action: 'PDF_APPROVED',
+      metadata: {
+        estimateId,
+        revisionNumber,
+        hash,
+      },
+    },
+  })
+}
+
+/**
+ * Audit log: PDF_EMAILED
+ */
+export async function auditPdfEmailed(
+  estimateId: string,
+  companyId: string,
+  userId: string,
+  recipient: string
+): Promise<void> {
+  await prisma.accessAuditLog.create({
+    data: {
+      companyId,
+      actorId: userId,
+      action: 'PDF_EMAILED',
+      metadata: {
+        estimateId,
+        recipient,
+      },
+    },
+  })
+}
+
+/**
+ * Audit log: PDF_SENT_TO_DISPATCH
+ */
+export async function auditPdfSentToDispatch(
+  estimateId: string,
+  companyId: string,
+  userId: string,
+  dispatchRequestId: string
+): Promise<void> {
+  await prisma.accessAuditLog.create({
+    data: {
+      companyId,
+      actorId: userId,
+      action: 'PDF_SENT_TO_DISPATCH',
+      metadata: {
+        estimateId,
+        dispatchRequestId,
+      },
+    },
+  })
+}
