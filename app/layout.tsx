@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import './globals.css'
 import { SpeedInsights } from "@vercel/speed-insights/next"
+import { GlobalSearch } from '@/components/global-search'
 
 const inter = Inter({ subsets: ['latin'], display: 'swap' })
 
@@ -42,6 +43,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en">
       <body className={`antialiased bg-[#f5f6f9] text-[#0b1220] ${inter.className}`}>
         {children}
+        <GlobalSearch />
         <SpeedInsights />
       </body>
     </html>

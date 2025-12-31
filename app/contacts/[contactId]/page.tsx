@@ -154,6 +154,12 @@ export default async function ContactDetailPage({ params, searchParams }: PagePr
               <button className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-900 hover:bg-slate-50">
                 🗓️ Meeting
               </button>
+              <Link
+                href={`/deals/new?contactId=${contact.id}`}
+                className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-900 hover:bg-slate-50"
+              >
+                💼 Deal
+              </Link>
             </div>
           </div>
         </div>
