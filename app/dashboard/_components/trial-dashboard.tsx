@@ -17,9 +17,9 @@ export function TrialDashboard({ data, trialEndsAt }: TrialDashboardProps) {
       <section className="flex flex-wrap items-center justify-between gap-4 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
         <div className="space-y-2">
           <p className="text-xs uppercase tracking-[0.25em] text-slate-500">Starter (Trial)</p>
-          <h1 className="text-3xl font-bold text-slate-900">Build the real CRM</h1>
+          <h1 className="text-3xl font-bold text-slate-900">Build your CRM</h1>
           <p className="max-w-3xl text-sm text-slate-600">
-            Everything in T-REX starts with a contact. Add contacts, log tasks and notes, send emails, and create deals today. Upgrading keeps every record intact.
+            Everything starts with a contact. Add contacts, log tasks and notes, send emails, and create deals today. Upgrading keeps every record intact.
           </p>
           <p className="text-sm font-semibold text-slate-800">
             {trialEndsAt ? `Trial access ends ${dateFormatter.format(trialEndsAt)}` : 'Trial access active — no expiry set'}
@@ -87,7 +87,7 @@ function QuickAccessSection({ accessContactHref, data }: { accessContactHref: st
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">CRM quick access</p>
           <p className="mt-1 text-2xl font-semibold text-slate-900">Contact-first navigation</p>
-          <p className="text-sm text-slate-600">Everything in T-REX starts with a contact. Jump to your most recent and keep working.</p>
+          <p className="text-sm text-slate-600">Everything starts with a contact. Jump to your most recent and keep working.</p>
         </div>
         <Link className="text-sm font-semibold text-blue-600 hover:text-blue-700" href="/contacts">
           View all contacts
