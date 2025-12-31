@@ -6,6 +6,7 @@ export type CrmTaskRow = {
   status: 'open' | 'completed'
   updatedAt: Date
   dueDate: Date | null
+  contactId: string
   contactName: string
   dealName: string | null
 }
@@ -22,6 +23,7 @@ export async function getCrmTasks(companyId: string, userId: string): Promise<Cr
       completed: true,
       updatedAt: true,
       dueDate: true,
+      contactId: true,
       contact: {
         select: {
           firstName: true,
@@ -48,6 +50,7 @@ export async function getCrmTasks(companyId: string, userId: string): Promise<Cr
     status: task.completed ? 'completed' : 'open',
     updatedAt: task.updatedAt,
     dueDate: task.dueDate,
+    contactId: task.contactId,
     contactName: `${task.contact.firstName} ${task.contact.lastName}`.trim(),
     dealName: task.deal?.name ?? null,
   }))

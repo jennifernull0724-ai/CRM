@@ -6,6 +6,7 @@ export type CrmDealRow = {
   stage: string
   updatedAt: Date
   sentToEstimatingAt: Date | null
+  contactId: string
   contactName: string
   contactEmail: string | null
   hasApprovedEstimate: boolean
@@ -24,6 +25,7 @@ export async function getCrmDeals(companyId: string, userId: string): Promise<Cr
       stage: true,
       updatedAt: true,
       sentToEstimatingAt: true,
+      contactId: true,
       contact: {
         select: {
           firstName: true,
@@ -53,6 +55,7 @@ export async function getCrmDeals(companyId: string, userId: string): Promise<Cr
     stage: deal.stage,
     updatedAt: deal.updatedAt,
     sentToEstimatingAt: deal.sentToEstimatingAt,
+    contactId: deal.contactId,
     contactName: `${deal.contact.firstName} ${deal.contact.lastName}`.trim(),
     contactEmail: deal.contact.email,
     hasApprovedEstimate: Boolean(deal.estimate?.revisions.length),

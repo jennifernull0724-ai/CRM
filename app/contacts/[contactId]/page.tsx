@@ -440,7 +440,6 @@ function TasksPanel({ tasks, completedTasks, overdueTasks, users, createAction, 
             </ul>
           </div>
         )}
-        </div>
       </div>
     </section>
   )

@@ -62,16 +62,12 @@ export async function GET(req: NextRequest) {
         take: 10,
       }),
 
-      // Tasks (assigned to user or created by user)
+      // Tasks (assigned to user)
       prisma.task.findMany({
         where: {
-          companyId,
-          OR: [
-            { assignedToId: userId },
-            { createdById: userId },
-          ],
+          assignedToId: userId,
           title: { contains: query, mode: 'insensitive' },
-          completedAt: null,
+          completed: false,
         },
         select: {
           id: true,

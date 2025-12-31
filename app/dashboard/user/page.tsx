@@ -55,7 +55,7 @@ export default async function UserDashboardPage() {
           />
           <MetricCard 
             label="Overdue tasks" 
-            value={userMetrics.overdutasks} 
+            value={userMetrics.overdueTasks} 
             helper="Immediate attention"
             color="orange"
           />
@@ -139,27 +139,20 @@ export default async function UserDashboardPage() {
               View all tasks
             </Link>
           </div>
-          {contactRadar.tasks.length === 0 ? (
-            <p className="mt-4 text-sm text-slate-500">No tasks assigned to you</p>
-          ) : (
-            <div className="mt-4 space-y-2">
-              {contactRadar.tasks.slice(0, 5).map((task) => (
-                <div key={task.id} className="flex items-center justify-between rounded-lg border border-slate-100 p-3">
-                  <div className="flex-1">
-                    <Link href={`/contacts/${task.contactId}`} className="text-sm font-medium text-blue-600 hover:text-blue-700">
-                      {task.contactName}
-                    </Link>
-                    <p className="text-sm text-slate-700">{task.description}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className={`text-xs font-semibold ${task.isOverdue ? 'text-red-600' : task.isDueToday ? 'text-orange-600' : 'text-slate-500'}`}>
-                      {task.isOverdue ? 'Overdue' : task.isDueToday ? 'Due today' : new Date(task.dueDate).toLocaleDateString()}
-                    </p>
-                  </div>
-                </div>
-              ))}
+          <div className="mt-4 grid gap-4 md:grid-cols-3">
+            <div className="rounded-xl bg-red-50 p-4">
+              <p className="text-sm text-red-600">Due today</p>
+              <p className="mt-2 text-3xl font-bold text-red-700">{contactRadar.tasks.tasksDueToday}</p>
             </div>
-          )}
+            <div className="rounded-xl bg-orange-50 p-4">
+              <p className="text-sm text-orange-600">Overdue</p>
+              <p className="mt-2 text-3xl font-bold text-orange-700">{contactRadar.tasks.tasksOverdue}</p>
+            </div>
+            <div className="rounded-xl bg-blue-50 p-4">
+              <p className="text-sm text-blue-600">This week</p>
+              <p className="mt-2 text-3xl font-bold text-blue-700">{contactRadar.tasks.tasksDueThisWeek}</p>
+            </div>
+          </div>
         </section>
       </div>
     </UserShell>
