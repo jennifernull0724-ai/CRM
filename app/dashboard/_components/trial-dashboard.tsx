@@ -26,7 +26,7 @@ export function TrialDashboard({ data, trialEndsAt }: TrialDashboardProps) {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <Link className="rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-900 hover:border-slate-400" href="/upgrade">
+          <Link className="rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800" href="/upgrade">
             Upgrade — no data loss
           </Link>
         </div>
@@ -64,10 +64,10 @@ function PrimaryActionStrip({ accessContactHref }: { accessContactHref: string }
 
 function MetricCard({ label, value, helper }: { label: string; value: number; helper: string }) {
   return (
-    <div className="rounded-2xl border border-slate-100 bg-slate-50/80 p-4">
-      <p className="text-xs uppercase tracking-wide text-slate-500">{label}</p>
+    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+      <p className="text-xs uppercase tracking-wide text-slate-600">{label}</p>
       <p className="mt-2 text-3xl font-semibold text-slate-900">{formatNumber(value)}</p>
-      <p className="text-xs text-slate-500">{helper}</p>
+      <p className="text-xs text-slate-600">{helper}</p>
     </div>
   )
 }
@@ -98,13 +98,13 @@ function QuickAccessSection({ accessContactHref, data }: { accessContactHref: st
           <Link
             key={tile.label}
             href={tile.href}
-            className={`rounded-2xl border ${tile.primary ? 'border-blue-500 bg-blue-50/80' : 'border-slate-100 bg-slate-50/70'} p-4 transition hover:-translate-y-0.5 hover:bg-white hover:shadow-sm`}
+            className={`rounded-2xl border ${tile.primary ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-200 bg-white'} p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md`}
           >
             <div className="flex items-center justify-between">
-              <p className="text-sm font-semibold text-slate-900">{tile.label}</p>
-              {tile.count !== null ? <span className="text-xs font-mono text-slate-600">{tile.count}</span> : null}
+              <p className={`text-sm font-semibold ${tile.primary ? 'text-white' : 'text-slate-900'}`}>{tile.label}</p>
+              {tile.count !== null ? <span className={`text-xs font-mono ${tile.primary ? 'text-slate-200' : 'text-slate-700'}`}>{tile.count}</span> : null}
             </div>
-            <p className="text-sm text-slate-600">{tile.helper}</p>
+            <p className={`text-sm ${tile.primary ? 'text-slate-100' : 'text-slate-700'}`}>{tile.helper}</p>
           </Link>
         ))}
       </div>
@@ -267,8 +267,8 @@ function RecentActivity({ events }: { events: TrialDashboardData['activity'] }) 
 function LockedInsights() {
   const items = [
     {
-      title: 'Analytics preview',
-      body: 'Rollups across contacts, deals, and dispatch readiness stay locked. Unlock in Growth/Pro.',
+      title: 'Advanced analytics',
+      body: 'Rollups across contacts, deals, and pipeline forecasting stay locked. Unlock in Growth/Pro.',
     },
     {
       title: 'Exports & automations',
@@ -288,17 +288,17 @@ function LockedInsights() {
           <p className="mt-1 text-2xl font-semibold text-slate-900">Upgrade to unlock analytics</p>
           <p className="text-sm text-slate-600">These are muted in trial. Upgrading keeps every record and setting.</p>
         </div>
-        <Link className="rounded-full border border-slate-900 px-4 py-2 text-sm font-semibold text-slate-900 transition hover:bg-slate-900 hover:text-white" href="/upgrade">
+        <Link className="rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800" href="/upgrade">
           Upgrade — keep all data
         </Link>
       </div>
       <div className="mt-6 grid gap-4 md:grid-cols-3">
         {items.map((item) => (
-          <div key={item.title} className="rounded-2xl border border-slate-100 bg-slate-50/80 p-4">
+          <div key={item.title} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
             <p className="text-base font-semibold text-slate-900">{item.title}</p>
-            <p className="text-sm text-slate-600">{item.body}</p>
-            <Link className="mt-3 inline-flex text-sm font-semibold text-blue-600 hover:text-blue-700" href="/upgrade">
-              Unlock with Growth/Pro
+            <p className="text-sm text-slate-700">{item.body}</p>
+            <Link className="mt-3 inline-flex text-sm font-semibold text-slate-900 hover:text-slate-700" href="/upgrade">
+              Unlock with Growth/Pro →
             </Link>
           </div>
         ))}
@@ -322,8 +322,8 @@ function EmptyState({ label, helper, actionLabel, href }: { label: string; helpe
 function ActionButton({ label, href, helper, tone = 'default' }: { label: string; href: string; helper: string; tone?: 'primary' | 'ghost' | 'default' }) {
   const styles = {
     primary: 'bg-slate-900 text-white shadow-sm hover:bg-slate-800',
-    ghost: 'border border-slate-300 bg-white text-slate-900 hover:border-slate-400',
-    default: 'border border-slate-200 bg-white text-slate-900 hover:border-slate-300',
+    ghost: 'border border-slate-200 bg-white text-slate-900 hover:bg-slate-50',
+    default: 'border border-slate-200 bg-white text-slate-900 hover:bg-slate-50',
   }
 
   return (
@@ -332,7 +332,7 @@ function ActionButton({ label, href, helper, tone = 'default' }: { label: string
       className={`flex flex-col rounded-2xl px-4 py-3 text-left transition ${styles[tone]}`}
     >
       <span className="text-sm font-semibold">{label}</span>
-      <span className="text-xs text-slate-500">{helper}</span>
+      <span className="text-xs text-slate-600">{helper}</span>
     </Link>
   )
 }
