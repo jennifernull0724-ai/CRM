@@ -10,8 +10,6 @@ interface TrialShellProps {
 const TRIAL_NAV = [
   { path: '/dashboard/trial', label: 'Dashboard', icon: <DashboardIcon /> },
   { path: '/contacts', label: 'Contacts', icon: <ContactsIcon /> },
-  { path: '/crm/deals', label: 'Deals', icon: <DealsIcon /> },
-  { path: '/crm/tasks', label: 'Tasks', icon: <TasksIcon /> },
   { path: '/settings', label: 'Settings', icon: <SettingsIcon /> },
 ]
 

@@ -155,9 +155,6 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(new URL('/app', request.url))
   }
 
-  if (pathname.startsWith('/dashboard/user')) {
-    return NextResponse.redirect(new URL('/crm', request.url))
-  }
 
   if (pathname.startsWith('/dashboard/estimator')) {
     return NextResponse.redirect(new URL('/estimating', request.url))

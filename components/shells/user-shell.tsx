@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { HubSpotIconNav, DashboardIcon, ContactsIcon, DealsIcon, TasksIcon, SettingsIcon } from './hubspot-icon-nav'
+import { HubSpotIconNav, DashboardIcon, ContactsIcon, DealsIcon, TasksIcon, EmailIcon, DocumentsIcon, SettingsIcon } from './hubspot-icon-nav'
 
 interface UserShellProps {
   companyLogoUrl?: string | null
@@ -12,6 +12,8 @@ const USER_NAV = [
   { path: '/contacts', label: 'Contacts', icon: <ContactsIcon /> },
   { path: '/crm/deals', label: 'Deals', icon: <DealsIcon /> },
   { path: '/crm/tasks', label: 'Tasks', icon: <TasksIcon /> },
+  { path: '/crm/email', label: 'Email', icon: <EmailIcon /> },
+  { path: '/crm/documents', label: 'Documents', icon: <DocumentsIcon /> },
   { path: '/settings', label: 'Settings', icon: <SettingsIcon /> },
 ]
 
