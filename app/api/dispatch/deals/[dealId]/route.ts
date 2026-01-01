@@ -13,7 +13,7 @@ import { DealStage } from '@/types/deal-centric';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { dealId: string } }
+  context: { params: Promise<{ dealId: string }> }
 ) {
   try {
     const session = await auth();
@@ -29,12 +29,13 @@ export async function GET(
       );
     }
 
+    const { dealId } = await context.params;
     const { companyId } = session.user;
 
     // Load deal (must be DISPATCHED)
     const deal = await prisma.deal.findFirst({
       where: {
-        id: params.dealId,
+        id: dealId,
         companyId,
         stage: DealStage.DISPATCHED,
       },
