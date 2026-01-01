@@ -24,7 +24,7 @@ import { DealError } from '@/types/deal-centric';
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { dealId: string } }
+  context: { params: Promise<{ dealId: string }> }
 ) {
   try {
     const session = await auth();
@@ -32,6 +32,7 @@ export async function POST(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const params = await context.params;
     const body = await request.json();
 
     const result = await approveDeal(

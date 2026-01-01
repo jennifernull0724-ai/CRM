@@ -28,9 +28,7 @@ import {
  */
 export async function PATCH(
   request: NextRequest,
-  {
-    params,
-  }: { params: { dealId: string; versionId: string; itemId: string } }
+  context: { params: Promise<{ dealId: string; versionId: string; itemId: string }> }
 ) {
   try {
     const session = await auth();
@@ -38,6 +36,7 @@ export async function PATCH(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const params = await context.params;
     const { companyId, id: userId, role } = session.user;
 
     // Verify role can price line items
@@ -173,9 +172,7 @@ export async function PATCH(
  */
 export async function DELETE(
   request: NextRequest,
-  {
-    params,
-  }: { params: { dealId: string; versionId: string; itemId: string } }
+  context: { params: Promise<{ dealId: string; versionId: string; itemId: string }> }
 ) {
   try {
     const session = await auth();
@@ -183,6 +180,7 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const params = await context.params;
     const { companyId, id: userId, role } = session.user;
 
     // Verify role can price line items

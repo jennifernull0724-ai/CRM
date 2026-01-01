@@ -13,7 +13,7 @@ import { DealStage } from '@/types/deal-centric';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { dealId: string } }
+  context: { params: Promise<{ dealId: string }> }
 ) {
   try {
     const session = await auth();
@@ -21,6 +21,7 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const params = await context.params;
     const { companyId } = session.user;
 
     // Load deal

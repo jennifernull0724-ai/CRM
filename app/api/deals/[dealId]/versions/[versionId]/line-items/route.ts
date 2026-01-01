@@ -31,7 +31,7 @@ import {
  */
 export async function POST(
   request: NextRequest,
-  { params }: { params: { dealId: string; versionId: string } }
+  context: { params: Promise<{ dealId: string; versionId: string }> }
 ) {
   try {
     const session = await auth();
@@ -39,6 +39,7 @@ export async function POST(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const params = await context.params;
     const { companyId, id: userId, role } = session.user;
 
     // Verify role can price line items
@@ -167,7 +168,7 @@ export async function POST(
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: { dealId: string; versionId: string } }
+  context: { params: Promise<{ dealId: string; versionId: string }> }
 ) {
   try {
     const session = await auth();
@@ -175,6 +176,7 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const params = await context.params;
     const { companyId } = session.user;
 
     // Verify deal belongs to company
