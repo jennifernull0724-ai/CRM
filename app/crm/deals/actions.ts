@@ -106,11 +106,6 @@ export async function createCrmDealAction(formData: FormData): Promise<ActionRes
         },
       })
 
-      await tx.contact.update({
-        where: { id: contact.id },
-        data: { lastActivityAt: now, activityState: 'ACTIVE' },
-      })
-
       await tx.activity.create({
         data: {
           companyId,

@@ -155,11 +155,6 @@ export async function createEstimate(input: CreateEstimateInput): Promise<Create
 
     await tx.estimate.update({ where: { id: estimate.id }, data: { currentRevisionId: revision.id } })
 
-    await tx.contact.update({
-      where: { id: contact.id },
-      data: { lastActivityAt: timestamp, activityState: 'ACTIVE' },
-    })
-
     await tx.activity.create({
       data: {
         companyId,

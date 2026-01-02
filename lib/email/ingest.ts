@@ -527,7 +527,6 @@ async function ensureSystemUnlinkedContact(companyId: string) {
       createdById: owner.id,
       isSystem: true,
       derivedCompanyName: 'System',
-      lastActivityAt: new Date(),
     },
   })
 }

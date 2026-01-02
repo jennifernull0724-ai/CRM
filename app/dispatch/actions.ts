@@ -327,11 +327,6 @@ export async function createWorkOrderFromDispatchAction(formData: FormData) {
       },
     })
 
-    await tx.contact.update({
-      where: { id: request.contactId },
-      data: { lastActivityAt: activityTimestamp, activityState: 'ACTIVE' },
-    })
-
     await tx.activity.create({
       data: {
         companyId,
@@ -443,11 +438,6 @@ export async function createManualWorkOrderAction(formData: FormData) {
           timestamp: activityTimestamp.toISOString(),
         },
       },
-    })
-
-    await tx.contact.update({
-      where: { id: contactId },
-      data: { lastActivityAt: activityTimestamp, activityState: 'ACTIVE' },
     })
 
     await tx.activity.create({
@@ -709,11 +699,6 @@ export async function sendWorkOrderEmailAction(
     })
 
     const eventTimestamp = new Date()
-
-    await prisma.contact.update({
-      where: { id: workOrder.contactId },
-      data: { lastActivityAt: eventTimestamp, activityState: 'ACTIVE' },
-    })
 
     const recipientSummary = {
       to: toRecipients.map((recipient) => recipient.email),

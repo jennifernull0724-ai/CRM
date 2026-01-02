@@ -6,6 +6,8 @@ import { z } from 'zod'
 import { enforceCanWrite, PricingEnforcementError } from '@/lib/billing/enforcement'
 import { updateContactRecord } from '@/lib/contacts/mutations'
 
+const forbiddenPatterns = /(demo|sample|mock)/i
+
 const updateSchema = z.object({
   firstName: z.string().min(1).optional(),
   lastName: z.string().min(1).optional(),
@@ -50,21 +52,11 @@ export async function GET(
             assignedTo: { select: { name: true } },
           },
         },
-        tasks: {
-          where: { completed: false },
-          orderBy: { dueDate: 'asc' },
-          include: {
-            assignedTo: { select: { name: true } },
-          },
-        },
-        notes: {
-          orderBy: { createdAt: 'desc' },
-          include: {
-            createdBy: { select: { name: true } },
-          },
-        },
         activities: {
-          orderBy: { createdAt: 'desc' },
+            orderBy: [
+              { occurredAt: 'desc' },
+              { createdAt: 'desc' },
+            ],
           take: 50,
           include: {
             user: { select: { name: true } },
@@ -124,6 +116,19 @@ export async function PATCH(
     const body = await req.json()
     const validated = updateSchema.parse(body)
 
+    const fieldsToCheck = [
+      validated.firstName ?? '',
+      validated.lastName ?? '',
+      validated.email ?? '',
+      validated.phone ?? '',
+      validated.mobile ?? '',
+      validated.jobTitle ?? '',
+    ]
+    const containsForbidden = fieldsToCheck.some((field) => forbiddenPatterns.test(field))
+    if (containsForbidden) {
+      return NextResponse.json({ error: 'Forbidden content' }, { status: 400 })
+    }
+
     // Only admin/owner can change owner or archive
     if (!isAdmin && (validated.ownerId || validated.archived !== undefined)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
@@ -180,7 +185,7 @@ export async function PATCH(
   }
 }
 
-// DELETE /api/contacts/[id] - Delete contact (admin/owner only)
+// DELETE /api/contacts/[id] - Archive contact (admin/owner only)
 export async function DELETE(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -211,19 +216,24 @@ export async function DELETE(
       return NextResponse.json({ error: 'Contact not found' }, { status: 404 })
     }
 
-    await prisma.contact.delete({
-      where: { id },
-    })
+    const archivedAt = new Date()
 
+    // Emit archival activity before state change to preserve immutable history
     await prisma.activity.create({
       data: {
         companyId,
-        type: 'CONTACT_DELETED',
-        subject: `Contact deleted: ${contact.firstName} ${contact.lastName}`,
+        type: 'CONTACT_ARCHIVED',
+        subject: `Contact archived: ${contact.firstName} ${contact.lastName}`,
         description: `Email: ${contact.email}`,
         contactId: contact.id,
         userId,
+        metadata: { archivedAt: archivedAt.toISOString() },
       },
+    })
+
+    await prisma.contact.update({
+      where: { id },
+      data: { archived: true, archivedAt },
     })
 
     return NextResponse.json({ success: true })

@@ -125,14 +125,6 @@ export async function POST(req: NextRequest) {
       },
     })
 
-    const activityTimestamp = deal.createdAt
-
-    // Update contact lastActivityAt
-    await prisma.contact.update({
-      where: { id: contact.id },
-      data: { lastActivityAt: activityTimestamp, activityState: 'ACTIVE' },
-    })
-
     // Log DEAL_CREATED activity
     await prisma.activity.create({
       data: {

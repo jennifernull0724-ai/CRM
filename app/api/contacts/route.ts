@@ -6,6 +6,8 @@ import { enforceCanWrite, PricingEnforcementError } from '@/lib/billing/enforcem
 import { listContactsForCompany, type ContactListFilters } from '@/lib/contacts/listContacts'
 import { createContactRecord } from '@/lib/contacts/mutations'
 
+const forbiddenPatterns = /(demo|sample|mock)/i
+
 const contactSchema = z.object({
   firstName: z.string().min(1),
   lastName: z.string().min(1),
@@ -79,6 +81,21 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json()
     const validated = contactSchema.parse(body)
+
+    const fieldsToCheck = [
+      validated.firstName,
+      validated.lastName,
+      validated.email,
+      validated.phone ?? '',
+      validated.mobile ?? '',
+      validated.jobTitle ?? '',
+      validated.companyLabel ?? '',
+      validated.source ?? '',
+    ]
+    const containsForbidden = fieldsToCheck.some((field) => forbiddenPatterns.test(field))
+    if (containsForbidden) {
+      return NextResponse.json({ error: 'Forbidden content' }, { status: 400 })
+    }
 
     const contact = await createContactRecord(
       {

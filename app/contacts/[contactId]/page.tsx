@@ -49,451 +49,221 @@ type WorkspaceUser = {
 }
 
 type PageProps = {
-  params: { contactId: string }
-  searchParams?: SearchParams
-}
+  import { notFound, redirect } from 'next/navigation'
+  import { getServerSession } from 'next-auth'
+  import { format, formatDistanceToNow } from 'date-fns'
+  import { authOptions } from '@/lib/auth'
+  import { prisma } from '@/lib/prisma'
+  import { AppLayout } from '@/ui/layouts/AppLayout'
+  import { GlobalHeader } from '@/ui/app-shell/GlobalHeader'
+  import { PrimaryNavRail } from '@/ui/app-shell/PrimaryNavRail'
+  import { ObjectSubNav } from '@/ui/app-shell/ObjectSubNav'
+  import { PrimaryNavItem } from '@/ui/navigation/PrimaryNavItem'
+  import { ActiveRouteIndicator } from '@/ui/navigation/ActiveRouteIndicator'
+  import { RecordPageLayout } from '@/ui/layouts/RecordPageLayout'
+  import { ObjectHeader } from '@/ui/objects/ObjectHeader'
+  import { PropertySection } from '@/ui/objects/PropertySection'
+  import { AssociationPanel } from '@/ui/objects/AssociationPanel'
+  import { ObjectEmptyState } from '@/ui/objects/ObjectEmptyState'
+  import { ActivityTimelineLayout } from '@/ui/layouts/ActivityTimelineLayout'
+  import { ActivityTimeline } from '@/ui/activity/ActivityTimeline'
+  import { ActivityItemShell } from '@/ui/activity/ActivityItemShell'
+  import { ActivityComposer } from '@/ui/activity/ActivityComposer'
+  import { ActivityEmptyState } from '@/ui/activity/ActivityEmptyState'
+  import { Pill } from '@/ui/primitives/Pill'
+  import { Card } from '@/ui/primitives/Card'
+  import { ScrollContainer } from '@/ui/primitives/ScrollContainer'
+  import { ActivityComposerForm } from './activity-composer-form'
 
-export default async function ContactDetailPage({ params, searchParams }: PageProps) {
-  const session = await getServerSession(authOptions)
-  if (!session?.user?.companyId) {
-    redirect(`/login?from=/contacts/${params.contactId}`)
+  export const dynamic = 'force-dynamic'
+
+  type PageProps = {
+    params: { contactId: string }
   }
 
-  const timelineTypes = normalizeTimelineFilters(searchParams?.timelineType)
-  const workspace = await getContactWorkspace(
-    params.contactId,
-    session.user.companyId,
-    {
-      types: timelineTypes,
-      limit: 75,
-    },
-    {
-      userId: session.user.id,
-      role: session.user.role ?? 'user',
+  const primaryNav = [
+    { label: 'Contacts', href: '/contacts' },
+    { label: 'Companies', href: '/companies' },
+    { label: 'Deals', href: '/deals' },
+    { label: 'Tickets', href: '/tickets' },
+    { label: 'Reports', href: '/reports' },
+    { label: 'Automation', href: '/automation' },
+    { label: 'Settings', href: '/settings' },
+  ]
+
+  export default async function ContactDetailPage({ params }: PageProps) {
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.companyId) {
+      redirect(`/login?from=/contacts/${params.contactId}`)
     }
-  )
 
-  if (!workspace) {
-    notFound()
-  }
+    const contact = await prisma.contact.findFirst({
+      where: { id: params.contactId, companyId: session.user.companyId },
+      include: { owner: { select: { id: true, name: true, email: true } } },
+    })
 
-  const { contact } = workspace
-  const normalizedTasks: TaskPanelProps['tasks'] = workspace.tasks.map((task) => ({
-    id: task.id,
-    title: task.title,
-    dueDate: task.dueDate,
-    priority: task.priority ?? 'medium',
-    notes: task.notes,
-    assignedTo: task.assignedTo
-      ? {
-          id: task.assignedTo.id,
-          name: task.assignedTo.name,
-          email: task.assignedTo.email ?? null,
-        }
-      : undefined,
-    createdAt: task.createdAt,
-    completed: Boolean(task.completedAt),
-  }))
-  const openTasks = normalizedTasks.filter((task) => !task.completed)
-  const completedTasks = normalizedTasks.filter((task) => task.completed).slice(0, 5)
-  const overdueTasks = openTasks.filter((task) => task.dueDate && task.dueDate < new Date()).length
-  const mentionableUsers = workspace.workspaceUsers.map((user: WorkspaceUser) => ({
-    id: user.id,
-    name: user.name ?? 'Workspace user',
-    role: user.role ?? 'user',
-    email: user.email,
-  }))
-  const mentionLookup = new Map<string, { id: string; name: string | null }>(
-    workspace.workspaceUsers.map((user: WorkspaceUser) => [user.id, { id: user.id, name: user.name }])
-  )
+    if (!contact) {
+      notFound()
+    }
 
-  const noteComposerAction = (state: ActionState, formData: FormData) => createContactNoteAction(contact.id, state, formData)
-  const createTask = (state: ActionState | FormData, formData?: FormData) => createContactTaskAction(contact.id, state, formData)
-  const updateTask = (taskId: string) => (state: ActionState | FormData, formData?: FormData) => updateContactTaskAction(contact.id, taskId, state, formData)
-  const completeTask = (taskId: string) => (state: ActionState | FormData, formData?: FormData) => completeContactTaskAction(contact.id, taskId, state, formData)
-  const logCall = (state: ActionState | FormData, formData?: FormData) => logContactCallAction(contact.id, state, formData)
-  const logMeeting = (state: ActionState | FormData, formData?: FormData) => logContactMeetingAction(contact.id, state, formData)
-  const logSocial = (state: ActionState | FormData, formData?: FormData) => logContactSocialAction(contact.id, state, formData)
-  const logCustom = (state: ActionState | FormData, formData?: FormData) => logContactCustomActivityAction(contact.id, state, formData)
-  const sendEmail = (state: ActionState, formData: FormData) => sendContactEmailAction(contact.id, state, formData)
+    const activities = await prisma.activity.findMany({
+      where: { contactId: contact.id, companyId: session.user.companyId },
+      orderBy: [
+        { occurredAt: 'desc' },
+        { createdAt: 'desc' },
+      ],
+      take: 120,
+    })
 
-  const ownerName = contact.owner?.name ?? 'Unassigned'
-  const companyLabel = contact.companyOverrideName ?? contact.derivedCompanyName
-  const lastActivityLabel = contact.lastActivityAt
-    ? formatDistanceToNow(new Date(contact.lastActivityAt), { addSuffix: true })
-    : 'Never'
+    const timelineGroups = groupActivitiesByDay(activities)
+    const latestActivity = activities[0]
+    const lastActivityLabel = latestActivity
+      ? formatDistanceToNow(latestActivity.occurredAt ?? latestActivity.createdAt, { addSuffix: true })
+      : 'No activity yet'
 
-  return (
-    <div className="min-h-screen bg-slate-50">
-      {/* HubSpot-Style Quick Actions Bar - Contact-Anchored */}
-      <div className="sticky top-0 z-20 border-b border-slate-200 bg-white shadow-sm">
-        <div className="mx-auto max-w-7xl px-6 py-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Link href="/contacts" className="text-sm text-slate-600 hover:text-slate-900">
-                ← Contacts
-              </Link>
-              <span className="text-slate-300">/</span>
-              <span className="text-sm font-semibold text-slate-900">
-                {contact.firstName} {contact.lastName}
-              </span>
-            </div>
-            <div className="flex items-center gap-2">
-              <button className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-900 hover:bg-slate-50">
-                📧 Email
-              </button>
-              <button className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-900 hover:bg-slate-50">
-                ✓ Task
-              </button>
-              <button className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-900 hover:bg-slate-50">
-                📝 Note
-              </button>
-              <button className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-900 hover:bg-slate-50">
-                📞 Call
-              </button>
-              <button className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-900 hover:bg-slate-50">
-                🗓️ Meeting
-              </button>
-              <Link
-                href={`/deals/new?contactId=${contact.id}`}
-                className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-900 hover:bg-slate-50"
-              >
-                💼 Deal
-              </Link>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="mx-auto max-w-7xl px-6 py-8">
-        {/* Contact Header - Clean HubSpot Style */}
-        <div className="mb-8 rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
-          <div className="flex items-start justify-between">
-            <div className="space-y-2">
-              <h1 className="text-2xl font-semibold text-slate-900">
-                {contact.firstName} {contact.lastName}
-              </h1>
-              <p className="text-sm text-slate-600">
-                {contact.jobTitle ?? 'No title'} {companyLabel && `at ${companyLabel}`}
-              </p>
-              <div className="flex items-center gap-4 text-sm text-slate-600">
-                {contact.email && (
-                  <a href={`mailto:${contact.email}`} className="hover:text-blue-600">
-                    {contact.email}
-                  </a>
-                )}
-                {contact.phone && (
-                  <a href={`tel:${contact.phone}`} className="hover:text-blue-600">
-                    {contact.phone}
-                  </a>
-                )}
+    return (
+      <AppLayout
+        header={<GlobalHeader leftSlot={<span className="text-sm font-semibold text-slate-800">Contacts</span>} rightSlot={<Pill tone="accent">Contact record</Pill>} />}
+        primaryNav={
+          <PrimaryNavRail>
+            {primaryNav.map((item) => (
+              <div key={item.label} className="grid grid-cols-[6px_1fr] items-center gap-2 px-2">
+                <ActiveRouteIndicator isActive={item.href.startsWith('/contacts')} />
+                <PrimaryNavItem label={item.label} isActive={item.href.startsWith('/contacts')} />
               </div>
-            </div>
-            <div className="flex gap-3">
-              <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-center">
-                <p className="text-xl font-semibold text-slate-900">{workspace.stats.openTasks}</p>
-                <p className="text-xs text-slate-600">Open tasks</p>
-              </div>
-              <div className={`rounded-lg border ${workspace.stats.overdueTasks > 0 ? 'border-red-200 bg-red-50' : 'border-slate-200 bg-slate-50'} px-4 py-3 text-center`}>
-                <p className={`text-xl font-semibold ${workspace.stats.overdueTasks > 0 ? 'text-red-600' : 'text-slate-900'}`}>
-                  {workspace.stats.overdueTasks}
-                </p>
-                <p className="text-xs text-slate-600">Overdue</p>
-              </div>
-              <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
-                <p className="text-xs text-slate-600">Last activity</p>
-                <p className="text-xs font-semibold text-slate-900">{lastActivityLabel}</p>
-              </div>
-            </div>
-          </div>
-          <div className="mt-4 flex items-center gap-4 border-t border-slate-100 pt-4 text-sm text-slate-600">
-            <span>Owner: {ownerName}</span>
-            <span className="text-slate-300">·</span>
-            <span>Status: {contact.activityState}</span>
-          </div>
-        </div>
-
-        <div className="grid gap-6 lg:grid-cols-[2fr,1fr]">
-          <div className="space-y-6">
-            <TasksPanel
-              tasks={openTasks}
-              completedTasks={completedTasks}
-              overdueTasks={overdueTasks}
-              users={workspace.workspaceUsers.map((user: WorkspaceUser) => ({ id: user.id, name: user.name ?? 'Workspace user' }))}
-              createAction={createTask}
-              updateAction={updateTask}
-              completeAction={completeTask}
-            />
-
-            <NotesPanel
-              notes={workspace.notes}
-              mentionLookup={mentionLookup}
-              mentionableUsers={mentionableUsers}
-              action={noteComposerAction}
-            />
-
-            <ManualActivityPanel logCall={logCall} logMeeting={logMeeting} logSocial={logSocial} logCustom={logCustom} />
-
-            <TimelinePanel contactId={contact.id} timeline={workspace.timeline} timelineTypes={timelineTypes} />
-          </div>
-
-          <div className="space-y-6">
-            <EmailShell
-              integration={workspace.emailIntegration}
-              contact={{ id: contact.id, firstName: contact.firstName, lastName: contact.lastName, email: contact.email }}
-              userContext={{ companyId: session.user.companyId, userId: session.user.id }}
-              action={sendEmail}
-            />
-            <RelatedObjectsPanel deals={workspace.deals} estimates={workspace.estimates} workOrders={workspace.workOrders} />
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function Metric({ label, value, helper, tone }: { label: string; value: string | number; helper: string; tone: 'emerald' | 'amber' | 'violet' }) {
-  const toneClass = tone === 'emerald' ? 'text-emerald-300' : tone === 'amber' ? 'text-amber-300' : 'text-indigo-300'
-  return (
-    <div className="rounded-2xl border border-slate-800 bg-slate-900/40 px-4 py-4">
-      <p className="text-xs uppercase tracking-[0.4em] text-slate-500">{label}</p>
-      <p className={`mt-1 text-2xl font-semibold ${toneClass}`}>{value}</p>
-      <p className="text-xs text-slate-500">{helper}</p>
-    </div>
-  )
-}
-
-type NotesPanelProps = {
-  notes: Array<{
-    id: string
-    content: string
-    mentions: string | null
-    createdAt: Date
-    createdBy: { name: string | null } | null
-  }>
-  mentionableUsers: Array<{ id: string; name: string; role: string; email?: string | null }>
-  mentionLookup: Map<string, { id: string; name: string | null }>
-  action: (state: ActionState, formData: FormData) => Promise<ActionState>
-}
-
-function NotesPanel({ notes, mentionableUsers, mentionLookup, action }: NotesPanelProps) {
-  return (
-    <section className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-base font-semibold text-slate-900">Notes</h2>
-          <p className="text-sm text-slate-600">Shared context across your team</p>
-        </div>
-      </div>
-      <div className="mt-6 space-y-4">
-        <NoteComposer action={action} mentionableUsers={mentionableUsers} />
-        {notes.length === 0 ? (
-          <p className="rounded-lg border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
-            No notes yet. Add your first note above.
-          </p>
-        ) : (
-          <div className="space-y-3">
-            {notes.map((note) => {
-              const mentionIds = parseMentionIds(note.mentions)
-              const mentionedUsers = mentionIds.map((id) => mentionLookup.get(id)).filter(Boolean)
-
-              return (
-                <article key={note.id} className="rounded-lg border border-slate-200 bg-slate-50 p-4">
-                  <div
-                    className="prose prose-sm max-w-none text-slate-700"
-                    dangerouslySetInnerHTML={{ __html: sanitizeNoteBody(note.content) }}
-                  />
-                  <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-slate-500">
-                    <span>{note.createdBy?.name ?? 'Unknown actor'}</span>
-                    <span>·</span>
-                    <span>{formatRelativeSafe(note.createdAt)}</span>
-                    {mentionedUsers.length > 0 && (
-                      <span className="inline-flex flex-wrap gap-2">
-                        {mentionedUsers.map((user) => (
-                          <span key={user!.id} className="rounded bg-blue-50 px-2 py-0.5 text-blue-700">
-                            @{user!.name}
-                          </span>
-                        ))}
-                      </span>
-                    )}
-                  </div>
-                </article>
-              )
-            })}
-          </div>
-        )}
-      </div>
-    </section>
-  )
-}
-
-type TaskAction = (stateOrFormData: ActionState | FormData, formData?: FormData) => Promise<ActionState>
-
-type TaskPanelProps = {
-  tasks: Array<{
-    id: string
-    title: string
-    dueDate: Date | null
-    priority: string
-    notes: string | null
-    assignedTo?: { id: string; name: string; email: string | null }
-    createdAt: Date
-    completed: boolean
-  }>
-  completedTasks: TaskPanelProps['tasks']
-  overdueTasks: number
-  users: Array<{ id: string; name: string }>
-  createAction: TaskAction
-  updateAction: (taskId: string) => TaskAction
-  completeAction: (taskId: string) => TaskAction
-}
-
-function TasksPanel({ tasks, completedTasks, overdueTasks, users, createAction, updateAction, completeAction }: TaskPanelProps) {
-  const bindAction = (action: TaskAction) => async (formData: FormData) => {
-    await action(formData)
-  }
-
-  return (
-    <section className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-base font-semibold text-slate-900">Tasks</h2>
-          <p className="text-sm text-slate-600">
-            {tasks.length} open {overdueTasks > 0 && <span className="text-red-600">· {overdueTasks} overdue</span>}
-          </p>
-        </div>
-      </div>
-      <div className="mt-6 space-y-4">
-        <form action={bindAction(createAction)} className="space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-4">
-          <p className="text-xs font-semibold text-slate-900">Create new task</p>
-          <input name="title" placeholder="Task title" className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400" required />
-          <div className="grid gap-3 md:grid-cols-2">
-            <label className="text-xs text-slate-600">
-              Due date
-              <input type="date" name="dueDate" className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900" />
-            </label>
-            <label className="text-xs text-slate-600">
-              Priority
-              <select name="priority" className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900">
-                <option value="medium">Medium</option>
-                <option value="high">High</option>
-                <option value="low">Low</option>
-              </select>
-            </label>
-          </div>
-          <label className="text-xs text-slate-600">
-            Assign owner
-            <select name="ownerId" className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900">
-              <option value="">Me</option>
-              {users.map((user) => (
-                <option key={user.id} value={user.id}>
-                  {user.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <textarea
-            name="notes"
-            placeholder="Internal notes"
-            className="h-20 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400"
-          />
-          <button type="submit" className="w-full rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">
-            Create task
-          </button>
-        </form>
-        {tasks.length === 0 ? (
-          <p className="rounded-lg border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
-            No open tasks. Create one above.
-          </p>
-        ) : (
-          <div className="space-y-2">
-            {tasks.map((task) => (
-              <article key={task.id} className="rounded-lg border border-slate-200 bg-slate-50 p-4">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <p className="text-sm font-semibold text-slate-900">{task.title}</p>
-                    <p className="mt-1 text-xs text-slate-600">
-                      {task.dueDate ? `Due ${formatRelativeSafe(task.dueDate)}` : 'No due date'} · {task.priority} priority
-                    </p>
-                    {task.assignedTo && (
-                      <p className="mt-1 text-xs text-slate-600">Assigned to {task.assignedTo.name}</p>
-                    )}
-                    {task.notes && <p className="mt-2 text-sm text-slate-700">{task.notes}</p>}
-                  </div>
-                  <form action={bindAction(completeAction(task.id))}>
-                    <button className="rounded-lg border border-green-600 bg-green-50 px-3 py-1 text-xs font-medium text-green-700 hover:bg-green-100">
-                      Complete
-                    </button>
-                  </form>
-                </div>
-              </article>
             ))}
-          </div>
-        )}
-        {completedTasks.length > 0 && (
-          <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-4">
-            <p className="mb-2 text-xs font-semibold text-slate-900">Recently completed</p>
-            <ul className="space-y-1.5">
-              {completedTasks.map((task) => (
-                <li key={task.id} className="text-sm text-slate-600">{task.title}</li>
-              ))}
-            </ul>
-          </div>
-        )}
-      </div>
-    </section>
-  )
-}
+          </PrimaryNavRail>
+        }
+        subNav={
+          <ObjectSubNav>
+            <span className="rounded-full bg-orange-50 px-3 py-1 text-xs font-semibold text-orange-700">Record</span>
+            <span className="text-xs text-slate-500">Timeline</span>
+            <span className="text-xs text-slate-500">Associations</span>
+          </ObjectSubNav>
+        }
+      >
+        <div className="mx-auto max-w-6xl space-y-6 p-6">
+          <RecordPageLayout
+            header={
+              <ObjectHeader
+                titleSlot={
+                  <div className="space-y-1">
+                    <div className="text-xs uppercase tracking-[0.3em] text-slate-500">Contact</div>
+                    <div className="text-2xl font-semibold text-slate-900">
+                      {contact.firstName} {contact.lastName}
+                    </div>
+                  </div>
+                }
+                metaSlot={
+                  <div className="flex flex-wrap gap-2 text-sm text-slate-600">
+                    {contact.email ? <span>{contact.email}</span> : <span>No email</span>}
+                    <span className="text-slate-300">·</span>
+                    <span>Owner: {contact.owner?.name ?? 'Unassigned'}</span>
+                    <span className="text-slate-300">·</span>
+                    <span>Last activity: {lastActivityLabel}</span>
+                  </div>
+                }
+                actionSlot={<Pill>Activity state: {contact.activityState}</Pill>}
+              />
+            }
+            leftColumn={
+              <div className="space-y-4">
+                <PropertySection title="Primary details">
+                  <DetailField label="Email" value={contact.email} />
+                  <DetailField label="Phone" value={contact.phone} />
+                  <DetailField label="Mobile" value={contact.mobile} />
+                  <DetailField label="Job title" value={contact.jobTitle} />
+                </PropertySection>
 
-type ManualPanelAction = (stateOrFormData: ActionState | FormData, formData?: FormData) => Promise<ActionState>
-
-function ManualActivityPanel({ logCall, logMeeting, logSocial, logCustom }: { logCall: ManualPanelAction; logMeeting: ManualPanelAction; logSocial: ManualPanelAction; logCustom: ManualPanelAction }) {
-  const bindAction = (action: ManualPanelAction) => async (formData: FormData) => {
-    await action(formData)
+                <PropertySection title="Ownership">
+                  <DetailField label="Owner" value={contact.owner?.name ?? 'Unassigned'} />
+                  <DetailField label="Created" value={format(contact.createdAt, 'PP p')} />
+                  <DetailField label="Updated" value={format(contact.updatedAt, 'PP p')} />
+                  <DetailField label="Archived" value={contact.archived ? 'Yes' : 'No'} />
+                </PropertySection>
+              </div>
+            }
+            rightColumn={
+              <ActivityTimelineLayout
+                composer={
+                  <ActivityComposer
+                    header={<div className="text-sm font-semibold text-slate-800">Log activity</div>}
+                    footer={<div className="flex justify-end text-xs text-slate-500">Commands emit Activities only</div>}
+                  >
+                    <ActivityComposerForm contactId={contact.id} />
+                  </ActivityComposer>
+                }
+                timeline={
+                  <ActivityTimeline>
+                    {timelineGroups.length === 0 ? (
+                      <ActivityEmptyState />
+                    ) : (
+                      <ScrollContainer height={420}>
+                        <div className="space-y-4">
+                          {timelineGroups.map((group) => (
+                            <Card key={group.label} padding="p-3">
+                              <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">{group.label}</div>
+                              <div className="space-y-2">
+                                {group.items.map((item) => (
+                                  <ActivityItemShell key={item.id}>
+                                    <div className="flex items-center justify-between text-xs text-slate-500">
+                                      <span>{item.type}</span>
+                                      <span>{format(item.occurredAt ?? item.createdAt, 'p')}</span>
+                                    </div>
+                                    <div className="text-sm font-semibold text-slate-800">{item.subject}</div>
+                                    {item.description ? (
+                                      <p className="text-sm text-slate-600">{item.description}</p>
+                                    ) : null}
+                                  </ActivityItemShell>
+                                ))}
+                              </div>
+                            </Card>
+                          ))}
+                        </div>
+                      </ScrollContainer>
+                    )}
+                  </ActivityTimeline>
+                }
+                associations={
+                  <AssociationPanel title="Associations">
+                    <ObjectEmptyState />
+                  </AssociationPanel>
+                }
+              />
+            }
+          />
+        </div>
+      </AppLayout>
+    )
   }
 
-  return (
-    <section className="rounded-3xl border border-slate-800 bg-slate-900/80 p-5">
-      <p className="text-xs uppercase tracking-[0.4em] text-slate-500">Manual activities</p>
-      <h2 className="text-2xl font-semibold text-white">Log the touch</h2>
-      <div className="mt-6 grid gap-4 lg:grid-cols-2">
-        <form action={bindAction(logCall)} className="space-y-2 rounded-2xl border border-slate-800 bg-slate-950/50 p-4 text-sm">
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Call</p>
-          <div className="grid gap-2 md:grid-cols-2">
-            <select name="direction" className="rounded-2xl border border-slate-800 bg-slate-900/70 px-2 py-1">
-              <option value="INBOUND">Inbound</option>
-              <option value="OUTBOUND">Outbound</option>
-            </select>
-            <input type="number" name="duration" min={0} placeholder="Duration (min)" className="rounded-2xl border border-slate-800 bg-slate-900/70 px-2 py-1" />
-          </div>
-          <input name="result" placeholder="Outcome" className="rounded-2xl border border-slate-800 bg-slate-900/70 px-2 py-1" required />
-          <input type="datetime-local" name="happenedAt" className="rounded-2xl border border-slate-800 bg-slate-900/70 px-2 py-1" />
-          <textarea name="notes" placeholder="Notes" className="h-16 rounded-2xl border border-slate-800 bg-slate-900/70 px-2 py-1" />
-          <button className="w-full rounded-2xl bg-slate-800/80 px-3 py-2 text-xs uppercase tracking-wide text-slate-200">Log call</button>
-        </form>
+  type ActivityProjection = { id: string; occurredAt: Date; createdAt: Date; type: string; subject: string; description: string | null }
 
-        <form action={bindAction(logMeeting)} className="space-y-2 rounded-2xl border border-slate-800 bg-slate-950/50 p-4 text-sm">
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Meeting</p>
-          <select name="meetingType" className="rounded-2xl border border-slate-800 bg-slate-900/70 px-2 py-1">
-            <option value="DISCOVERY">Discovery</option>
-            <option value="REVIEW">Review</option>
-            <option value="SITE_VISIT">Site visit</option>
-            <option value="OTHER">Other</option>
-          </select>
-          <input type="datetime-local" name="scheduledFor" className="rounded-2xl border border-slate-800 bg-slate-900/70 px-2 py-1" />
-          <input type="number" name="duration" min={0} placeholder="Duration (min)" className="rounded-2xl border border-slate-800 bg-slate-900/70 px-2 py-1" />
-          <input name="attendees" placeholder="Attendees (comma separated)" className="rounded-2xl border border-slate-800 bg-slate-900/70 px-2 py-1" />
-          <input name="outcome" placeholder="Outcome" className="rounded-2xl border border-slate-800 bg-slate-900/70 px-2 py-1" />
-          <textarea name="notes" placeholder="Notes" className="h-16 rounded-2xl border border-slate-800 bg-slate-900/70 px-2 py-1" />
-          <button className="w-full rounded-2xl bg-slate-800/80 px-3 py-2 text-xs uppercase tracking-wide text-slate-200">Log meeting</button>
-        </form>
+  function groupActivitiesByDay(activities: ActivityProjection[]) {
+    const groups: Array<{ label: string; items: ActivityProjection[] }> = []
 
-        <form action={bindAction(logSocial)} className="space-y-2 rounded-2xl border border-slate-800 bg-slate-950/50 p-4 text-sm">
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Social touch</p>
-          <select name="platform" className="rounded-2xl border border-slate-800 bg-slate-900/70 px-2 py-1">
-            <option value="LINKEDIN">LinkedIn</option>
-            <option value="X">X</option>
-            <option value="INSTAGRAM">Instagram</option>
+    for (const activity of activities) {
+      const dayKey = format(activity.occurredAt ?? activity.createdAt, 'yyyy-MM-dd')
+      const label = format(activity.occurredAt ?? activity.createdAt, 'PPP')
+      const existing = groups.find((group) => group.label === label)
+      if (existing) {
+        existing.items.push(activity)
+      } else {
+        groups.push({ label, items: [activity] })
+      }
+    }
+
+    return groups
+  }
+
+  function DetailField({ label, value }: { label: string; value?: string | null }) {
+    return (
+      <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm">
+        <div className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">{label}</div>
+        <div className="mt-1 text-slate-800">{value && value.length > 0 ? value : 'Not set'}</div>
+      </div>
+    )
+  }
             <option value="FIELD">Field</option>
             <option value="OTHER">Other</option>
           </select>

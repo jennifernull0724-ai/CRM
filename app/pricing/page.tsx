@@ -74,9 +74,7 @@ const tiers: Tier[] = [
     notIncluded: ['Enterprise compliance automations'],
     primaryCtaLabel: 'Buy Growth',
     primaryCtaHref: '/upgrade?plan=growth',
-    secondaryCtaLabel: 'Talk to sales',
-    secondaryCtaHref: '/request-demo',
-    ctaVariant: 'secondary',
+    ctaVariant: 'primary',
   },
   {
     name: 'Pro',
@@ -92,14 +90,11 @@ const tiers: Tier[] = [
     notIncluded: [],
     primaryCtaLabel: 'Buy Pro',
     primaryCtaHref: '/upgrade?plan=pro',
-    secondaryCtaLabel: 'Request alignment call',
-    secondaryCtaHref: '/request-demo',
-    ctaVariant: 'secondary',
+    ctaVariant: 'primary',
   },
   {
     name: 'Enterprise',
-    badge: 'Custom',
-    price: 'Custom',
+    price: '$6,999/year',
     subtext: 'National operators and regulated rail programs',
     seats: 'Unlimited seats + dedicated pods',
     included: [
@@ -109,8 +104,8 @@ const tiers: Tier[] = [
       'Platform APIs and integrations',
     ],
     notIncluded: [],
-    primaryCtaLabel: 'Contact enterprise team',
-    primaryCtaHref: '/request-demo',
+    primaryCtaLabel: 'Buy Enterprise',
+    primaryCtaHref: '/upgrade?plan=enterprise',
     ctaVariant: 'primary',
   },
 ]
@@ -139,7 +134,7 @@ const comparisonRows: ComparisonRow[] = [
   },
   {
     tier: 'Enterprise',
-    price: 'Custom',
+    price: '$6,999/yr',
     seats: 'Unlimited',
     crm: 'Full',
     estimating: 'Custom workflows',
@@ -289,16 +284,37 @@ export default function PricingPage() {
         </section>
 
         <section className="px-6 pb-24">
-          <div className="mx-auto max-w-5xl rounded-3xl border border-orange-500/30 bg-gradient-to-r from-orange-500/10 to-transparent p-10 text-center">
-            <h4 className="text-3xl font-semibold text-white">Ready to see T-REX AI OS in action?</h4>
-            <p className="mt-3 text-base text-slate-200">Launch the Starter trial for instant CRM access or request a guided walkthrough for Growth, Pro, or Enterprise.</p>
-            <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center">
-              <Link href="/signup" className="rounded-full bg-orange-500 px-6 py-3 text-sm font-semibold text-white hover:bg-orange-600">
-                Start free trial
-              </Link>
-              <Link href="/request-demo" className="rounded-full border border-slate-600 px-6 py-3 text-sm font-semibold text-white hover:border-white">
-                Talk to sales
-              </Link>
+          <div className="mx-auto max-w-5xl rounded-3xl border border-white bg-slate-900 p-10">
+            <div className="text-center">
+              <h4 className="text-3xl font-semibold text-white">Ready to see T-REX AI OS in action?</h4>
+              <p className="mt-3 text-base text-slate-200">Launch the Starter trial for instant CRM access or request a guided walkthrough for Growth, Pro, or Enterprise.</p>
+              <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center">
+                <Link href="/signup" className="rounded-full bg-orange-500 px-6 py-3 text-sm font-semibold text-white hover:bg-orange-600">
+                  Start free trial
+                </Link>
+              </div>
+            </div>
+            <div className="mt-8 border-t border-slate-700 pt-8">
+              <div className="mx-auto max-w-md">
+                <label htmlFor="promo-code" className="block text-center text-sm font-medium text-slate-300 mb-3">
+                  Have a promo code?
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    id="promo-code"
+                    placeholder="Enter promo code"
+                    className="flex-1 rounded-full border border-slate-600 bg-slate-800 px-4 py-2 text-sm text-white placeholder-slate-500 focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500"
+                  />
+                  <button
+                    type="button"
+                    className="rounded-full border border-slate-600 px-6 py-2 text-sm font-semibold text-white hover:border-orange-500 hover:text-orange-400"
+                  >
+                    Apply
+                  </button>
+                </div>
+                <p className="mt-2 text-center text-xs text-slate-500">Promo codes will be applied at checkout</p>
+              </div>
             </div>
           </div>
         </section>

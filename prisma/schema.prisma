@@ -181,6 +181,7 @@ model Contact {
   lastActivityAt      DateTime             @default(now())
   activityState       ContactActivityState @default(NEW)
   archived            Boolean              @default(false)
+  archivedAt          DateTime?
   createdAt           DateTime             @default(now())
   updatedAt           DateTime             @updatedAt
   activities          Activity[]
@@ -210,37 +211,44 @@ model Contact {
 }
 
 model Deal {
-  id             String         @id @default(cuid())
-  name           String
-  description    String?
-  stage          String         @default("New")
-  pipeline       String         @default("Main")
-  value          Float?
-  probability    Int?
-  closeDate      DateTime?
-  lostReason     String?
-  contactId      String
-  companyId      String?
-  assignedToId   String?
-  createdById    String?
-  currentVersion Int            @default(1)
-  isApproved     Boolean        @default(false)
-  sentToEstimatingAt DateTime?
-  createdAt      DateTime       @default(now())
-  updatedAt      DateTime       @updatedAt
-  activities     Activity[]
-  assignedTo     User?          @relation("AssignedEstimator", fields: [assignedToId], references: [id])
-  company        Company?       @relation(fields: [companyId], references: [id])
-  contact        Contact        @relation(fields: [contactId], references: [id], onDelete: Cascade)
-  createdBy      User?          @relation("DealCreator", fields: [createdById], references: [id])
-  emails         DealEmail[]
-  lineItems      DealLineItem[]
-  pdfs           DealPdf[]
-  versions       DealVersion[]
-  estimate       Estimate?
-  notes          Note[]
-  tasks          Task[]
-  bidDocuments   DealBidDocument[]
+  id                   String         @id @default(cuid())
+  name                 String
+  description          String?
+  stage                String         @default("New")
+  pipeline             String         @default("Main")
+  value                Float?
+  subtotal             Float          @default(0)
+  taxes                Float?
+  total                Float          @default(0)
+  probability          Int?
+  closeDate            DateTime?
+  lostReason           String?
+  contactId            String
+  companyId            String?
+  assignedToId         String?
+  createdById          String?
+  currentVersion       Int            @default(1)
+  isApproved           Boolean        @default(false)
+  approvedAt           DateTime?
+  inEstimating         Boolean        @default(false)
+  estimatingStartedAt  DateTime?
+  lastActivityAt       DateTime       @default(now())
+  sentToEstimatingAt   DateTime?
+  createdAt            DateTime       @default(now())
+  updatedAt            DateTime       @updatedAt
+  activities           Activity[]
+  assignedTo           User?          @relation("AssignedEstimator", fields: [assignedToId], references: [id])
+  company              Company?       @relation(fields: [companyId], references: [id])
+  contact              Contact        @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  createdBy            User?          @relation("DealCreator", fields: [createdById], references: [id])
+  emails               DealEmail[]
+  lineItems            DealLineItem[]
+  pdfs                 DealPdf[]
+  versions             DealVersion[]
+  estimate             Estimate?
+  notes                Note[]
+  tasks                Task[]
+  bidDocuments         DealBidDocument[]
 }
 
 model DealVersion {
@@ -261,21 +269,27 @@ model DealVersion {
 }
 
 model DealLineItem {
-  id          String      @id @default(cuid())
-  dealId      String
-  versionId   String
-  category    String
-  description String
-  quantity    Float       @default(1)
-  unit        String?
-  unitPrice   Float
-  totalPrice  Float
-  notes       String?
-  sortOrder   Int         @default(0)
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
-  deal        Deal        @relation(fields: [dealId], references: [id], onDelete: Cascade)
-  version     DealVersion @relation(fields: [versionId], references: [id], onDelete: Cascade)
+  id              String      @id @default(cuid())
+  dealId          String
+  versionId       String
+  category        String
+  description     String
+  quantity        Float       @default(1)
+  unit            String?
+  unitPrice       Float
+  totalPrice      Float
+  unitCost        Float       @default(0)
+  lineTotal       Float       @default(0)
+  notes           String?
+  phase           String?
+  discipline      String?
+  customerVisible Boolean     @default(true)
+  internalOnly    Boolean     @default(false)
+  sortOrder       Int         @default(0)
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  deal            Deal        @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  version         DealVersion @relation(fields: [versionId], references: [id], onDelete: Cascade)
 }
 
 model DealPdf {
@@ -344,9 +358,10 @@ model Activity {
   contactId   String
   dealId      String?
   userId      String?
+  occurredAt  DateTime @default(now())
   createdAt   DateTime @default(now())
   company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  contact     Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  contact     Contact  @relation(fields: [contactId], references: [id])
   deal        Deal?    @relation(fields: [dealId], references: [id], onDelete: Cascade)
   user        User?    @relation(fields: [userId], references: [id])
 

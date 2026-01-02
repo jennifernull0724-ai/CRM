@@ -66,13 +66,6 @@ async function ensureContactScope(contactId: string, companyId: string): Promise
 	return contact
 }
 
-async function touchContactActivity(contactId: string, state: ContactActivityState = 'ACTIVE') {
-	await prisma.contact.update({
-		where: { id: contactId },
-		data: { lastActivityAt: new Date(), activityState: state },
-	})
-}
-
 async function logActivity(params: {
 	companyId: string
 	contactId: string
@@ -81,8 +74,9 @@ async function logActivity(params: {
 	subject: string
 	description?: string | null
 	metadata?: Prisma.InputJsonValue
+	occurredAt?: Date
 }) {
-	await prisma.activity.create({
+	return prisma.activity.create({
 		data: {
 			companyId: params.companyId,
 			contactId: params.contactId,
@@ -91,6 +85,7 @@ async function logActivity(params: {
 			description: params.description ?? null,
 			metadata: params.metadata ?? Prisma.JsonNull,
 			userId: params.userId,
+			occurredAt: params.occurredAt ?? new Date(),
 		},
 	})
 }
@@ -236,19 +231,6 @@ const updateTaskSchema = z.object({
 	notes: z.string().optional(),
 })
 
-async function ensureTaskScope(taskId: string, contactId: string, companyId: string) {
-	const task = await prisma.task.findFirst({
-		where: { id: taskId, contactId },
-		include: { contact: { select: { id: true, companyId: true, firstName: true, lastName: true } } },
-	})
-
-	if (!task || task.contact.companyId !== companyId) {
-		throw new Error('Task not found in this workspace')
-	}
-
-	return task
-}
-
 export async function createContactTaskAction(
 	contactId: string,
 	stateOrFormData: ActionState | FormData,
@@ -266,47 +248,33 @@ export async function createContactTaskAction(
 			notes: formData.get('notes')?.toString() ?? undefined,
 		})
 
-		const ownerId = data.ownerId ?? userId
-		if (data.ownerId) {
-			const owner = await prisma.user.findFirst({ where: { id: data.ownerId, companyId } })
-			if (!owner) {
-				throw new Error('Owner not found in this workspace')
-			}
-		}
+			const dueDate = data.dueDate ? new Date(data.dueDate) : null
+			const ownerId = data.ownerId ?? userId
 
-		const dueDate = data.dueDate ? new Date(data.dueDate) : null
-		const task = await prisma.task.create({
-			data: {
-				title: data.title,
-				dueDate,
-				priority: data.priority,
-				notes: data.notes ?? null,
-				contactId: contact.id,
-				assignedToId: ownerId,
-				description: data.notes ?? null,
-			},
-		})
+			const activity = await logActivity({
+					companyId,
+					contactId: contact.id,
+					userId,
+					type: 'TASK_CREATED',
+					subject: `Task created: ${data.title}`,
+					description: data.notes?.slice(0, 140) ?? null,
+					metadata: {
+							taskId: randomUUID(),
+							dueDate: dueDate?.toISOString() ?? null,
+							priority: data.priority,
+							ownerId,
+					},
+			})
+			await logAuditEvent({
+					companyId,
+					actorId: userId,
+					action: 'TASK_CREATED',
+					metadata: { contactId: contact.id, activityId: activity.id },
+			})
 
-		await touchContactActivity(contact.id)
-		await logActivity({
-			companyId,
-			contactId: contact.id,
-			userId,
-			type: 'TASK_CREATED',
-			subject: `Task created: ${data.title}`,
-			description: data.notes?.slice(0, 140) ?? null,
-			metadata: { taskId: task.id, dueDate: dueDate?.toISOString() ?? null },
-		})
-		await logAuditEvent({
-			companyId,
-			actorId: userId,
-			action: 'TASK_CREATED',
-			metadata: { contactId: contact.id, taskId: task.id },
-		})
+			revalidateContactSurfaces(contact.id)
 
-		revalidateContactSurfaces(contact.id)
-
-		return { success: true, contactId: contact.id, resetToken: randomUUID() }
+			return { success: true, contactId: contact.id, resetToken: randomUUID() }
 	} catch (error) {
 		const message = error instanceof Error ? error.message : 'Unable to create task'
 		return { success: false, message }
@@ -322,8 +290,7 @@ export async function updateContactTaskAction(
 	try {
 		const formData = resolveFormData(stateOrFormData, maybeFormData)
 		const { userId, companyId } = await requireWorkspaceContext()
-		await ensureContactScope(contactId, companyId)
-		const task = await ensureTaskScope(taskId, contactId, companyId)
+			await ensureContactScope(contactId, companyId)
 		const data = updateTaskSchema.parse({
 			title: formData.get('title')?.toString(),
 			dueDate: formData.get('dueDate')?.toString() ?? undefined,
@@ -332,45 +299,30 @@ export async function updateContactTaskAction(
 			notes: formData.get('notes')?.toString() ?? undefined,
 		})
 
-		if (data.ownerId) {
-			const owner = await prisma.user.findFirst({ where: { id: data.ownerId, companyId } })
-			if (!owner) {
-				throw new Error('Owner not found in this workspace')
-			}
-		}
+			const dueDate = data.dueDate ? new Date(data.dueDate) : null
+			const activity = await logActivity({
+					companyId,
+					contactId,
+					userId,
+					type: 'TASK_UPDATED',
+					subject: `Task updated: ${data.title}`,
+					metadata: {
+							taskId,
+							dueDate: dueDate?.toISOString() ?? null,
+							priority: data.priority,
+							ownerId: data.ownerId ?? null,
+					},
+			})
+			await logAuditEvent({
+					companyId,
+					actorId: userId,
+					action: 'TASK_UPDATED',
+					metadata: { contactId, activityId: activity.id },
+			})
 
-		const dueDate = data.dueDate ? new Date(data.dueDate) : null
-		await prisma.task.update({
-			where: { id: task.id },
-			data: {
-				title: data.title,
-				dueDate,
-				priority: data.priority,
-				assignedToId: data.ownerId ?? task.assignedToId,
-				notes: data.notes ?? null,
-				description: data.notes ?? null,
-			},
-		})
+			revalidateContactSurfaces(contactId)
 
-		await touchContactActivity(contactId)
-		await logActivity({
-			companyId,
-			contactId,
-			userId,
-			type: 'TASK_UPDATED',
-			subject: `Task updated: ${data.title}`,
-			metadata: { taskId, dueDate: dueDate?.toISOString() ?? null },
-		})
-		await logAuditEvent({
-			companyId,
-			actorId: userId,
-			action: 'TASK_UPDATED',
-			metadata: { contactId, taskId },
-		})
-
-		revalidateContactSurfaces(contactId)
-
-		return { success: true, contactId }
+			return { success: true, contactId }
 	} catch (error) {
 		const message = error instanceof Error ? error.message : 'Unable to update task'
 		return { success: false, message }
@@ -386,35 +338,26 @@ export async function completeContactTaskAction(
 	try {
 		resolveFormData(stateOrFormData, maybeFormData)
 		const { userId, companyId } = await requireWorkspaceContext()
-		const task = await ensureTaskScope(taskId, contactId, companyId)
+			await ensureContactScope(contactId, companyId)
 
-		await prisma.task.update({
-			where: { id: task.id },
-			data: {
-				completed: true,
-				completedAt: new Date(),
-			},
-		})
+			const activity = await logActivity({
+					companyId,
+					contactId,
+					userId,
+					type: 'TASK_COMPLETED',
+					subject: `Task completed`,
+					metadata: { taskId },
+			})
+			await logAuditEvent({
+					companyId,
+					actorId: userId,
+					action: 'TASK_COMPLETED',
+					metadata: { contactId, activityId: activity.id },
+			})
 
-		await touchContactActivity(contactId)
-		await logActivity({
-			companyId,
-			contactId,
-			userId,
-			type: 'TASK_COMPLETED',
-			subject: `Task completed: ${task.title}`,
-			metadata: { taskId },
-		})
-		await logAuditEvent({
-			companyId,
-			actorId: userId,
-			action: 'TASK_COMPLETED',
-			metadata: { contactId, taskId },
-		})
+			revalidateContactSurfaces(contactId)
 
-		revalidateContactSurfaces(contactId)
-
-		return { success: true, contactId }
+			return { success: true, contactId }
 	} catch (error) {
 		const message = error instanceof Error ? error.message : 'Unable to complete task'
 		return { success: false, message }
@@ -441,32 +384,22 @@ export async function createContactNoteAction(
 		})
 
 		const sanitized = sanitizeNoteBody(data.body)
-		const note = await prisma.note.create({
-			data: {
-				content: sanitized,
-				mentions: data.mentions.length ? JSON.stringify(data.mentions) : null,
-				contactId: contact.id,
-				createdById: userId,
-			},
-		})
-
-		await touchContactActivity(contact.id)
 		const plainText = sanitized.replace(/<[^>]*>/g, '')
 
-		await logActivity({
-			companyId,
-			contactId: contact.id,
-			userId,
-			type: 'NOTE_ADDED',
-			subject: 'Note added',
-			description: plainText.slice(0, 140),
-			metadata: { noteId: note.id },
-		})
+			const activity = await logActivity({
+					companyId,
+					contactId: contact.id,
+					userId,
+					type: 'NOTE_ADDED',
+					subject: 'Note added',
+					description: plainText.slice(0, 140),
+					metadata: { noteId: randomUUID(), mentions: data.mentions },
+			})
 		await logAuditEvent({
 			companyId,
 			actorId: userId,
 			action: 'NOTE_ADDED',
-			metadata: { contactId: contact.id, noteId: note.id },
+					metadata: { contactId: contact.id, activityId: activity.id },
 		})
 
 		if (data.mentions.length) {
@@ -483,7 +416,7 @@ export async function createContactNoteAction(
 						actorId: userId,
 						targetUserId: mentioned.id,
 						action: 'MENTION_CREATED',
-						metadata: { contactId: contact.id, noteId: note.id },
+						metadata: { contactId: contact.id, activityId: activity.id },
 					})
 
 					if (mentioned.email) {
@@ -535,34 +468,25 @@ export async function logContactCallAction(
 		const durationMinutes = data.duration ? parseInt(data.duration, 10) : null
 		const happenedAt = data.happenedAt ? new Date(data.happenedAt) : new Date()
 
-		const call = await prisma.contactCall.create({
-			data: {
-				companyId,
-				contactId: contact.id,
-				createdById: userId,
-				direction: data.direction,
-				result: data.result,
-				durationMinutes,
-				notes: data.notes ?? null,
-				happenedAt,
-			},
-		})
-
-		await touchContactActivity(contact.id)
-		await logActivity({
+			const activity = await logActivity({
 			companyId,
 			contactId: contact.id,
 			userId,
 			type: 'CALL_LOGGED',
 			subject: `Call (${data.direction.toLowerCase()})`,
 			description: data.result,
-			metadata: { callId: call.id, durationMinutes },
+					metadata: {
+							callId: randomUUID(),
+							durationMinutes,
+							notes: data.notes ?? null,
+					},
+					occurredAt: happenedAt,
 		})
 		await logAuditEvent({
 			companyId,
 			actorId: userId,
 			action: 'CALL_LOGGED',
-			metadata: { contactId: contact.id, callId: call.id },
+					metadata: { contactId: contact.id, activityId: activity.id },
 		})
 
 		revalidateContactSurfaces(contact.id)
@@ -610,35 +534,27 @@ export async function logContactMeetingAction(
 					.filter(Boolean)
 			: []
 
-		const meeting = await prisma.contactMeeting.create({
-			data: {
-				companyId,
-				contactId: contact.id,
-				createdById: userId,
-				meetingType: data.meetingType,
-				scheduledFor,
-				durationMinutes,
-				attendees: attendeeList.length ? attendeeList : Prisma.JsonNull,
-				outcome: data.outcome ?? null,
-				notes: data.notes ?? null,
-			},
-		})
-
-		await touchContactActivity(contact.id)
-		await logActivity({
+			const activity = await logActivity({
 			companyId,
 			contactId: contact.id,
 			userId,
 			type: 'MEETING_LOGGED',
 			subject: `${data.meetingType.toLowerCase()} meeting logged`,
 			description: data.outcome ?? null,
-			metadata: { meetingId: meeting.id },
+					metadata: {
+							meetingId: randomUUID(),
+							scheduledFor: scheduledFor.toISOString(),
+							durationMinutes,
+							attendees: attendeeList,
+							notes: data.notes ?? null,
+					},
+					occurredAt: scheduledFor,
 		})
 		await logAuditEvent({
 			companyId,
 			actorId: userId,
 			action: 'MEETING_LOGGED',
-			metadata: { contactId: contact.id, meetingId: meeting.id },
+					metadata: { contactId: contact.id, activityId: activity.id },
 		})
 
 		revalidateContactSurfaces(contact.id)
@@ -675,33 +591,25 @@ export async function logContactSocialAction(
 
 		const occurredAt = data.occurredAt ? new Date(data.occurredAt) : new Date()
 
-		const social = await prisma.contactSocialTouch.create({
-			data: {
-				companyId,
-				contactId: contact.id,
-				createdById: userId,
-				platform: data.platform,
-				action: data.action,
-				notes: data.notes ?? null,
-				occurredAt,
-			},
-		})
-
-		await touchContactActivity(contact.id)
-		await logActivity({
+			const activity = await logActivity({
 			companyId,
 			contactId: contact.id,
 			userId,
 			type: 'SOCIAL_LOGGED',
 			subject: `${data.platform.toLowerCase()} touch`,
 			description: data.action,
-			metadata: { socialId: social.id },
+					metadata: {
+							socialId: randomUUID(),
+							occurredAt: occurredAt.toISOString(),
+							notes: data.notes ?? null,
+					},
+					occurredAt,
 		})
 		await logAuditEvent({
 			companyId,
 			actorId: userId,
 			action: 'SOCIAL_LOGGED',
-			metadata: { contactId: contact.id, socialId: social.id },
+					metadata: { contactId: contact.id, activityId: activity.id },
 		})
 
 		revalidateContactSurfaces(contact.id)
@@ -736,14 +644,15 @@ export async function logContactCustomActivityAction(
 
 		const occurredAt = data.occurredAt ? new Date(data.occurredAt) : new Date()
 
-		await logActivity({
+			await logActivity({
 			companyId,
 			contactId: contact.id,
 			userId,
 			type: 'CUSTOM_ACTIVITY_LOGGED',
 			subject: data.description,
 			description: data.notes ?? null,
-			metadata: { occurredAt: occurredAt.toISOString() },
+					metadata: { occurredAt: occurredAt.toISOString() },
+					occurredAt,
 		})
 		await logAuditEvent({
 			companyId,
@@ -751,8 +660,6 @@ export async function logContactCustomActivityAction(
 			action: 'CUSTOM_ACTIVITY_LOGGED',
 			metadata: { contactId: contact.id, description: data.description },
 		})
-
-		await touchContactActivity(contact.id)
 		revalidateContactSurfaces(contact.id)
 
 		return { success: true, contactId: contact.id }
@@ -871,7 +778,6 @@ export async function sendContactEmailAction(
 			attachments,
 		})
 
-		await touchContactActivity(contact.id)
 		await logAuditEvent({
 			companyId,
 			actorId: userId,

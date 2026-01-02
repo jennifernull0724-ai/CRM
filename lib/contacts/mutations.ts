@@ -1,4 +1,4 @@
-import { Prisma, type Contact, type ContactActivityState } from '@prisma/client'
+import { Prisma, type Contact } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { deriveCompanyNameFromEmail } from '@/lib/contacts/deriveCompany'
 
@@ -79,8 +79,6 @@ export async function createContactRecord(draft: CreateContactDraft, context: Co
       companyOverrideName,
       ownerId,
       createdById: context.actorId,
-      lastActivityAt: new Date(),
-      activityState: 'NEW' as ContactActivityState,
     },
     include: {
       owner: { select: { id: true, name: true, email: true } },
@@ -159,8 +157,6 @@ export async function updateContactRecord(
     where: { id: contact.id },
     data: {
       ...updates,
-      lastActivityAt: new Date(),
-      activityState: 'ACTIVE' as ContactActivityState,
     },
   })
 
